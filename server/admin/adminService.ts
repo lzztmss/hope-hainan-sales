@@ -48,6 +48,7 @@ export interface AdminUserRecord {
   storeId: string | null;
   storeName: string | null;
   active: boolean;
+  isPrimaryStoreManager: boolean;
   mustChangePassword: boolean;
   lastLoginAt: Date | null;
   createdAt: Date;
@@ -74,6 +75,7 @@ export interface AdminUserFilters {
   storeId?: string;
   role?: UserRole;
   active?: boolean;
+  isPrimaryStoreManager?: boolean;
   query?: string;
 }
 
@@ -116,6 +118,7 @@ export interface AdminUserPatch {
   personnelType?: PersonnelType;
   storeId?: string | null;
   active?: boolean;
+  isPrimaryStoreManager?: boolean;
   mustChangePassword?: boolean;
   updatedAt: Date;
 }
@@ -646,6 +649,13 @@ export const createAdminService = (options: AdminServiceOptions) => {
             personnelType: input.personnelType,
             storeId: input.storeId === undefined ? undefined : store?.id ?? null,
             active: input.active,
+            isPrimaryStoreManager:
+              existing.isPrimaryStoreManager &&
+              (next.role !== "store_manager" ||
+                !next.active ||
+                next.storeId !== existing.storeId)
+                ? false
+                : undefined,
             ...(phone ?? {}),
             updatedAt: at,
           });

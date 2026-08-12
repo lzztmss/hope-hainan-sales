@@ -54,6 +54,7 @@ const userSelection = {
   storeId: users.storeId,
   storeName: stores.name,
   active: users.active,
+  isPrimaryStoreManager: users.isPrimaryStoreManager,
   mustChangePassword: users.mustChangePassword,
   lastLoginAt: users.lastLoginAt,
   createdAt: users.createdAt,
