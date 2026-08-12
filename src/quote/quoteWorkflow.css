@@ -154,6 +154,15 @@
   color: var(--app-color-text-muted);
 }
 
+.quote-workflow__selection-notice {
+  margin: 0;
+  padding: var(--hfttr-space-3) var(--hfttr-space-4);
+  border-radius: var(--app-radius-control);
+  background: var(--app-color-accent-subtle);
+  color: var(--app-color-on-accent);
+  font-weight: var(--app-font-weight-bold);
+}
+
 .quote-workflow__choice-group {
   display: flex;
   min-width: 0;

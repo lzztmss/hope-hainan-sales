@@ -294,6 +294,7 @@ export const QuoteWorkflowPage = ({
   const [customFttr, setCustomFttr] = useState(originalFttrPlan != null && !originalFttrIsStandard ? String(originalFttrPlan) : "");
   const [customFttrNote, setCustomFttrNote] = useState(originalPricing?.customFttrNote ?? "");
   const [scenario, setScenario] = useState<Scenario>("custom");
+  const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
   const [selection, setSelection] = useState<QuoteSelection>(originalPricing?.selection ?? initialSelection());
   const [savedQuote, setSavedQuote] = useState<ConfirmedQuoteSummary | null>(null);
   const [createdOrder, setCreatedOrder] = useState<OrderMutationDto | null>(null);
@@ -337,6 +338,7 @@ export const QuoteWorkflowPage = ({
 
   const chooseScenario = (nextScenario: Scenario) => {
     setScenario(nextScenario);
+    setSelectionNotice(nextScenario === "room" ? "已按当前户型和长者人数重新生成推荐配置。" : null);
     setSelection((current) =>
       scenarioSelection(nextScenario, roomType, elderCount, current),
     );
@@ -346,6 +348,7 @@ export const QuoteWorkflowPage = ({
     setRoomType(nextRoom);
     if (scenario === "room") {
       setSelection(buildRoomPreset(nextRoom, elderCount));
+      setSelectionNotice(`已切换为${ROOM_LABELS[nextRoom]}推荐配置。`);
     }
   };
 
@@ -353,6 +356,7 @@ export const QuoteWorkflowPage = ({
     setElderCount(nextCount);
     if (scenario === "room") {
       setSelection(buildRoomPreset(roomType, nextCount));
+      setSelectionNotice(`已按 ${nextCount} 位长者重新生成推荐配置。`);
     }
   };
 
@@ -361,6 +365,9 @@ export const QuoteWorkflowPage = ({
     const quantity = Number.isInteger(parsed)
       ? Math.min(20, Math.max(0, parsed))
       : 0;
+    if (scenario !== "custom") {
+      setSelectionNotice("你已手动修改数量，报价场景已切换为“自选产品”。");
+    }
     setScenario("custom");
     setSelection((current) => ({ ...current, [key]: quantity }));
   };
@@ -627,6 +634,9 @@ export const QuoteWorkflowPage = ({
           <p>按当前所选计价商品的生效单价与数量逐项相加，不自动改为其他优惠组合。</p>
           <p>人体传感器、门磁或报警按钮必须连接网关；未选网关时，系统会自动补充 1 个并在预览明细中标出。</p>
         </aside>
+        {selectionNotice ? (
+          <p className="quote-workflow__selection-notice" role="status">{selectionNotice}</p>
+        ) : null}
 
         <section className="quote-workflow__catalog" aria-labelledby="catalog-title">
           <h3 id="catalog-title">大客户特优价与数量</h3>

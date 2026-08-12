@@ -23,7 +23,7 @@ export const QuoteListPage = ({ client }: { client: ApiClient }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (nextQuery = query, nextStatus = status) => {
+  const load = useCallback(async (nextQuery: string, nextStatus: QuoteStatus | "") => {
     setLoading(true);
     setError(null);
     try {
@@ -37,13 +37,13 @@ export const QuoteListPage = ({ client }: { client: ApiClient }) => {
     } finally {
       setLoading(false);
     }
-  }, [client, query, status]);
+  }, [client]);
 
   useEffect(() => { void load("", ""); }, [load]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    void load();
+    void load(query, status);
   };
 
   return (
@@ -103,4 +103,3 @@ export const QuoteListPage = ({ client }: { client: ApiClient }) => {
     </PageLayout>
   );
 };
-
