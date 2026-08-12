@@ -9,7 +9,10 @@ import type { AuthenticatedUser } from "../auth/authorization.js";
 import { createDatabaseClient } from "../db/client.js";
 import { migrateDatabase } from "../db/migrate.js";
 import { stores, users } from "../db/schema.js";
+import { DrizzleOrderRepository } from "../orders/orderRepository.js";
+import { createOrderService } from "../orders/orderService.js";
 import { createPiiProtector } from "../security/pii.js";
+import { ACTIVE_CATALOG } from "../../shared/pricing/catalog.js";
 import { DrizzleQuoteRepository } from "./quoteRepository.js";
 import { createQuoteService } from "./quoteService.js";
 
@@ -94,6 +97,31 @@ describe("SQLite 报价持久化主链路", () => {
     );
     const list = await service.listQuotes(seller, { query: "王女士", limit: 50 });
     expect(list.items.map((quote) => quote.id)).toContain(created.id);
+
+    const orderService = createOrderService({
+      repository: new DrizzleOrderRepository(client),
+      activeCatalogVersion: ACTIVE_CATALOG.version,
+      commissionAccrual: { accrueForActivatedOrder: async () => undefined },
+      now: () => new Date("2026-08-12T10:00:00.000Z"),
+      randomSuffix: () => "ORD123",
+    });
+    const order = await orderService.createOrderFromQuote(
+      seller,
+      created.id,
+      undefined,
+      "sqlite-order-key-123456",
+    );
+    const duplicate = await orderService.createOrderFromQuote(
+      seller,
+      created.id,
+      undefined,
+      "sqlite-order-key-another",
+    );
+    expect(duplicate.id).toBe(order.id);
+    expect((await service.getQuote(seller, created.id)).status).toBe("converted");
+    await expect(service.updateQuote(seller, created.id, draft(3), 2)).rejects.toThrow(
+      "当前报价已锁定",
+    );
     await client.close();
   });
 });
