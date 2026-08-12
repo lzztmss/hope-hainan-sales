@@ -161,9 +161,11 @@ export const OrderListPage = ({
   }, [appliedFilters.recycleBin, items.length]);
 
   const availableStores = useMemo(() => {
-    const options = new Map(storeOptions.map((option) => [option.label, option]));
+    const options = new Map(storeOptions.map((option) => [option.id, option]));
     for (const order of items) {
-      options.set(order.storeName, { id: order.storeId, label: order.storeName });
+      if (!options.has(order.storeId)) {
+        options.set(order.storeId, { id: order.storeId, label: order.storeName });
+      }
     }
     return Array.from(options.values()).sort((left, right) =>
       left.label.localeCompare(right.label, "zh-CN"),
@@ -171,13 +173,15 @@ export const OrderListPage = ({
   }, [items, storeOptions]);
 
   const availableSellers = useMemo(() => {
-    const options = new Map(sellerOptions.map((option) => [option.label, option]));
+    const options = new Map(sellerOptions.map((option) => [option.id, option]));
     for (const order of items) {
-      options.set(order.sellerName, {
-        id: order.sellerId,
-        label: order.sellerName,
-        storeId: order.storeId,
-      });
+      if (!options.has(order.sellerId)) {
+        options.set(order.sellerId, {
+          id: order.sellerId,
+          label: order.sellerName,
+          storeId: order.storeId,
+        });
+      }
     }
     const selectedStore = availableStores.find(
       (option) => option.label === draftFilters.storeQuery,

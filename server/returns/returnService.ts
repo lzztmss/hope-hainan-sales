@@ -139,6 +139,9 @@ export interface ReturnRepository {
 }
 
 export interface CommissionReversalPort {
+  validateReversalForCompletedReturn(
+    completedReturn: ReturnRequestRecord,
+  ): Promise<void>;
   reverseForCompletedReturn(completedReturn: ReturnRequestRecord): Promise<unknown>;
 }
 
@@ -382,6 +385,32 @@ export const createReturnService = (options: ReturnServiceOptions) => {
         return existing;
       }
 
+      const requestForValidation = await options.repository.findRequestById(returnId);
+      if (!requestForValidation) throw new Error("退单不存在");
+      await requireScopedOrder(
+        options.repository,
+        actor,
+        requestForValidation.orderId,
+      );
+      if (requestForValidation.status !== "approved") {
+        throw new Error("只能完成已审批的退单");
+      }
+      if (
+        !Number.isSafeInteger(refundFen) ||
+        refundFen < 0 ||
+        refundFen > requestForValidation.maxRefundFen
+      ) {
+        throw new Error("退款金额不能超过可退金额");
+      }
+      const completedAt = now();
+      await options.commissionReversal.validateReversalForCompletedReturn({
+        ...requestForValidation,
+        status: "completed",
+        completedBy: actor.id,
+        completedAt,
+        refundFen,
+      });
+
       const completed = await options.repository.runTransaction(async (repository) => {
         const existingInside =
           await repository.findByCompletionIdempotencyKey(idempotencyKey);
@@ -400,7 +429,7 @@ export const createReturnService = (options: ReturnServiceOptions) => {
         const completed = await repository.completeRequest(returnId, {
           completionIdempotencyKey: idempotencyKey,
           completedBy: actor.id,
-          completedAt: now(),
+          completedAt,
           refundFen,
         });
         const order = await repository.findOrderForReturn(request.orderId);

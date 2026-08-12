@@ -332,6 +332,19 @@ export const createCommissionLedgerService = (
       });
     },
 
+    async validateReversalForCompletedReturn(
+      completedReturn: ReturnRequestRecord,
+    ): Promise<void> {
+      if (completedReturn.status !== "completed" || !completedReturn.completedAt) {
+        throw new Error("只有已完成退单可以冲销提成");
+      }
+      const accrual = await options.repository.findAccrualByOrder(
+        completedReturn.orderId,
+      );
+      if (!accrual) throw new Error("订单尚未产生提成快照");
+      reversalsForReturn(accrual, completedReturn, `return:${completedReturn.id}`);
+    },
+
     async reverseForCompletedReturn(
       completedReturn: ReturnRequestRecord,
     ): Promise<CommissionReversalResult> {

@@ -202,6 +202,19 @@ export class DrizzleReturnRepository implements ReturnRepository {
         })),
       )
       .returning();
+    await this.executor
+      .update(orders)
+      .set({
+        status: "return_pending",
+        updatedAt: input.requestedAt,
+        version: sql`${orders.version} + 1`,
+      })
+      .where(
+        and(
+          eq(orders.id, input.orderId),
+          inArray(orders.status, ["activated", "completed", "partially_returned"]),
+        ),
+      );
     return mapRequest(created, itemRows);
   }
 
@@ -253,6 +266,37 @@ export class DrizzleReturnRepository implements ReturnRepository {
       )
       .returning();
     if (!updated) throw new Error("退单已被其他操作更新");
+    if (decision.status === "rejected") {
+      const [order] = await this.executor
+        .select({ completedAt: orders.completedAt })
+        .from(orders)
+        .where(eq(orders.id, updated.orderId))
+        .limit(1);
+      const completedReturns = await this.executor
+        .select({ id: returnTable.id })
+        .from(returnTable)
+        .where(
+          and(
+            eq(returnTable.orderId, updated.orderId),
+            eq(returnTable.status, "completed"),
+          ),
+        );
+      await this.executor
+        .update(orders)
+        .set({
+          status:
+            completedReturns.length > 0
+              ? "partially_returned"
+              : order?.completedAt
+                ? "completed"
+                : "activated",
+          updatedAt: decision.decidedAt,
+          version: sql`${orders.version} + 1`,
+        })
+        .where(
+          and(eq(orders.id, updated.orderId), eq(orders.status, "return_pending")),
+        );
+    }
     return this.loadRequest(updated);
   }
 
