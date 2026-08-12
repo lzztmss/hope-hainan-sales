@@ -208,6 +208,7 @@ export interface OrderServiceOptions {
   repository: OrderRepository;
   activeCatalogVersion: string;
   commissionAccrual: {
+    validateActivation(orderId: string, activatedAt: Date): Promise<void>;
     accrueForActivatedOrder(orderId: string, eventKey: string): Promise<unknown>;
   };
   now?: () => Date;
@@ -574,6 +575,29 @@ export const createOrderService = (options: OrderServiceOptions) => {
         );
       }
       const changedAt = now();
+      if (nextStatus === "activated") {
+        try {
+          await options.commissionAccrual.validateActivation(order.id, changedAt);
+        } catch (error) {
+          throw new OrderServiceError(
+            error instanceof Error ? error.message : "提成规则校验失败",
+            409,
+          );
+        }
+      }
+      if (nextStatus === "completed") {
+        try {
+          await options.commissionAccrual.accrueForActivatedOrder(
+            order.id,
+            `activation:${order.id}`,
+          );
+        } catch (error) {
+          throw new OrderServiceError(
+            error instanceof Error ? error.message : "订单提成生成失败",
+            409,
+          );
+        }
+      }
       const updated = await options.repository.transition(
         order.id,
         expectedVersion,

@@ -495,11 +495,14 @@ export const createCommissionRuleService = (
             version.status === "published" &&
             isEffectiveAt(version, new Date(cutoverTime)),
         );
-        if (covering.length !== 1) {
+        if (covering.length > 1) {
           throw new Error("提成规则版本生效时间重叠");
         }
-        predecessor = covering[0]!;
-        if (cutoverTime <= Date.parse(predecessor.effectiveFrom)) {
+        predecessor = covering[0] ?? null;
+        if (
+          predecessor &&
+          cutoverTime <= Date.parse(predecessor.effectiveFrom)
+        ) {
           throw new Error("提成规则版本生效时间重叠");
         }
         publishedEffectiveFrom = cutover;

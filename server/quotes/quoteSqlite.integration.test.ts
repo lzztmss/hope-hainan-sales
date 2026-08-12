@@ -101,7 +101,10 @@ describe("SQLite 报价持久化主链路", () => {
     const orderService = createOrderService({
       repository: new DrizzleOrderRepository(client),
       activeCatalogVersion: ACTIVE_CATALOG.version,
-      commissionAccrual: { accrueForActivatedOrder: async () => undefined },
+      commissionAccrual: {
+        validateActivation: async () => undefined,
+        accrueForActivatedOrder: async () => undefined,
+      },
       now: () => new Date("2026-08-12T10:00:00.000Z"),
       randomSuffix: () => "ORD123",
     });

@@ -107,6 +107,19 @@ export interface CommissionLedgerServiceOptions {
   now?: () => Date;
 }
 
+const validateActivationInputs = async (
+  repository: CommissionLedgerRepository,
+  orderId: string,
+  activatedAt: Date,
+): Promise<void> => {
+  const order = await repository.findOrderForAccrual(orderId);
+  if (!order) throw new Error("订单不存在");
+  validateAttributions(order.attributions);
+  const policy = await repository.findEffectivePolicy(activatedAt);
+  if (!policy) throw new Error("未找到生效的提成规则版本");
+  calculateCommission(order.lines, policy.rules, order.sellerContext);
+};
+
 const validateEventKey = (eventKey: string): void => {
   if (!/^[A-Za-z0-9:_-]{12,128}$/.test(eventKey)) {
     throw new Error("提成事件键格式不正确");
@@ -263,6 +276,10 @@ export const createCommissionLedgerService = (
   const now = options.now ?? (() => new Date());
 
   return {
+    async validateActivation(orderId: string, activatedAt: Date): Promise<void> {
+      await validateActivationInputs(options.repository, orderId, activatedAt);
+    },
+
     async accrueForActivatedOrder(
       orderId: string,
       eventKey: string,
