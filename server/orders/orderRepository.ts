@@ -479,7 +479,7 @@ export class DrizzleOrderRepository implements OrderRepository {
     }
     if (filters.roomType) {
       conditions.push(
-        sql`${orders.customerSnapshot}->>'roomType' = ${filters.roomType}`,
+        sql`json_extract(${orders.customerSnapshot}, '$.roomType') = ${filters.roomType}`,
       );
     }
     if (filters.customerPhoneTail) {
