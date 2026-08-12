@@ -120,6 +120,41 @@ services:
     cap_drop:
       - ALL
 
+  backup:
+    image: *api-image
+    build: *api-build
+    command: ["node", "dist-server/server/db/backup.js", "backup"]
+    profiles: ["maintenance"]
+    environment:
+      SQLITE_PATH: *sqlite-path
+      BACKUP_DIR: /backups
+    volumes:
+      - sqlite_data:/app/data
+      - ${BACKUP_DIR:-./backups}:/backups
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  restore:
+    image: *api-image
+    build: *api-build
+    command: ["node", "dist-server/server/db/backup.js", "restore"]
+    profiles: ["maintenance"]
+    environment:
+      SQLITE_PATH: *sqlite-path
+      BACKUP_FILE: ${BACKUP_FILE:-/backups/restore.sqlite}
+      CONFIRM_SQLITE_RESTORE: ${CONFIRM_SQLITE_RESTORE:-NO}
+    volumes:
+      - sqlite_data:/app/data
+      - ${BACKUP_DIR:-./backups}:/backups
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
 volumes:
   sqlite_data:
     name: ${SQLITE_VOLUME_NAME:-hainan_fttr_heartlink_sqlite_data}
