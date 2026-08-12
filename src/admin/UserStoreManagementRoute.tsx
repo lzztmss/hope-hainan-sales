@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   UserStoreManagementPage,
@@ -16,8 +16,12 @@ const messageFor = (error: unknown): string =>
   error instanceof Error ? error.message : "营业厅与账号数据加载失败";
 
 export const UserStoreManagementRoute = ({
-  api = createUserStoreManagementApi(),
+  api: providedApi,
 }: UserStoreManagementRouteProps) => {
+  const api = useMemo(
+    () => providedApi ?? createUserStoreManagementApi(),
+    [providedApi],
+  );
   const [stores, setStores] = useState<readonly ManagedStoreView[]>([]);
   const [users, setUsers] = useState<readonly ManagedUserView[]>([]);
   const [loading, setLoading] = useState(true);
