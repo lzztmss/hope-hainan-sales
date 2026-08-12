@@ -48,6 +48,7 @@ const dateSchema = z
   .refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00+08:00`)));
 
 const listQuerySchema = z.object({
+  query: z.string().trim().min(1).max(120).optional(),
   orderNo: z.string().trim().min(1).max(64).optional(),
   customerPhoneTail: z.string().regex(/^\d{4}$/).optional(),
   storeQuery: z.string().trim().min(1).max(160).optional(),
@@ -146,6 +147,7 @@ const parseListFilters = (
   return {
     success: true,
     filters: {
+      query: parsed.data.query,
       orderNo: parsed.data.orderNo,
       customerPhoneTail: parsed.data.customerPhoneTail,
       storeQuery: parsed.data.storeQuery,

@@ -242,11 +242,7 @@ const listQueryFor = (filters: OrderListFilters) => {
   const search = filters.search.trim();
   return {
     recycleBin: filters.recycleBin,
-    ...(search
-      ? /^\d{4}$/.test(search)
-        ? { customerPhoneTail: search }
-        : { orderNo: search }
-      : {}),
+    ...(search ? { query: search } : {}),
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.paymentMode ? { paymentMode: filters.paymentMode } : {}),
     ...(filters.storeQuery ? { storeQuery: filters.storeQuery.trim() } : {}),

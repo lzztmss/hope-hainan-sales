@@ -225,6 +225,7 @@ export interface OrderDto {
 
 export interface OrderListApiQuery {
   recycleBin?: boolean;
+  query?: string;
   orderNo?: string;
   customerPhoneTail?: string;
   storeQuery?: string;
@@ -624,6 +625,7 @@ export const createApiClient = ({
     },
     async listQuotes(query = {}) {
       const parameters = new URLSearchParams();
+      if (query.query) parameters.set("query", query.query);
       if (query.query) parameters.set("query", query.query);
       if (query.status) parameters.set("status", query.status);
       if (query.dateFrom) parameters.set("dateFrom", query.dateFrom);

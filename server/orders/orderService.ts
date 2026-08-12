@@ -121,6 +121,7 @@ export interface OrderRecord extends OrderWriteRecord {
 }
 
 export interface OrderListFilters {
+  query?: string;
   orderNo?: string;
   customerPhoneTail?: string;
   storeQuery?: string;
@@ -668,8 +669,16 @@ export const createOrderService = (options: OrderServiceOptions) => {
         ...filters,
         deletedOnly: false,
       });
+      const query = filters.query?.trim().toLocaleLowerCase("zh-CN");
+      const presented = result.items.map((order) => presentOrder(order, options.decryptPii));
       return {
-        items: result.items.map((order) => presentOrder(order, options.decryptPii)),
+        items: query
+          ? presented.filter((order) =>
+              order.orderNo.toLocaleLowerCase("zh-CN").includes(query) ||
+              order.customer.name?.toLocaleLowerCase("zh-CN").includes(query) ||
+              order.customer.phoneMasked?.replace(/\D/g, "").endsWith(query.replace(/\D/g, "")),
+            )
+          : presented,
         nextCursor: result.nextCursor,
       };
     },
@@ -686,8 +695,16 @@ export const createOrderService = (options: OrderServiceOptions) => {
         ...filters,
         deletedOnly: true,
       });
+      const query = filters.query?.trim().toLocaleLowerCase("zh-CN");
+      const presented = result.items.map((order) => presentOrder(order, options.decryptPii));
       return {
-        items: result.items.map((order) => presentOrder(order, options.decryptPii)),
+        items: query
+          ? presented.filter((order) =>
+              order.orderNo.toLocaleLowerCase("zh-CN").includes(query) ||
+              order.customer.name?.toLocaleLowerCase("zh-CN").includes(query) ||
+              order.customer.phoneMasked?.replace(/\D/g, "").endsWith(query.replace(/\D/g, "")),
+            )
+          : presented,
         nextCursor: result.nextCursor,
       };
     },

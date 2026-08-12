@@ -529,7 +529,10 @@ export class DrizzleOrderRepository implements OrderRepository {
       .from(orders)
       .where(and(...conditions))
       .orderBy(desc(orders.createdAt), desc(orders.id))
-      .limit(filters.limit + 1);
+      .limit(filters.query ? 500 : filters.limit + 1);
+    if (filters.query) {
+      return { items: await Promise.all(rows.map((row) => this.hydrate(row))), nextCursor: null };
+    }
     const hasNext = rows.length > filters.limit;
     const pageRows = hasNext ? rows.slice(0, filters.limit) : rows;
     return {
