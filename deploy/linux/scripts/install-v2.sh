@@ -64,12 +64,11 @@ generate_environment() {
   require_command openssl
   mkdir -p "$(dirname "${ENV_FILE}")"
   umask 077
-  local version pii_one pii_two admin_password backup_password
+  local version pii_one pii_two admin_password
   version="$(tr -d '[:space:]' < "${DEPLOY_ROOT}/VERSION")"
   pii_one="$(openssl rand -base64 32 | tr -d '\n')"
   pii_two="$(openssl rand -base64 32 | tr -d '\n')"
   admin_password="A$(openssl rand -hex 16)a9"
-  backup_password="$(openssl rand -hex 32)"
   cat > "${ENV_FILE}" <<EOF
 APP_VERSION=${version}
 APP_ORIGIN=${APP_ORIGIN_INPUT}
@@ -80,7 +79,6 @@ PII_ENCRYPTION_KEY_BASE64=${pii_one}
 PII_LOOKUP_HMAC_KEY_BASE64=${pii_two}
 BOOTSTRAP_ADMIN_USERNAME=ADMIN001
 BOOTSTRAP_ADMIN_PASSWORD=${admin_password}
-BACKUP_ENCRYPTION_PASSPHRASE=${backup_password}
 BACKUP_RETENTION_DAYS=30
 BACKUP_DIR=./backups
 EOF

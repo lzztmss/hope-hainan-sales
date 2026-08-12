@@ -69,7 +69,7 @@ validate_environment() {
   require_command openssl
 
   local app_version app_origin bind_address http_port sqlite_volume
-  local pii_encryption pii_lookup admin_username admin_password backup_passphrase retention
+  local pii_encryption pii_lookup admin_username admin_password retention
   app_version="$(env_value "${env_file}" APP_VERSION)"
   app_origin="$(env_value "${env_file}" APP_ORIGIN)"
   bind_address="$(env_value "${env_file}" BIND_ADDRESS)"
@@ -79,7 +79,6 @@ validate_environment() {
   pii_lookup="$(env_value "${env_file}" PII_LOOKUP_HMAC_KEY_BASE64)"
   admin_username="$(env_value "${env_file}" BOOTSTRAP_ADMIN_USERNAME)"
   admin_password="$(env_value "${env_file}" BOOTSTRAP_ADMIN_PASSWORD)"
-  backup_passphrase="$(env_value "${env_file}" BACKUP_ENCRYPTION_PASSPHRASE)"
   retention="$(env_value "${env_file}" BACKUP_RETENTION_DAYS)"
 
   [[ "${app_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9]{8}$ ]] || die "APP_VERSION 必须采用 X.Y.Z-YYYYMMDD 格式"
@@ -101,8 +100,6 @@ validate_environment() {
   [[ "${admin_password}" =~ [A-Z] && "${admin_password}" =~ [a-z] && "${admin_password}" =~ [0-9] ]] ||
     die "BOOTSTRAP_ADMIN_PASSWORD 必须同时包含大写字母、小写字母和数字"
 
-  reject_placeholder BACKUP_ENCRYPTION_PASSPHRASE "${backup_passphrase}"
-  ((${#backup_passphrase} >= 24 && ${#backup_passphrase} <= 256)) || die "BACKUP_ENCRYPTION_PASSPHRASE 至少 24 位"
   [[ "${retention:-30}" =~ ^[0-9]{1,4}$ ]] || die "BACKUP_RETENTION_DAYS 必须是 1–3650"
   ((10#${retention:-30} >= 1 && 10#${retention:-30} <= 3650)) || die "BACKUP_RETENTION_DAYS 必须是 1–3650"
 }

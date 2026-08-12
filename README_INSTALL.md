@@ -6,12 +6,12 @@
 
 - 手机/电脑自适应销售系统 Web 前端；
 - Fastify API、登录与权限、客户/报价/订单/退单/提成/报表数据；
-- PostgreSQL 16 持久数据库；
+- SQLite 持久数据库（单 API 实例）；
 - 版本化迁移、初始管理员和默认提成规则初始化；
-- 加密备份、SHA-256 校验、先 staging 恢复和生产切换；
+- SQLite 在线一致性备份、SHA-256 校验和安全恢复；
 - 安装、升级、验证及故障排查脚本。
 
-本版不是旧的“无登录静态报价页”。生产数据会保存到 PostgreSQL，必须纳入正式备份和隐私数据管理。
+本版不是旧的“无登录静态报价页”。生产数据会保存到 SQLite 持久化卷，必须纳入正式备份和隐私数据管理。
 
 ## 2. 安全拓扑
 
@@ -24,13 +24,13 @@
     |
     +---- /api/* ---> API:3001（Docker 内网）
                          |
-                         +---- PostgreSQL:5432（internal 网络）
+                         +---- SQLite: /app/data/app.sqlite（持久化卷）
 ```
 
 默认安全设置：
 
 - Web 仅绑定主机 `127.0.0.1:8080`，不直接暴露 HTTP 给公网；
-- PostgreSQL **没有主机端口映射**，仅 API/运维容器可访问；
+- SQLite 数据卷不映射为公网端口，仅 API/迁移/备份容器挂载；
 - 敏感 API 禁止缓存，Nginx 配置 CSP、`nosniff`、禁止 iframe 和权限策略；
 - 应用与 Web 容器使用只读文件系统、临时 tmpfs、去除 Linux capabilities；
 - 真实密码、PII 密钥和备份口令只放在服务器 `.env`，不在镜像或 ZIP 中。
@@ -86,12 +86,11 @@ bash deploy/linux/scripts/install-v2.sh \
 cp deploy/linux/.env.example deploy/linux/.env
 chmod 600 deploy/linux/.env
 openssl rand -base64 32  # 分别生成两个不同的 PII 密钥
-openssl rand -hex 32     # 可用于数据库密码和备份口令
 vi deploy/linux/.env
 bash deploy/linux/scripts/install-v2.sh --check-only
 ```
 
-强制规则包括：正式 `https://` 来源、数据库随机密码至少 24 位、两个 PII 密钥各自解码为 32 字节且不相同、管理员密码至少 16 位并含大小写和数字、备份口令至少 24 位。占位值和常见弱密码会被拒绝。
+强制规则包括：正式 `https://` 来源、两个 PII 密钥各自解码为 32 字节且不相同、管理员密码至少 16 位并含大小写和数字。占位值和常见弱密码会被拒绝。
 
 ## 6. 首次安装
 
@@ -102,8 +101,8 @@ bash deploy/linux/scripts/install-v2.sh --yes
 脚本顺序固定为：
 
 1. 校验 ZIP 内部 SHA-256 和 `.env` 安全要求；
-2. 用固定版本基础镜像构建 `api`、`web`、`backup`；
-3. 只启动 PostgreSQL 并等待健康；
+2. 用固定版本基础镜像构建 `api`、`web`；
+3. 创建 SQLite 持久化卷；
 4. **先运行全部版本化迁移**；
 5. 初始化首个管理员和默认提成规则；
 6. 迁移与初始化成功后才启动 API；
@@ -115,7 +114,7 @@ bash deploy/linux/scripts/install-v2.sh --yes
 
 ```bash
 docker compose --env-file deploy/linux/.env -f deploy/linux/docker-compose.yml -p hainan-fttr-heartlink ps
-docker compose --env-file deploy/linux/.env -f deploy/linux/docker-compose.yml -p hainan-fttr-heartlink logs --tail=200 api web postgres
+docker compose --env-file deploy/linux/.env -f deploy/linux/docker-compose.yml -p hainan-fttr-heartlink logs --tail=200 api web
 ```
 
 若服务器使用旧命令，把 `docker compose` 换成 `docker-compose`；所有交付脚本会自动检测两者。
@@ -153,7 +152,7 @@ server {
 
 必须传递 `Host`、`X-Real-IP`、`X-Forwarded-For`、`X-Forwarded-Proto` 和请求 ID。`X-Forwarded-Proto https` 对 Secure Cookie、审计和跳转判断很重要。证书和私钥不属于安装包，必须由公司证书系统或 ACME 单独管理。
 
-防火墙只放行 80/443；不要放行 5432、3001 或默认内部 8080。安装后从公网验证 HTTP 自动跳 HTTPS，浏览器地址栏证书可信，且：
+防火墙只放行 80/443；不要放行 3001 或默认内部 8080。安装后从公网验证 HTTP 自动跳 HTTPS，浏览器地址栏证书可信，且：
 
 ```bash
 curl -I https://quote.example.com/
@@ -178,7 +177,7 @@ curl -i https://quote.example.com/api/health
 bash deploy/linux/scripts/verify-v2.sh http://127.0.0.1:8080
 ```
 
-## 9. 加密备份
+## 9. SQLite 备份
 
 手工备份：
 
@@ -189,12 +188,11 @@ bash deploy/linux/scripts/backup.sh
 输出目录默认为 `deploy/linux/backups/`，每次产生：
 
 ```text
-hainan-fttr-YYYYMMDDTHHMMSS.dump.enc
-hainan-fttr-YYYYMMDDTHHMMSS.dump.enc.sha256
-hainan-fttr-YYYYMMDDTHHMMSS.dump.enc.meta
+app-YYYYMMDDTHHMMSSZ.sqlite
+app-YYYYMMDDTHHMMSSZ.sqlite.sha256
 ```
 
-`.dump.enc` 是 PostgreSQL custom dump 经 AES-256-CBC + PBKDF2（200,000 次）加密后的文件；`.sha256` 校验密文传输完整性；`.meta` 记录格式、应用版本和算法，不含密钥。脚本不会把未加密 dump 写入宿主机磁盘。
+备份通过 SQLite 在线备份接口生成一致性副本，完成后立即执行完整性检查并生成 SHA-256。当前备份文件未做应用层二次加密，备份目录必须限制访问，并建议同步到具备服务端加密和权限审计的异地存储。
 
 建议每天定时并把三件套同步到独立、访问受控的异地存储。示例（每天 02:20）：
 
@@ -204,40 +202,20 @@ hainan-fttr-YYYYMMDDTHHMMSS.dump.enc.meta
 
 本机保留天数由 `BACKUP_RETENTION_DAYS` 控制。**本机备份不等于灾备**；至少每季度执行一次真实恢复演练。
 
-## 10. 恢复演练（默认安全）
+## 10. 恢复演练
 
-恢复脚本默认只创建全新 staging 数据库，不会覆盖生产：
-
-```bash
-bash deploy/linux/scripts/restore.sh \
-  --backup deploy/linux/backups/hainan-fttr-20260802T120000.dump.enc
-```
-
-它会先验证 SHA-256 和解密口令，再创建全新空库、执行 `pg_restore`，并检查：
-
-- 一个报价不会重复生成多个订单；
-- 订单销售归属比例合计为 10000 基点；
-- 提成快照与计提流水相符；
-- 完成退单数量不超过销售数量；
-- 结算流水没有重复纳入；
-- 订单关键不可变快照完整。
-
-若 staging 名已存在，脚本直接拒绝，绝不静默覆盖。
-
-## 11. 生产恢复切换（仅灾难场景）
-
-先完成第 10 节的 staging 恢复和业务抽查。确认窗口后必须精确输入生产库名并二次确认：
+恢复会短暂停止 Web/API，先验证 SHA-256 与 SQLite 完整性，再保留当前数据库副本并替换为备份：
 
 ```bash
 bash deploy/linux/scripts/restore.sh \
-  --backup deploy/linux/backups/hainan-fttr-20260802T120000.dump.enc \
-  --staging-database hainan_fttr_restore_verified \
-  --confirm-production-overwrite hainan_fttr
+  --backup deploy/linux/backups/app-20260812T120000Z.sqlite
 ```
 
-脚本会停止 Web/API，重新验证 staging，把旧生产库重命名保留为 `hainan_fttr_before_restore_时间戳`，再把 staging 切换为生产库，随后重启和验收。旧库不会自动删除。非交互自动化还必须显式增加 `--yes`。
+脚本恢复成功后会重启服务并运行 Web、API、SQLite 完整性和迁移记录检查；原数据库以 `.before-restore-时间戳` 文件保留，不会自动删除。
 
-不要手工把 `pg_restore --clean` 指向生产库。不要在没有当前加密备份、变更单和现场负责人的情况下执行生产切换。
+## 11. 生产恢复边界
+
+恢复属于生产数据替换操作，必须安排维护窗口并先确认备份文件来源。非交互执行需显式增加 `--yes`。禁止直接复制运行中的 WAL/SHM 文件代替在线备份，也禁止删除恢复前自动保留的原库，直到业务验收完成。
 
 ## 12. 升级与回退边界
 
@@ -248,7 +226,7 @@ chmod 600 deploy/linux/.env
 bash deploy/linux/scripts/upgrade-v2.sh --yes
 ```
 
-升级先做加密备份，再构建带新版本 tag 的镜像并执行向上迁移。脚本不会自动执行 down-migration。
+升级先做 SQLite 一致性备份，再构建带新版本 tag 的镜像并执行向上迁移。脚本不会自动执行 down-migration。
 
 应用回退仅在新版数据库迁移经过评审、确认对旧应用**向后兼容**时允许：回到旧版解压目录，用旧 `.env` 和旧镜像 tag 重新启动 API/Web。若迁移不向后兼容，不得启动旧应用；应使用已验证备份按第 10–11 节恢复。数据库回退属于数据恢复，不是普通应用回滚。
 
@@ -287,7 +265,7 @@ docker compose --env-file deploy/linux/.env -f deploy/linux/docker-compose.yml -
 docker compose --env-file deploy/linux/.env -f deploy/linux/docker-compose.yml -p hainan-fttr-heartlink up -d api web
 ```
 
-**严禁**在生产运行 `docker compose down -v`、`docker volume rm`、手工删除 `/var/lib/postgresql/data` 或编辑迁移记录。
+**严禁**在生产运行 `docker compose down -v`、`docker volume rm`、手工删除 SQLite 数据卷 或编辑迁移记录。
 
 ## 15. 故障排查
 
@@ -305,11 +283,11 @@ API 故意依赖 `migrate` 和 `seed` 成功。不要绕开依赖强行启动；
 
 ### 备份失败
 
-检查备份目录空间和权限、`BACKUP_ENCRYPTION_PASSPHRASE` 是否仍满足要求、PostgreSQL 是否健康。不要为了“先备份出来”而改成明文 dump。
+检查备份目录空间和权限、SQLite 数据卷是否可读写，以及 API 容器能否访问 `/app/data/app.sqlite`。
 
-### 恢复报 staging 已存在
+### 恢复校验失败
 
-这是安全保护。使用新的 staging 名；旧 staging 应先由工程师确认用途后人工处理，脚本不会自动删除数据库。
+停止恢复并检查 `.sha256` 是否与备份同目录、文件是否完整。不要绕过校验或手工覆盖生产数据库。
 
 ### 镜像构建无法下载
 
@@ -319,12 +297,12 @@ API 故意依赖 `migrate` 和 `seed` 成功。不要绕开依赖强行启动；
 
 - [ ] ZIP 外部和内部 SHA-256 均通过；
 - [ ] `.env` 权限 0600，密钥已进入密码管理器；
-- [ ] PostgreSQL 没有主机端口，防火墙只开 80/443；
+- [ ] SQLite 数据卷未暴露为主机端口，防火墙只开 80/443；
 - [ ] 公网 HTTPS 证书可信，HTTP 强制跳转；
 - [ ] `verify-v2.sh` 通过；
 - [ ] 管理员已改初始密码；
 - [ ] 销售/主管/管理员权限抽查通过；
 - [ ] 报价打印、订单激活、退单、提成和报表业务旅程通过；
-- [ ] 加密备份已复制到异地；
-- [ ] 一次 staging 恢复和一致性检查通过；
+- [ ] SQLite 一致性备份已复制到权限受控的异地存储；
+- [ ] 一次恢复演练和完整性检查通过；
 - [ ] 升级/恢复负责人、维护窗口和告警联系方式已归档。
