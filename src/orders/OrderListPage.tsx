@@ -173,12 +173,19 @@ export const OrderListPage = ({
   const availableSellers = useMemo(() => {
     const options = new Map(sellerOptions.map((option) => [option.label, option]));
     for (const order of items) {
-      options.set(order.sellerName, { id: order.sellerId, label: order.sellerName });
+      options.set(order.sellerName, {
+        id: order.sellerId,
+        label: order.sellerName,
+        storeId: order.storeId,
+      });
     }
-    return Array.from(options.values()).sort((left, right) =>
-      left.label.localeCompare(right.label, "zh-CN"),
+    const selectedStore = availableStores.find(
+      (option) => option.label === draftFilters.storeQuery,
     );
-  }, [items, sellerOptions]);
+    return Array.from(options.values())
+      .filter((option) => !selectedStore || !option.storeId || option.storeId === selectedStore.id)
+      .sort((left, right) => left.label.localeCompare(right.label, "zh-CN"));
+  }, [availableStores, draftFilters.storeQuery, items, sellerOptions]);
 
   const renderOrderAmount = (order: OrderSummary) => (
     <span className="order-amount">

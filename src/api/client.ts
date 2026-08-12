@@ -239,6 +239,11 @@ export interface OrderListApiResponse {
   nextCursor: string | null;
 }
 
+export interface OrderFilterOptionsApiResponse {
+  stores: Array<{ id: string; label: string }>;
+  sellers: Array<{ id: string; label: string; storeId: string }>;
+}
+
 export interface OrderAttributionApiInput {
   beneficiaryId: string;
   attributionRole: "primary" | "collaborator";
@@ -343,6 +348,7 @@ export interface ApiClient {
   listCommissionPolicyVersions(): Promise<readonly CommissionPolicyVersionDto[]>;
   listOrderReturns(orderId: string): Promise<readonly ReturnRecordDto[]>;
   listOrders(query: OrderListApiQuery): Promise<OrderListApiResponse>;
+  listOrderFilterOptions(): Promise<OrderFilterOptionsApiResponse>;
   login(input: LoginInput): Promise<AuthenticatedUser>;
   logout(): Promise<void>;
   recordQuotePrint(quoteId: string): Promise<void>;
@@ -676,6 +682,9 @@ export const createApiClient = ({
         ? "/api/orders/recycle-bin"
         : "/api/orders";
       return readOrderList(await request(`${path}?${parameters.toString()}`));
+    },
+    async listOrderFilterOptions() {
+      return (await request("/api/order-filter-options")) as OrderFilterOptionsApiResponse;
     },
     async getOrder(orderId) {
       return readOrder(

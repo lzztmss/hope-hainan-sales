@@ -11,6 +11,8 @@ test-results/
 !deploy/linux/.env.example
 
 *.sqlite
+*.sqlite-shm
+*.sqlite-wal
 *.sqlite3
 *.db
 *.db-shm
@@ -21,4 +23,3 @@ deploy/linux/state/
 
 .DS_Store
 *.log
-

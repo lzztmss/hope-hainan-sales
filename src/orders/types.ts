@@ -162,6 +162,7 @@ export interface OrderManagementAdapter {
 export interface SelectOption {
   id: string;
   label: string;
+  storeId?: string;
 }
 
 export const ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> = {

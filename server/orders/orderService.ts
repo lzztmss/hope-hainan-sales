@@ -143,6 +143,11 @@ export interface OrderListResult {
   nextCursor: string | null;
 }
 
+export interface OrderFilterOptions {
+  stores: Array<{ id: string; label: string }>;
+  sellers: Array<{ id: string; label: string; storeId: string }>;
+}
+
 export interface OrderAuditInput {
   actorUserId: string;
   storeId: string | null;
@@ -184,6 +189,7 @@ export interface OrderRepository {
   ): Promise<OrderRecord | null>;
   hasCommissionLedger(orderId: string): Promise<boolean>;
   list(scope: UserScope, filters: OrderListFilters): Promise<OrderListResult>;
+  listFilterOptions(scope: UserScope): Promise<OrderFilterOptions>;
   writeAudit(input: OrderAuditInput): Promise<void>;
 }
 
@@ -666,6 +672,10 @@ export const createOrderService = (options: OrderServiceOptions) => {
         items: result.items.map((order) => presentOrder(order, options.decryptPii)),
         nextCursor: result.nextCursor,
       };
+    },
+
+    async listFilterOptions(user: AuthenticatedUser) {
+      return options.repository.listFilterOptions(scopeForUser(user));
     },
 
     async listRecycleBin(

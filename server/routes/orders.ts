@@ -222,6 +222,16 @@ export const registerOrderRoutes = async (
     }
   });
 
+  app.get("/api/order-filter-options", async (request, reply) => {
+    const user = await resolveUser(request, reply, options.authService);
+    if (!user) return;
+    try {
+      return await options.orderService.listFilterOptions(user);
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
+
   app.get<{ Params: { id: string } }>(
     "/api/orders/:id",
     async (request, reply) => {

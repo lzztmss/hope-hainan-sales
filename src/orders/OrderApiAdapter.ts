@@ -24,6 +24,7 @@ export type OrderApiClient = Pick<
   | "getOrder"
   | "listOrderReturns"
   | "listOrders"
+  | "listOrderFilterOptions"
   | "requestOrderReturn"
   | "restoreOrder"
   | "transitionOrder"

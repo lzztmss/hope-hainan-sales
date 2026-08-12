@@ -39,6 +39,7 @@ import type {
   OrderLineRecord,
   OrderListFilters,
   OrderListResult,
+  OrderFilterOptions,
   OrderRecord,
   OrderRepository,
   OrderWriteRecord,
@@ -537,6 +538,35 @@ export class DrizzleOrderRepository implements OrderRepository {
         hasNext && pageRows.length > 0
           ? encodeCursor(pageRows[pageRows.length - 1]!)
           : null,
+    };
+  }
+
+  async listFilterOptions(scope: Parameters<OrderRepository["listFilterOptions"]>[0]): Promise<OrderFilterOptions> {
+    if (scope.kind === "seller") return { stores: [], sellers: [] };
+    const storeCondition = scope.kind === "store" ? eq(stores.id, scope.storeId) : eq(stores.active, true);
+    const sellerCondition =
+      scope.kind === "store"
+        ? and(eq(users.storeId, scope.storeId), eq(users.active, true))
+        : and(eq(users.active, true), isNotNull(users.storeId));
+    const [storeRows, sellerRows] = await Promise.all([
+      this.executor
+        .select({ id: stores.id, code: stores.code, name: stores.name })
+        .from(stores)
+        .where(storeCondition)
+        .orderBy(stores.code),
+      this.executor
+        .select({ id: users.id, workNo: users.workNo, name: users.displayName, storeId: users.storeId })
+        .from(users)
+        .where(sellerCondition)
+        .orderBy(users.displayName, users.workNo),
+    ]);
+    return {
+      stores: storeRows.map((row) => ({ id: row.id, label: `${row.name}（${row.code}）` })),
+      sellers: sellerRows.flatMap((row) =>
+        row.storeId
+          ? [{ id: row.id, label: `${row.name}（${row.workNo}）`, storeId: row.storeId }]
+          : [],
+      ),
     };
   }
 
