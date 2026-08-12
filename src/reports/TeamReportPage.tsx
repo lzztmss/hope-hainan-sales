@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { SalesReportFilters, SalesReportResponse } from "../../shared/reports/types";
 import { PageLayout } from "../components/layout";
@@ -12,7 +12,7 @@ export interface TeamReportPageProps {
   initialReport?: SalesReportResponse;
   onLoad?: (filters: SalesReportFilters) => Promise<SalesReportResponse>;
   onExport?: (filters: SalesReportFilters) => Promise<void> | void;
-  sellers?: readonly { id: string; label: string }[];
+  sellers?: readonly { id: string; label: string; storeId?: string }[];
   stores?: readonly { id: string; label: string }[];
 }
 
@@ -20,18 +20,22 @@ export const TeamReportPage = ({
   initialReport,
   onLoad = reportsApi.getSalesReport,
   onExport = reportsApi.exportSalesReport,
-  sellers,
-  stores,
+  sellers: providedSellers,
+  stores: providedStores,
 }: TeamReportPageProps) => {
   const [report, setReport] = useState(initialReport);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const defaults = defaultShanghaiReportFilters();
-  const initialFilters: SalesReportFilters = {
+  const [options, setOptions] = useState({
+    stores: providedStores ?? [],
+    sellers: providedSellers ?? [],
+  });
+  const defaults = useMemo(() => defaultShanghaiReportFilters(), []);
+  const initialFilters: SalesReportFilters = useMemo(() => ({
     from: report?.period.from ?? defaults.from,
     to: report?.period.to ?? defaults.to,
     groupBy: report?.rows[0]?.sellerId ? "seller" : "store",
-  };
+  }), [defaults.from, defaults.to, report?.period.from, report?.period.to, report?.rows]);
   const load = async (filters: SalesReportFilters) => {
     setBusy(true);
     setError(null);
@@ -43,6 +47,18 @@ export const TeamReportPage = ({
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (!initialReport) void load(initialFilters);
+    if (providedStores || providedSellers) return;
+    void fetch("/api/order-filter-options", { credentials: "include" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("筛选项加载失败");
+        return response.json() as Promise<typeof options>;
+      })
+      .then(setOptions)
+      .catch(() => setOptions({ stores: [], sellers: [] }));
+  }, []);
 
   return (
     <PageLayout
@@ -56,8 +72,8 @@ export const TeamReportPage = ({
         initialValue={initialFilters}
         onApply={(filters) => void load(filters)}
         onExport={(filters) => void onExport(filters)}
-        sellers={sellers}
-        stores={stores}
+        sellers={options.sellers}
+        stores={options.stores}
       />
       {error ? <div className="report-error" role="alert">{error}</div> : null}
       {report ? (

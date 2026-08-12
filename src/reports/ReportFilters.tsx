@@ -9,7 +9,7 @@ export interface ReportFiltersProps {
   initialValue: SalesReportFilters;
   onApply(filters: SalesReportFilters): void;
   onExport(filters: SalesReportFilters): void;
-  sellers?: readonly { id: string; label: string }[];
+  sellers?: readonly { id: string; label: string; storeId?: string }[];
   stores?: readonly { id: string; label: string }[];
 }
 
@@ -25,6 +25,9 @@ export const ReportFilters = ({
   const [value, setValue] = useState<SalesReportFilters>(initialValue);
   const update = (field: keyof SalesReportFilters, next: string) =>
     setValue((current) => ({ ...current, [field]: next || undefined }));
+  const visibleSellers = value.storeId
+    ? sellers.filter((seller) => !seller.storeId || seller.storeId === value.storeId)
+    : sellers;
 
   return (
     <form
@@ -63,7 +66,13 @@ export const ReportFilters = ({
               <select
                 aria-label="营业厅"
                 value={value.storeId ?? ""}
-                onChange={(event) => update("storeId", event.currentTarget.value)}
+                onChange={(event) =>
+                  setValue((current) => ({
+                    ...current,
+                    storeId: event.currentTarget.value || undefined,
+                    sellerId: undefined,
+                  }))
+                }
               >
                 <option value="">全部可见营业厅</option>
                 {stores.map((store) => <option key={store.id} value={store.id}>{store.label}</option>)}
@@ -79,7 +88,7 @@ export const ReportFilters = ({
                 onChange={(event) => update("sellerId", event.currentTarget.value)}
               >
                 <option value="">全部可见销售员</option>
-                {sellers.map((seller) => <option key={seller.id} value={seller.id}>{seller.label}</option>)}
+                {visibleSellers.map((seller) => <option key={seller.id} value={seller.id}>{seller.label}</option>)}
               </select>
             </label>
           ) : null}
