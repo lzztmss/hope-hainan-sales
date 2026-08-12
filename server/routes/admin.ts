@@ -28,9 +28,15 @@ const updateStoreSchema = z
   .object({
     name: z.string().trim().min(1).max(160).optional(),
     active: z.boolean().optional(),
+    managerUserId: storeIdSchema.nullable().optional(),
     reason: reasonSchema,
   })
-  .refine((value) => value.name !== undefined || value.active !== undefined);
+  .refine(
+    (value) =>
+      value.name !== undefined ||
+      value.active !== undefined ||
+      value.managerUserId !== undefined,
+  );
 
 const createUserSchema = z.object({
   workNo: z.string().trim().min(2).max(64),

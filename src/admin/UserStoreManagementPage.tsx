@@ -15,6 +15,8 @@ export interface ManagedStoreView {
   name: string;
   active: boolean;
   activeUserCount: number;
+  managerUserId: string | null;
+  managerName: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,6 +46,7 @@ export interface CreateManagedStoreInput {
 export interface UpdateManagedStoreInput {
   name?: string;
   active?: boolean;
+  managerUserId?: string | null;
   reason: string;
 }
 
@@ -277,6 +280,9 @@ export const UserStoreManagementPage = ({
   const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
   const [resetDraft, setResetDraft] = useState<ResetDraft | null>(null);
   const [statusAction, setStatusAction] = useState<StatusAction | null>(null);
+  const [managerStoreId, setManagerStoreId] = useState<string | null>(null);
+  const [managerUserId, setManagerUserId] = useState("");
+  const [managerReason, setManagerReason] = useState("");
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -481,7 +487,42 @@ export const UserStoreManagementPage = ({
     }
   };
 
+  const saveStoreManager = async (event: FormEvent): Promise<void> => {
+    event.preventDefault();
+    if (!managerStoreId || !managerReason.trim()) {
+      setError("请填写指定营业厅经理的原因");
+      return;
+    }
+    begin();
+    try {
+      await onUpdateStore?.(managerStoreId, {
+        managerUserId: managerUserId || null,
+        reason: managerReason.trim(),
+      });
+      setManagerStoreId(null);
+      setManagerUserId("");
+      setManagerReason("");
+      setMessage("营业厅主经理已更新");
+    } catch (caught) {
+      setError(errorText(caught, "营业厅主经理更新失败"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const storeActions = (store: ManagedStoreView) => (
+    <div className="management-row-actions">
+    <button
+      type="button"
+      disabled={busy || !onUpdateStore}
+      onClick={() => {
+        setManagerStoreId(store.id);
+        setManagerUserId(store.managerUserId ?? "");
+        setManagerReason("");
+      }}
+    >
+      指定经理
+    </button>
     <button
       type="button"
       className={store.active ? "management-danger" : "management-secondary"}
@@ -501,6 +542,7 @@ export const UserStoreManagementPage = ({
     >
       {store.active ? "停用" : "启用"}
     </button>
+    </div>
   );
 
   const userActions = (managedUser: ManagedUserView) => (
@@ -597,18 +639,29 @@ export const UserStoreManagementPage = ({
           {stores.map((store) => (
             <article className="management-mobile-card" data-testid={`managed-store-mobile-${store.id}`} key={store.id}>
               <header><div><span>{store.code}</span><h3>{store.name}</h3></div>{statusBadge(store.active)}</header>
-              <dl><div><dt>启用账号</dt><dd>{store.activeUserCount} 人</dd></div></dl>
-              <div className="management-row-actions">{storeActions(store)}</div>
+              <dl><div><dt>启用账号</dt><dd>{store.activeUserCount} 人</dd></div><div><dt>主经理</dt><dd>{store.managerName ?? "未指定"}</dd></div></dl>
+              {storeActions(store)}
             </article>
           ))}
         </div>
 
         <div className="management-desktop-table">
-          <table aria-label="营业厅桌面列表"><thead><tr><th>编码</th><th>营业厅</th><th>启用账号</th><th>状态</th><th>操作</th></tr></thead>
-            <tbody>{stores.map((store) => <tr key={store.id}><td>{store.code}</td><td>{store.name}</td><td>{store.activeUserCount} 人</td><td>{statusBadge(store.active)}</td><td>{storeActions(store)}</td></tr>)}</tbody>
+          <table aria-label="营业厅桌面列表"><thead><tr><th>编码</th><th>营业厅</th><th>主经理</th><th>启用账号</th><th>状态</th><th>操作</th></tr></thead>
+            <tbody>{stores.map((store) => <tr key={store.id}><td>{store.code}</td><td>{store.name}</td><td>{store.managerName ?? "未指定"}</td><td>{store.activeUserCount} 人</td><td>{statusBadge(store.active)}</td><td>{storeActions(store)}</td></tr>)}</tbody>
           </table>
         </div>
       </section>
+
+      {managerStoreId ? (
+        <section className="management-action-panel" aria-labelledby="manager-action-title">
+          <h2 id="manager-action-title">指定营业厅主经理</h2>
+          <form onSubmit={(event) => void saveStoreManager(event)}>
+            <label>主经理<select value={managerUserId} onChange={(event) => setManagerUserId(event.currentTarget.value)}><option value="">暂不指定</option>{users.filter((user) => user.storeId === managerStoreId && user.role === "store_manager" && user.active).map((user) => <option key={user.id} value={user.id}>{user.displayName}（{user.workNo}）</option>)}</select></label>
+            <label>变更原因<input required value={managerReason} onChange={(event) => setManagerReason(event.currentTarget.value)} /></label>
+            <div className="management-form-actions"><button type="button" onClick={() => setManagerStoreId(null)}>取消</button><button className="management-primary" disabled={busy} type="submit">确认指定</button></div>
+          </form>
+        </section>
+      ) : null}
 
       {statusAction ? (
         <section className="management-action-panel" aria-labelledby="status-action-title">

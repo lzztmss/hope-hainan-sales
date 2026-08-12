@@ -8,6 +8,13 @@
       "when": 1786528786881,
       "tag": "0000_rainy_firebird",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1786534823223,
+      "tag": "0001_giant_jane_foster",
+      "breakpoints": true
     }
   ]
 }

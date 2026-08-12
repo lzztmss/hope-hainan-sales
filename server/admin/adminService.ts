@@ -18,6 +18,8 @@ export interface AdminStoreRecord {
   name: string;
   active: boolean;
   activeUserCount: number;
+  managerUserId: string | null;
+  managerName: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -28,6 +30,8 @@ export interface AdminStoreView {
   name: string;
   active: boolean;
   activeUserCount: number;
+  managerUserId: string | null;
+  managerName: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -140,6 +144,7 @@ export interface AdminRepository {
   findStoreForUpdate(id: string): Promise<AdminStoreRecord | null>;
   createStore(input: AdminStoreWrite): Promise<AdminStoreRecord>;
   updateStore(id: string, patch: AdminStorePatch): Promise<AdminStoreRecord | null>;
+  assignStoreManager(storeId: string, userId: string | null): Promise<void>;
   listActiveUsersInStoreForUpdate(storeId: string): Promise<readonly string[]>;
   listUsers(filters: AdminUserFilters): Promise<readonly AdminUserRecord[]>;
   findUserForUpdate(id: string): Promise<AdminUserRecord | null>;
@@ -159,6 +164,7 @@ export interface CreateStoreInput {
 export interface UpdateStoreInput {
   name?: string;
   active?: boolean;
+  managerUserId?: string | null;
   reason: string;
 }
 
@@ -273,6 +279,8 @@ const storeView = (store: AdminStoreRecord): AdminStoreView => ({
   name: store.name,
   active: store.active,
   activeUserCount: store.activeUserCount,
+  managerUserId: store.managerUserId,
+  managerName: store.managerName,
   createdAt: store.createdAt.toISOString(),
   updatedAt: store.updatedAt.toISOString(),
 });
@@ -283,6 +291,8 @@ const storeAuditSnapshot = (store: AdminStoreRecord): Record<string, unknown> =>
   name: store.name,
   active: store.active,
   activeUserCount: store.activeUserCount,
+  managerUserId: store.managerUserId,
+  managerName: store.managerName,
 });
 
 const safeDecryptPhone = (
@@ -443,7 +453,11 @@ export const createAdminService = (options: AdminServiceOptions) => {
     ): Promise<AdminStoreView> {
       requireAdmin(actor);
       const reason = normalizeReason(input.reason);
-      if (input.name === undefined && input.active === undefined) {
+      if (
+        input.name === undefined &&
+        input.active === undefined &&
+        input.managerUserId === undefined
+      ) {
         throw new AdminServiceError("营业厅没有可更新的字段", 400);
       }
       const at = now();
@@ -456,6 +470,23 @@ export const createAdminService = (options: AdminServiceOptions) => {
           if (activeUsers.length > 0) {
             throw new AdminServiceError("营业厅仍有启用账号，请先停用或转移账号", 409);
           }
+        }
+        if (input.managerUserId) {
+          const manager = await repository.findUserForUpdate(input.managerUserId);
+          if (
+            !manager ||
+            manager.storeId !== storeId ||
+            manager.role !== "store_manager" ||
+            !manager.active
+          ) {
+            throw new AdminServiceError(
+              "主经理必须是该营业厅内启用的厅经理账号",
+              400,
+            );
+          }
+        }
+        if (input.managerUserId !== undefined) {
+          await repository.assignStoreManager(storeId, input.managerUserId);
         }
         const updated = await repository.updateStore(storeId, {
           name:

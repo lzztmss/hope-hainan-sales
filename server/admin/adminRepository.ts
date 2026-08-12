@@ -29,12 +29,15 @@ type StoreRow = typeof stores.$inferSelect;
 const toStoreRecord = (
   row: StoreRow,
   activeUserCount: number,
+  manager?: { id: string; displayName: string } | null,
 ): AdminStoreRecord => ({
   id: row.id,
   code: row.code,
   name: row.name,
   active: row.active,
   activeUserCount,
+  managerUserId: manager?.id ?? null,
+  managerName: manager?.displayName ?? null,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });
@@ -85,6 +88,20 @@ export class DrizzleAdminRepository implements AdminRepository {
     return row?.value ?? 0;
   }
 
+  private async primaryManager(storeId: string) {
+    const [manager] = await this.executor
+      .select({ id: users.id, displayName: users.displayName })
+      .from(users)
+      .where(
+        and(
+          eq(users.storeId, storeId),
+          eq(users.isPrimaryStoreManager, true),
+        ),
+      )
+      .limit(1);
+    return manager ?? null;
+  }
+
   async listStores(): Promise<readonly AdminStoreRecord[]> {
     const [storeRows, countRows] = await Promise.all([
       this.executor.select().from(stores).orderBy(desc(stores.active), asc(stores.code)),
@@ -99,7 +116,15 @@ export class DrizzleAdminRepository implements AdminRepository {
         row.storeId ? [[row.storeId, row.value]] : [],
       ),
     );
-    return storeRows.map((row) => toStoreRecord(row, counts.get(row.id) ?? 0));
+    return Promise.all(
+      storeRows.map(async (row) =>
+        toStoreRecord(
+          row,
+          counts.get(row.id) ?? 0,
+          await this.primaryManager(row.id),
+        ),
+      ),
+    );
   }
 
   async findStoreForUpdate(id: string): Promise<AdminStoreRecord | null> {
@@ -108,7 +133,13 @@ export class DrizzleAdminRepository implements AdminRepository {
       .from(stores)
       .where(eq(stores.id, id))
       .limit(1);
-    return row ? toStoreRecord(row, await this.activeUserCount(row.id)) : null;
+    return row
+      ? toStoreRecord(
+          row,
+          await this.activeUserCount(row.id),
+          await this.primaryManager(row.id),
+        )
+      : null;
   }
 
   async createStore(input: AdminStoreWrite): Promise<AdminStoreRecord> {
@@ -126,7 +157,31 @@ export class DrizzleAdminRepository implements AdminRepository {
       .set(patch)
       .where(eq(stores.id, id))
       .returning();
-    return row ? toStoreRecord(row, await this.activeUserCount(row.id)) : null;
+    return row
+      ? toStoreRecord(
+          row,
+          await this.activeUserCount(row.id),
+          await this.primaryManager(row.id),
+        )
+      : null;
+  }
+
+  async assignStoreManager(storeId: string, userId: string | null): Promise<void> {
+    await this.executor
+      .update(users)
+      .set({ isPrimaryStoreManager: false, updatedAt: new Date() })
+      .where(
+        and(
+          eq(users.storeId, storeId),
+          eq(users.isPrimaryStoreManager, true),
+        ),
+      );
+    if (userId) {
+      await this.executor
+        .update(users)
+        .set({ isPrimaryStoreManager: true, updatedAt: new Date() })
+        .where(and(eq(users.id, userId), eq(users.storeId, storeId)));
+    }
   }
 
   async listActiveUsersInStoreForUpdate(

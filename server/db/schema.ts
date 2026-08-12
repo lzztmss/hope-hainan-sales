@@ -161,6 +161,11 @@ export const users = sqliteTable(
     mustChangePassword: integer("must_change_password", { mode: "boolean" })
       .default(true)
       .notNull(),
+    isPrimaryStoreManager: integer("is_primary_store_manager", {
+      mode: "boolean",
+    })
+      .default(false)
+      .notNull(),
     lastLoginAt: integer("last_login_at", { mode: "timestamp_ms" }),
     ...timestamps,
   },
@@ -170,6 +175,9 @@ export const users = sqliteTable(
       .on(table.phoneLookupHash)
       .where(sql`${table.phoneLookupHash} IS NOT NULL`),
     index("users_store_idx").on(table.storeId),
+    uniqueIndex("users_primary_store_manager_unique")
+      .on(table.storeId)
+      .where(sql`${table.isPrimaryStoreManager} = 1`),
   ],
 );
 
