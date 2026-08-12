@@ -4,9 +4,8 @@ import {
   count,
   desc,
   eq,
-  ilike,
+  like,
   or,
-  sql,
   type SQL,
 } from "drizzle-orm";
 
@@ -26,7 +25,6 @@ import type {
 
 type QueryExecutor = AppDatabase | DbTransaction;
 type StoreRow = typeof stores.$inferSelect;
-const ADMINISTRATION_LOCK_KEY = 2_026_072_804;
 
 const toStoreRecord = (
   row: StoreRow,
@@ -76,9 +74,7 @@ export class DrizzleAdminRepository implements AdminRepository {
   }
 
   async lockAdministration(): Promise<void> {
-    await this.executor.execute(
-      sql`SELECT pg_advisory_xact_lock(${ADMINISTRATION_LOCK_KEY})`,
-    );
+    // SQLite 写事务由 BEGIN IMMEDIATE 串行化，无需额外的数据库级锁。
   }
 
   private async activeUserCount(storeId: string): Promise<number> {
@@ -111,8 +107,7 @@ export class DrizzleAdminRepository implements AdminRepository {
       .select()
       .from(stores)
       .where(eq(stores.id, id))
-      .limit(1)
-      .for("update");
+      .limit(1);
     return row ? toStoreRecord(row, await this.activeUserCount(row.id)) : null;
   }
 
@@ -141,8 +136,7 @@ export class DrizzleAdminRepository implements AdminRepository {
       .select({ id: users.id })
       .from(users)
       .where(and(eq(users.storeId, storeId), eq(users.active, true)))
-      .orderBy(users.id)
-      .for("update");
+      .orderBy(users.id);
     return rows.map((row) => row.id);
   }
 
@@ -158,8 +152,8 @@ export class DrizzleAdminRepository implements AdminRepository {
     if (filters.query) {
       conditions.push(
         or(
-          ilike(users.workNo, `%${filters.query}%`),
-          ilike(users.displayName, `%${filters.query}%`),
+          like(users.workNo, `%${filters.query}%`),
+          like(users.displayName, `%${filters.query}%`),
         )!,
       );
     }
@@ -186,8 +180,7 @@ export class DrizzleAdminRepository implements AdminRepository {
       .select({ id: users.id })
       .from(users)
       .where(eq(users.id, id))
-      .limit(1)
-      .for("update");
+      .limit(1);
     return locked ? this.loadUser(locked.id) : null;
   }
 
@@ -218,8 +211,7 @@ export class DrizzleAdminRepository implements AdminRepository {
       .select({ id: users.id })
       .from(users)
       .where(and(eq(users.role, "admin"), eq(users.active, true)))
-      .orderBy(users.id)
-      .for("update");
+      .orderBy(users.id);
     return rows.map((row) => row.id);
   }
 

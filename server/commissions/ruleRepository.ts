@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, max, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, max } from "drizzle-orm";
 
 import type { CommissionRule, CommissionScope } from "../../shared/commission/types.js";
 import type { AppDatabase, DbClient, DbTransaction } from "../db/client.js";
@@ -405,9 +405,6 @@ export class DrizzleCommissionRuleRepository
   ): Promise<boolean> {
     try {
       return await this.client.withTransaction(async (tx) => {
-        await tx.execute(
-          sql`SELECT pg_advisory_xact_lock(hashtext(${POLICY_CODE}))`,
-        );
         const rows = await tx
           .select({
             id: commissionPolicyVersions.id,

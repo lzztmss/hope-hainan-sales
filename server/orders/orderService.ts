@@ -123,6 +123,8 @@ export interface OrderRecord extends OrderWriteRecord {
 export interface OrderListFilters {
   orderNo?: string;
   customerPhoneTail?: string;
+  storeQuery?: string;
+  sellerQuery?: string;
   status?: OrderStatus;
   paymentMode?: PaymentMode;
   fttrKind?: FttrKind;
@@ -250,7 +252,7 @@ const isUniqueViolation = (error: unknown): boolean =>
   typeof error === "object" &&
   error !== null &&
   "code" in error &&
-  error.code === "23505";
+  (error.code === "23505" || String(error.code).startsWith("SQLITE_CONSTRAINT"));
 
 const presentOrder = (
   order: OrderRecord,

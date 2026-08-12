@@ -63,8 +63,8 @@ const normaliseFilters = (filters: OrderListFilters): OrderListFilters => {
     paymentMode: filters.paymentMode,
     recycleBin: filters.recycleBin,
   };
-  if (filters.storeId) normalised.storeId = filters.storeId;
-  if (filters.sellerId) normalised.sellerId = filters.sellerId;
+  if (filters.storeQuery?.trim()) normalised.storeQuery = filters.storeQuery.trim();
+  if (filters.sellerQuery?.trim()) normalised.sellerQuery = filters.sellerQuery.trim();
   return normalised;
 };
 
@@ -160,6 +160,26 @@ export const OrderListPage = ({
     return `共 ${items.length} 笔可见订单`;
   }, [appliedFilters.recycleBin, items.length]);
 
+  const availableStores = useMemo(() => {
+    const options = new Map(storeOptions.map((option) => [option.label, option]));
+    for (const order of items) {
+      options.set(order.storeName, { id: order.storeId, label: order.storeName });
+    }
+    return Array.from(options.values()).sort((left, right) =>
+      left.label.localeCompare(right.label, "zh-CN"),
+    );
+  }, [items, storeOptions]);
+
+  const availableSellers = useMemo(() => {
+    const options = new Map(sellerOptions.map((option) => [option.label, option]));
+    for (const order of items) {
+      options.set(order.sellerName, { id: order.sellerId, label: order.sellerName });
+    }
+    return Array.from(options.values()).sort((left, right) =>
+      left.label.localeCompare(right.label, "zh-CN"),
+    );
+  }, [items, sellerOptions]);
+
   const renderOrderAmount = (order: OrderSummary) => (
     <span className="order-amount">
       <strong>{formatOrderPrice(order.oneTimeFen, order.monthlyTotalFen)}</strong>
@@ -245,29 +265,33 @@ export const OrderListPage = ({
           {viewer.role === "admin" ? (
             <label>
               <span>营业厅</span>
-              <select
-                onChange={(event) => setFilter("storeId", event.currentTarget.value || undefined)}
-                value={draftFilters.storeId ?? ""}
-              >
-                <option value="">全部营业厅</option>
-                {storeOptions.map((option) => (
-                  <option key={option.id} value={option.id}>{option.label}</option>
+              <input
+                list="order-store-options"
+                onChange={(event) => setFilter("storeQuery", event.currentTarget.value || undefined)}
+                placeholder="输入营业厅名称或编码"
+                value={draftFilters.storeQuery ?? ""}
+              />
+              <datalist id="order-store-options">
+                {availableStores.map((option) => (
+                  <option key={option.id} value={option.label} />
                 ))}
-              </select>
+              </datalist>
             </label>
           ) : null}
           {viewer.role !== "sales" ? (
             <label>
               <span>销售员</span>
-              <select
-                onChange={(event) => setFilter("sellerId", event.currentTarget.value || undefined)}
-                value={draftFilters.sellerId ?? ""}
-              >
-                <option value="">全部销售员</option>
-                {sellerOptions.map((option) => (
-                  <option key={option.id} value={option.id}>{option.label}</option>
+              <input
+                list="order-seller-options"
+                onChange={(event) => setFilter("sellerQuery", event.currentTarget.value || undefined)}
+                placeholder="输入销售员姓名或工号"
+                value={draftFilters.sellerQuery ?? ""}
+              />
+              <datalist id="order-seller-options">
+                {availableSellers.map((option) => (
+                  <option key={option.id} value={option.label} />
                 ))}
-              </select>
+              </datalist>
             </label>
           ) : null}
           <label className="order-recycle-filter">

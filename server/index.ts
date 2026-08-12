@@ -36,7 +36,7 @@ const decodeKey = (name: string): Buffer => {
 
 const port = Number(process.env.PORT ?? 3001);
 const host = process.env.HOST ?? "127.0.0.1";
-const databaseClient = createDatabaseClient(requiredEnvironment("DATABASE_URL"));
+const databaseClient = createDatabaseClient(requiredEnvironment("SQLITE_PATH"));
 const pii = createPiiProtector({
   encryptionKey: decodeKey("PII_ENCRYPTION_KEY_BASE64"),
   lookupKey: decodeKey("PII_LOOKUP_HMAC_KEY_BASE64"),

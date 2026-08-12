@@ -9,7 +9,7 @@ import { createDatabaseClient } from "./client.js";
 import { stores, users } from "./schema.js";
 
 export interface BootstrapAdminInput {
-  databaseUrl: string;
+  sqlitePath: string;
   username: string;
   password: string;
 }
@@ -23,13 +23,13 @@ export interface BootstrapAdminResult {
 export const seedBootstrapAdmin = async (
   input: BootstrapAdminInput,
 ): Promise<BootstrapAdminResult> => {
-  const databaseUrl = input.databaseUrl.trim();
+  const sqlitePath = input.sqlitePath.trim();
   const username = input.username.trim().toUpperCase();
   const password = input.password;
 
-  if (!databaseUrl || !username || !password) {
+  if (!sqlitePath || !username || !password) {
     throw new Error(
-      "运行种子前必须配置 DATABASE_URL、BOOTSTRAP_ADMIN_USERNAME 和 BOOTSTRAP_ADMIN_PASSWORD",
+      "运行种子前必须配置 SQLITE_PATH、BOOTSTRAP_ADMIN_USERNAME 和 BOOTSTRAP_ADMIN_PASSWORD",
     );
   }
 
@@ -37,7 +37,7 @@ export const seedBootstrapAdmin = async (
     throw new Error("BOOTSTRAP_ADMIN_PASSWORD 至少需要 12 个字符");
   }
 
-  const client = createDatabaseClient(databaseUrl);
+  const client = createDatabaseClient(sqlitePath);
   try {
     const [store] = await client.db
       .insert(stores)
@@ -131,7 +131,7 @@ const invokedPath = process.argv[1]
 
 if (invokedPath === import.meta.url) {
   await seedBootstrapAdmin({
-    databaseUrl: process.env.DATABASE_URL ?? "",
+    sqlitePath: process.env.SQLITE_PATH ?? "",
     username: process.env.BOOTSTRAP_ADMIN_USERNAME ?? "",
     password: process.env.BOOTSTRAP_ADMIN_PASSWORD ?? "",
   });

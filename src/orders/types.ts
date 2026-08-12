@@ -107,8 +107,8 @@ export interface OrderListFilters {
   search: string;
   status: OrderStatus | "";
   paymentMode: OrderPaymentMode | "";
-  storeId?: string;
-  sellerId?: string;
+  storeQuery?: string;
+  sellerQuery?: string;
   recycleBin: boolean;
 }
 

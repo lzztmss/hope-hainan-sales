@@ -124,120 +124,116 @@ export class DrizzleSalesReportRepository implements SalesReportRepository {
     scope: SalesReportScope,
     period: ReportPeriod,
   ): Promise<readonly SalesReportFact[]> {
-    const sql = this.client.sql;
-    const periodStart = period.start.toISOString();
-    const periodEnd = period.endExclusive.toISOString();
-    const quoteScope =
-      scope.kind === "seller"
-        ? sql`AND q.store_id = ${scope.storeId} AND q.seller_id = ${scope.sellerId}`
-        : scope.kind === "store"
-          ? sql`AND q.store_id = ${scope.storeId} ${scope.sellerId ? sql`AND q.seller_id = ${scope.sellerId}` : sql``}`
-          : sql`${scope.storeId ? sql`AND q.store_id = ${scope.storeId}` : sql``} ${scope.sellerId ? sql`AND q.seller_id = ${scope.sellerId}` : sql``}`;
-    const orderScope =
-      scope.kind === "seller"
-        ? sql`AND o.store_id = ${scope.storeId} AND o.seller_id = ${scope.sellerId}`
-        : scope.kind === "store"
-          ? sql`AND o.store_id = ${scope.storeId} ${scope.sellerId ? sql`AND o.seller_id = ${scope.sellerId}` : sql``}`
-          : sql`${scope.storeId ? sql`AND o.store_id = ${scope.storeId}` : sql``} ${scope.sellerId ? sql`AND o.seller_id = ${scope.sellerId}` : sql``}`;
-    const ledgerScope =
-      scope.kind === "seller"
-        ? sql`AND cl.store_id = ${scope.storeId} AND cl.beneficiary_id = ${scope.sellerId}`
-        : scope.kind === "store"
-          ? sql`AND cl.store_id = ${scope.storeId} ${scope.sellerId ? sql`AND cl.beneficiary_id = ${scope.sellerId}` : sql``}`
-          : sql`${scope.storeId ? sql`AND cl.store_id = ${scope.storeId}` : sql``} ${scope.sellerId ? sql`AND cl.beneficiary_id = ${scope.sellerId}` : sql``}`;
+    const periodStart = period.start.getTime();
+    const periodEnd = period.endExclusive.getTime();
+    const makeScope = (
+      tableAlias: string,
+      sellerColumn: "seller_id" | "beneficiary_id",
+    ): { clause: string; params: string[] } => {
+      const clauses: string[] = [];
+      const params: string[] = [];
+      if (scope.storeId) {
+        clauses.push(`AND ${tableAlias}.store_id = ?`);
+        params.push(scope.storeId);
+      }
+      if (scope.sellerId) {
+        clauses.push(`AND ${tableAlias}.${sellerColumn} = ?`);
+        params.push(scope.sellerId);
+      }
+      return { clause: clauses.join(" "), params };
+    };
+    const quoteScope = makeScope("q", "seller_id");
+    const orderScope = makeScope("o", "seller_id");
+    const ledgerScope = makeScope("cl", "beneficiary_id");
+    const all = <T>(query: string, params: readonly unknown[]): T[] =>
+      this.client.raw.prepare(query).all(...params) as T[];
 
     const [quoteRows, orderCountRows, orderAmountRows, returnRows, ledgerRows, paidRows] =
-      await Promise.all([
-        sql<CountRow[]>`
+      [
+        all<CountRow>(`
           SELECT q.store_id, s.name AS store_name, q.seller_id,
-                 u.display_name AS seller_name, COUNT(*)::int AS count
+                 u.display_name AS seller_name, COUNT(*) AS count
           FROM quotes q
           JOIN stores s ON s.id = q.store_id
           JOIN users u ON u.id = q.seller_id
-          WHERE q.confirmed_at >= ${periodStart}
-            AND q.confirmed_at < ${periodEnd}
+          WHERE q.confirmed_at >= ? AND q.confirmed_at < ?
             AND q.deleted_at IS NULL AND q.status <> 'voided'
-            ${quoteScope}
+            ${quoteScope.clause}
           GROUP BY q.store_id, s.name, q.seller_id, u.display_name
-        `,
-        sql<CountRow[]>`
+        `, [periodStart, periodEnd, ...quoteScope.params]),
+        all<CountRow>(`
           SELECT o.store_id, s.name AS store_name, o.seller_id,
-                 u.display_name AS seller_name, COUNT(*)::int AS count
+                 u.display_name AS seller_name, COUNT(*) AS count
           FROM orders o
           JOIN stores s ON s.id = o.store_id
           JOIN users u ON u.id = o.seller_id
-          WHERE o.created_at >= ${periodStart}
-            AND o.created_at < ${periodEnd}
+          WHERE o.created_at >= ? AND o.created_at < ?
             AND o.deleted_at IS NULL
             AND o.status NOT IN ('cancelled', 'voided')
-            ${orderScope}
+            ${orderScope.clause}
           GROUP BY o.store_id, s.name, o.seller_id, u.display_name
-        `,
-        sql<OrderAmountRow[]>`
+        `, [periodStart, periodEnd, ...orderScope.params]),
+        all<OrderAmountRow>(`
           SELECT o.store_id, s.name AS store_name, o.seller_id,
                  u.display_name AS seller_name,
-                 COALESCE(SUM(o.one_time_fen), 0)::int AS one_time_fen,
-                 COALESCE(SUM(o.fttr_monthly_fen), 0)::int AS fttr_monthly_fen,
-                 COALESCE(SUM(o.heart_monthly_fen), 0)::int AS heart_monthly_fen,
-                 COALESCE(SUM(o.contract_36_fen), 0)::int AS contract_36_fen
+                 COALESCE(SUM(o.one_time_fen), 0) AS one_time_fen,
+                 COALESCE(SUM(o.fttr_monthly_fen), 0) AS fttr_monthly_fen,
+                 COALESCE(SUM(o.heart_monthly_fen), 0) AS heart_monthly_fen,
+                 COALESCE(SUM(o.contract_36_fen), 0) AS contract_36_fen
           FROM orders o
           JOIN stores s ON s.id = o.store_id
           JOIN users u ON u.id = o.seller_id
-          WHERE o.activated_at >= ${periodStart}
-            AND o.activated_at < ${periodEnd}
+          WHERE o.activated_at >= ? AND o.activated_at < ?
             AND o.deleted_at IS NULL
-            ${orderScope}
+            ${orderScope.clause}
           GROUP BY o.store_id, s.name, o.seller_id, u.display_name
-        `,
-        sql<AmountRow[]>`
+        `, [periodStart, periodEnd, ...orderScope.params]),
+        all<AmountRow>(`
           SELECT o.store_id, s.name AS store_name, o.seller_id,
                  u.display_name AS seller_name,
-                 COALESCE(SUM(r.refund_fen), 0)::int AS amount_fen
+                 COALESCE(SUM(r.refund_fen), 0) AS amount_fen
           FROM returns r
           JOIN orders o ON o.id = r.order_id
           JOIN stores s ON s.id = o.store_id
           JOIN users u ON u.id = o.seller_id
           WHERE r.status = 'completed'
-            AND r.completed_at >= ${periodStart}
-            AND r.completed_at < ${periodEnd}
-            ${orderScope}
+            AND r.completed_at >= ? AND r.completed_at < ?
+            ${orderScope.clause}
           GROUP BY o.store_id, s.name, o.seller_id, u.display_name
-        `,
-        sql<LedgerRow[]>`
+        `, [periodStart, periodEnd, ...orderScope.params]),
+        all<LedgerRow>(`
           SELECT cl.store_id, s.name AS store_name,
                  cl.beneficiary_id AS seller_id, u.display_name AS seller_name,
                  COALESCE(SUM(CASE WHEN sb.id IS NULL OR sb.status = 'draft'
-                   THEN cl.amount_fen ELSE 0 END), 0)::int AS pending_fen,
+                   THEN cl.amount_fen ELSE 0 END), 0) AS pending_fen,
                  COALESCE(SUM(CASE WHEN cl.entry_type = 'return_reversal'
-                   THEN ABS(cl.amount_fen) ELSE 0 END), 0)::int AS reversed_fen,
-                 COALESCE(SUM(cl.amount_fen), 0)::int AS net_fen
+                   THEN ABS(cl.amount_fen) ELSE 0 END), 0) AS reversed_fen,
+                 COALESCE(SUM(cl.amount_fen), 0) AS net_fen
           FROM commission_ledger cl
           JOIN stores s ON s.id = cl.store_id
           JOIN users u ON u.id = cl.beneficiary_id
           LEFT JOIN settlement_items si ON si.ledger_entry_id = cl.id
           LEFT JOIN settlement_batches sb ON sb.id = si.batch_id
           WHERE cl.entry_type IN ('accrual', 'return_reversal', 'manual_positive', 'manual_negative')
-            AND cl.occurred_at >= ${periodStart}
-            AND cl.occurred_at < ${periodEnd}
-            ${ledgerScope}
+            AND cl.occurred_at >= ? AND cl.occurred_at < ?
+            ${ledgerScope.clause}
           GROUP BY cl.store_id, s.name, cl.beneficiary_id, u.display_name
-        `,
-        sql<AmountRow[]>`
+        `, [periodStart, periodEnd, ...ledgerScope.params]),
+        all<AmountRow>(`
           SELECT cl.store_id, s.name AS store_name,
                  cl.beneficiary_id AS seller_id, u.display_name AS seller_name,
-                 COALESCE(SUM(si.amount_fen), 0)::int AS amount_fen
+                 COALESCE(SUM(si.amount_fen), 0) AS amount_fen
           FROM settlement_items si
           JOIN settlement_batches sb ON sb.id = si.batch_id
           JOIN commission_ledger cl ON cl.id = si.ledger_entry_id
           JOIN stores s ON s.id = cl.store_id
           JOIN users u ON u.id = cl.beneficiary_id
           WHERE sb.status = 'paid'
-            AND sb.paid_at >= ${periodStart}
-            AND sb.paid_at < ${periodEnd}
-            ${ledgerScope}
+            AND sb.paid_at >= ? AND sb.paid_at < ?
+            ${ledgerScope.clause}
           GROUP BY cl.store_id, s.name, cl.beneficiary_id, u.display_name
-        `,
-      ]);
+        `, [periodStart, periodEnd, ...ledgerScope.params]),
+      ];
 
     const facts = new Map<string, SalesReportFact>();
     const ensure = (row: DimensionRow) => {
@@ -284,12 +280,12 @@ export class DrizzleSalesReportRepository implements SalesReportRepository {
       const people =
         beneficiaryIds.length === 0
           ? []
-          : await sql<DimensionRow[]>`
+          : all<DimensionRow>(`
               SELECT u.store_id, s.name AS store_name, u.id AS seller_id,
                      u.display_name AS seller_name
               FROM users u JOIN stores s ON s.id = u.store_id
-              WHERE u.id IN ${sql(beneficiaryIds)}
-            `;
+              WHERE u.id IN (${beneficiaryIds.map(() => "?").join(", ")})
+            `, beneficiaryIds);
       const peopleById = new Map(people.map((person) => [person.seller_id, person]));
       for (const order of estimatedOrders) {
         const calculation = calculateCommission(order.lines, policy.rules, {

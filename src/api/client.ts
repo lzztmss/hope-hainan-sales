@@ -226,6 +226,8 @@ export interface OrderListApiQuery {
   recycleBin?: boolean;
   orderNo?: string;
   customerPhoneTail?: string;
+  storeQuery?: string;
+  sellerQuery?: string;
   status?: OrderStatus;
   paymentMode?: OrderPaymentMode;
   cursor?: string;
@@ -664,6 +666,8 @@ export const createApiClient = ({
       if (query.customerPhoneTail) {
         parameters.set("customerPhoneTail", query.customerPhoneTail);
       }
+      if (query.storeQuery) parameters.set("storeQuery", query.storeQuery);
+      if (query.sellerQuery) parameters.set("sellerQuery", query.sellerQuery);
       if (query.status) parameters.set("status", query.status);
       if (query.paymentMode) parameters.set("paymentMode", query.paymentMode);
       if (query.cursor) parameters.set("cursor", query.cursor);

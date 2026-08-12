@@ -33,5 +33,5 @@
 .quote-management__detail li span { color: var(--app-color-text-muted); text-align: right; }
 .quote-management__actions { display: flex; flex-wrap: wrap; gap: var(--hfttr-space-3); }
 .quote-management__error { color: var(--app-color-danger); font-weight: 700; }
-@media (min-width: 48rem) { .quote-management__filters { grid-template-columns: minmax(0, 2fr) minmax(12rem, 1fr) auto; align-items: end; } }
+@media (min-width: 64rem) { .quote-management__filters { grid-template-columns: minmax(0, 2fr) minmax(10rem, 1fr) minmax(9rem, 1fr) minmax(9rem, 1fr) auto; align-items: end; } }
 @media print { .quote-management__actions, .page-header { display: none !important; } .quote-management__detail { border: 0; box-shadow: none; padding: 0; } }

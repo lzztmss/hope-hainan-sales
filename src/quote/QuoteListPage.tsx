@@ -20,16 +20,20 @@ export const QuoteListPage = ({ client }: { client: ApiClient }) => {
   const [items, setItems] = useState<readonly QuoteDetailDto[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<QuoteStatus | "">("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (nextQuery: string, nextStatus: QuoteStatus | "") => {
+  const load = useCallback(async (nextQuery: string, nextStatus: QuoteStatus | "", nextFrom = "", nextTo = "") => {
     setLoading(true);
     setError(null);
     try {
       const result = await client.listQuotes({
         query: nextQuery.trim() || undefined,
         status: nextStatus || undefined,
+        dateFrom: nextFrom || undefined,
+        dateTo: nextTo || undefined,
       });
       setItems(result.items);
     } catch (reason) {
@@ -43,7 +47,7 @@ export const QuoteListPage = ({ client }: { client: ApiClient }) => {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    void load(query, status);
+    void load(query, status, dateFrom, dateTo);
   };
 
   return (
@@ -71,6 +75,14 @@ export const QuoteListPage = ({ client }: { client: ApiClient }) => {
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
+        </label>
+        <label>
+          <span>开始日期</span>
+          <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.currentTarget.value)} />
+        </label>
+        <label>
+          <span>结束日期</span>
+          <input type="date" value={dateTo} onChange={(event) => setDateTo(event.currentTarget.value)} />
         </label>
         <button type="submit" disabled={loading}>查询</button>
       </form>

@@ -50,6 +50,8 @@ const dateSchema = z
 const listQuerySchema = z.object({
   orderNo: z.string().trim().min(1).max(64).optional(),
   customerPhoneTail: z.string().regex(/^\d{4}$/).optional(),
+  storeQuery: z.string().trim().min(1).max(160).optional(),
+  sellerQuery: z.string().trim().min(1).max(120).optional(),
   status: z
     .enum([
       "pending",
@@ -146,6 +148,8 @@ const parseListFilters = (
     filters: {
       orderNo: parsed.data.orderNo,
       customerPhoneTail: parsed.data.customerPhoneTail,
+      storeQuery: parsed.data.storeQuery,
+      sellerQuery: parsed.data.sellerQuery,
       status: parsed.data.status,
       paymentMode: parsed.data.paymentMode,
       fttrKind: parsed.data.fttrKind,

@@ -1,0 +1,3477 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "3e2f950b-7f70-467a-95f0-194717d7493c",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "tables": {
+    "audit_logs": {
+      "name": "audit_logs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actor_user_id": {
+          "name": "actor_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "store_id": {
+          "name": "store_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "entity_type": {
+          "name": "entity_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "before_snapshot": {
+          "name": "before_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "after_snapshot": {
+          "name": "after_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_ip": {
+          "name": "source_ip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "audit_logs_entity_idx": {
+          "name": "audit_logs_entity_idx",
+          "columns": [
+            "entity_type",
+            "entity_id"
+          ],
+          "isUnique": false
+        },
+        "audit_logs_actor_idx": {
+          "name": "audit_logs_actor_idx",
+          "columns": [
+            "actor_user_id"
+          ],
+          "isUnique": false
+        },
+        "audit_logs_created_at_idx": {
+          "name": "audit_logs_created_at_idx",
+          "columns": [
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "audit_logs_actor_user_id_users_id_fk": {
+          "name": "audit_logs_actor_user_id_users_id_fk",
+          "tableFrom": "audit_logs",
+          "tableTo": "users",
+          "columnsFrom": [
+            "actor_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "audit_logs_store_id_stores_id_fk": {
+          "name": "audit_logs_store_id_stores_id_fk",
+          "tableFrom": "audit_logs",
+          "tableTo": "stores",
+          "columnsFrom": [
+            "store_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "commission_ledger": {
+      "name": "commission_ledger",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "return_id": {
+          "name": "return_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "snapshot_id": {
+          "name": "snapshot_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "rule_id": {
+          "name": "rule_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "beneficiary_id": {
+          "name": "beneficiary_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "store_id": {
+          "name": "store_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "entry_type": {
+          "name": "entry_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "event_key": {
+          "name": "event_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "amount_fen": {
+          "name": "amount_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "commission_ledger_event_identity_unique": {
+          "name": "commission_ledger_event_identity_unique",
+          "columns": [
+            "order_id",
+            "rule_id",
+            "beneficiary_id",
+            "event_key"
+          ],
+          "isUnique": true
+        },
+        "commission_ledger_beneficiary_occurred_idx": {
+          "name": "commission_ledger_beneficiary_occurred_idx",
+          "columns": [
+            "beneficiary_id",
+            "occurred_at"
+          ],
+          "isUnique": false
+        },
+        "commission_ledger_store_occurred_idx": {
+          "name": "commission_ledger_store_occurred_idx",
+          "columns": [
+            "store_id",
+            "occurred_at"
+          ],
+          "isUnique": false
+        },
+        "commission_ledger_order_idx": {
+          "name": "commission_ledger_order_idx",
+          "columns": [
+            "order_id"
+          ],
+          "isUnique": false
+        },
+        "commission_ledger_return_idx": {
+          "name": "commission_ledger_return_idx",
+          "columns": [
+            "return_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "commission_ledger_order_id_orders_id_fk": {
+          "name": "commission_ledger_order_id_orders_id_fk",
+          "tableFrom": "commission_ledger",
+          "tableTo": "orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "commission_ledger_return_id_returns_id_fk": {
+          "name": "commission_ledger_return_id_returns_id_fk",
+          "tableFrom": "commission_ledger",
+          "tableTo": "returns",
+          "columnsFrom": [
+            "return_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "commission_ledger_snapshot_id_order_commission_snapshots_id_fk": {
+          "name": "commission_ledger_snapshot_id_order_commission_snapshots_id_fk",
+          "tableFrom": "commission_ledger",
+          "tableTo": "order_commission_snapshots",
+          "columnsFrom": [
+            "snapshot_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "commission_ledger_rule_id_commission_rules_id_fk": {
+          "name": "commission_ledger_rule_id_commission_rules_id_fk",
+          "tableFrom": "commission_ledger",
+          "tableTo": "commission_rules",
+          "columnsFrom": [
+            "rule_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "commission_ledger_beneficiary_id_users_id_fk": {
+          "name": "commission_ledger_beneficiary_id_users_id_fk",
+          "tableFrom": "commission_ledger",
+          "tableTo": "users",
+          "columnsFrom": [
+            "beneficiary_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "commission_ledger_store_id_stores_id_fk": {
+          "name": "commission_ledger_store_id_stores_id_fk",
+          "tableFrom": "commission_ledger",
+          "tableTo": "stores",
+          "columnsFrom": [
+            "store_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "commission_ledger_created_by_users_id_fk": {
+          "name": "commission_ledger_created_by_users_id_fk",
+          "tableFrom": "commission_ledger",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "commission_ledger_amount_sign": {
+          "name": "commission_ledger_amount_sign",
+          "value": "(\n        \"commission_ledger\".\"entry_type\" IN ('accrual', 'manual_positive', 'settlement')\n        AND \"commission_ledger\".\"amount_fen\" > 0\n      ) OR (\n        \"commission_ledger\".\"entry_type\" IN ('return_reversal', 'manual_negative', 'settlement_reversal')\n        AND \"commission_ledger\".\"amount_fen\" < 0\n      )"
+        },
+        "commission_ledger_manual_reason": {
+          "name": "commission_ledger_manual_reason",
+          "value": "\"commission_ledger\".\"entry_type\" NOT IN ('manual_positive', 'manual_negative') OR NULLIF(BTRIM(\"commission_ledger\".\"reason\"), '') IS NOT NULL"
+        }
+      }
+    },
+    "commission_policy_versions": {
+      "name": "commission_policy_versions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "policy_code": {
+          "name": "policy_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version_no": {
+          "name": "version_no",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "effective_from": {
+          "name": "effective_from",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "effective_to": {
+          "name": "effective_to",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "published_by": {
+          "name": "published_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "stopped_by": {
+          "name": "stopped_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "stopped_at": {
+          "name": "stopped_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "change_note": {
+          "name": "change_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "commission_policy_code_version_unique": {
+          "name": "commission_policy_code_version_unique",
+          "columns": [
+            "policy_code",
+            "version_no"
+          ],
+          "isUnique": true
+        },
+        "commission_policy_status_effective_idx": {
+          "name": "commission_policy_status_effective_idx",
+          "columns": [
+            "status",
+            "effective_from",
+            "effective_to"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "commission_policy_versions_created_by_users_id_fk": {
+          "name": "commission_policy_versions_created_by_users_id_fk",
+          "tableFrom": "commission_policy_versions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "commission_policy_versions_published_by_users_id_fk": {
+          "name": "commission_policy_versions_published_by_users_id_fk",
+          "tableFrom": "commission_policy_versions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "published_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "commission_policy_versions_stopped_by_users_id_fk": {
+          "name": "commission_policy_versions_stopped_by_users_id_fk",
+          "tableFrom": "commission_policy_versions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "stopped_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "commission_policy_version_no_positive": {
+          "name": "commission_policy_version_no_positive",
+          "value": "\"commission_policy_versions\".\"version_no\" >= 1"
+        },
+        "commission_policy_version_positive": {
+          "name": "commission_policy_version_positive",
+          "value": "\"commission_policy_versions\".\"version\" >= 1"
+        },
+        "commission_policy_effective_range": {
+          "name": "commission_policy_effective_range",
+          "value": "\"commission_policy_versions\".\"effective_to\" IS NULL OR \"commission_policy_versions\".\"effective_to\" > \"commission_policy_versions\".\"effective_from\" OR (\"commission_policy_versions\".\"status\" = 'stopped' AND \"commission_policy_versions\".\"effective_to\" = \"commission_policy_versions\".\"effective_from\")"
+        }
+      }
+    },
+    "commission_rules": {
+      "name": "commission_rules",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "policy_version_id": {
+          "name": "policy_version_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rule_code": {
+          "name": "rule_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "rule_name": {
+          "name": "rule_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'active'"
+        },
+        "business_domain": {
+          "name": "business_domain",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_type": {
+          "name": "target_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_sku": {
+          "name": "target_sku",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "fttr_plan": {
+          "name": "fttr_plan",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "payment_mode_scope": {
+          "name": "payment_mode_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "calculation_basis": {
+          "name": "calculation_basis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "package_mode": {
+          "name": "package_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "amount_fen": {
+          "name": "amount_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "store_id": {
+          "name": "store_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "personnel_type": {
+          "name": "personnel_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "salesperson_id": {
+          "name": "salesperson_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "attribution_scope": {
+          "name": "attribution_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'all'"
+        },
+        "effective_from": {
+          "name": "effective_from",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "effective_to": {
+          "name": "effective_to",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "mutual_exclusion_group": {
+          "name": "mutual_exclusion_group",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "stackable": {
+          "name": "stackable",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "allows_cross_domain": {
+          "name": "allows_cross_domain",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "change_note": {
+          "name": "change_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "commission_rules_policy_code_unique": {
+          "name": "commission_rules_policy_code_unique",
+          "columns": [
+            "policy_version_id",
+            "rule_code"
+          ],
+          "isUnique": true
+        },
+        "commission_rules_match_idx": {
+          "name": "commission_rules_match_idx",
+          "columns": [
+            "business_domain",
+            "target_type",
+            "target_sku",
+            "payment_mode_scope"
+          ],
+          "isUnique": false
+        },
+        "commission_rules_scope_idx": {
+          "name": "commission_rules_scope_idx",
+          "columns": [
+            "salesperson_id",
+            "personnel_type",
+            "store_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "commission_rules_policy_version_id_commission_policy_versions_id_fk": {
+          "name": "commission_rules_policy_version_id_commission_policy_versions_id_fk",
+          "tableFrom": "commission_rules",
+          "tableTo": "commission_policy_versions",
+          "columnsFrom": [
+            "policy_version_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "commission_rules_store_id_stores_id_fk": {
+          "name": "commission_rules_store_id_stores_id_fk",
+          "tableFrom": "commission_rules",
+          "tableTo": "stores",
+          "columnsFrom": [
+            "store_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "commission_rules_salesperson_id_users_id_fk": {
+          "name": "commission_rules_salesperson_id_users_id_fk",
+          "tableFrom": "commission_rules",
+          "tableTo": "users",
+          "columnsFrom": [
+            "salesperson_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "commission_rules_created_by_users_id_fk": {
+          "name": "commission_rules_created_by_users_id_fk",
+          "tableFrom": "commission_rules",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "commission_rules_amount_nonnegative": {
+          "name": "commission_rules_amount_nonnegative",
+          "value": "\"commission_rules\".\"amount_fen\" >= 0"
+        },
+        "commission_rules_version_positive": {
+          "name": "commission_rules_version_positive",
+          "value": "\"commission_rules\".\"version\" >= 1"
+        },
+        "commission_rules_effective_range": {
+          "name": "commission_rules_effective_range",
+          "value": "\"commission_rules\".\"effective_to\" IS NULL OR \"commission_rules\".\"effective_to\" >= \"commission_rules\".\"effective_from\""
+        },
+        "commission_rules_target_present": {
+          "name": "commission_rules_target_present",
+          "value": "(\"commission_rules\".\"target_type\" IN ('product', 'package') AND NULLIF(BTRIM(\"commission_rules\".\"target_sku\"), '') IS NOT NULL) OR (\"commission_rules\".\"target_type\" = 'fttr_plan' AND (\"commission_rules\".\"fttr_plan\" BETWEEN 1 AND 9999 OR \"commission_rules\".\"target_sku\" = 'CUSTOM'))"
+        }
+      }
+    },
+    "customers": {
+      "name": "customers",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "store_id": {
+          "name": "store_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_user_id": {
+          "name": "owner_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name_encrypted": {
+          "name": "name_encrypted",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "phone_encrypted": {
+          "name": "phone_encrypted",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "phone_lookup_hash": {
+          "name": "phone_lookup_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "phone_tail": {
+          "name": "phone_tail",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "district_encrypted": {
+          "name": "district_encrypted",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "address_encrypted": {
+          "name": "address_encrypted",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "room_type": {
+          "name": "room_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "elder_count": {
+          "name": "elder_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "notes_encrypted": {
+          "name": "notes_encrypted",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "customers_store_owner_idx": {
+          "name": "customers_store_owner_idx",
+          "columns": [
+            "store_id",
+            "owner_user_id"
+          ],
+          "isUnique": false
+        },
+        "customers_phone_tail_idx": {
+          "name": "customers_phone_tail_idx",
+          "columns": [
+            "phone_tail"
+          ],
+          "isUnique": false
+        },
+        "customers_phone_lookup_idx": {
+          "name": "customers_phone_lookup_idx",
+          "columns": [
+            "phone_lookup_hash"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "customers_store_id_stores_id_fk": {
+          "name": "customers_store_id_stores_id_fk",
+          "tableFrom": "customers",
+          "tableTo": "stores",
+          "columnsFrom": [
+            "store_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "customers_owner_user_id_users_id_fk": {
+          "name": "customers_owner_user_id_users_id_fk",
+          "tableFrom": "customers",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "customers_created_by_users_id_fk": {
+          "name": "customers_created_by_users_id_fk",
+          "tableFrom": "customers",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "customers_elder_count_range": {
+          "name": "customers_elder_count_range",
+          "value": "\"customers\".\"elder_count\" BETWEEN 1 AND 20"
+        },
+        "customers_version_positive": {
+          "name": "customers_version_positive",
+          "value": "\"customers\".\"version\" >= 1"
+        }
+      }
+    },
+    "order_attributions": {
+      "name": "order_attributions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "beneficiary_id": {
+          "name": "beneficiary_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attribution_role": {
+          "name": "attribution_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "basis_points": {
+          "name": "basis_points",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "beneficiary_snapshot": {
+          "name": "beneficiary_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "order_attributions_order_beneficiary_unique": {
+          "name": "order_attributions_order_beneficiary_unique",
+          "columns": [
+            "order_id",
+            "beneficiary_id"
+          ],
+          "isUnique": true
+        },
+        "order_attributions_one_primary_unique": {
+          "name": "order_attributions_one_primary_unique",
+          "columns": [
+            "order_id"
+          ],
+          "isUnique": true,
+          "where": "\"order_attributions\".\"attribution_role\" = 'primary'"
+        },
+        "order_attributions_beneficiary_idx": {
+          "name": "order_attributions_beneficiary_idx",
+          "columns": [
+            "beneficiary_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "order_attributions_order_id_orders_id_fk": {
+          "name": "order_attributions_order_id_orders_id_fk",
+          "tableFrom": "order_attributions",
+          "tableTo": "orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "order_attributions_beneficiary_id_users_id_fk": {
+          "name": "order_attributions_beneficiary_id_users_id_fk",
+          "tableFrom": "order_attributions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "beneficiary_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "order_attributions_basis_points_range": {
+          "name": "order_attributions_basis_points_range",
+          "value": "\"order_attributions\".\"basis_points\" BETWEEN 1 AND 10000"
+        }
+      }
+    },
+    "order_commission_snapshots": {
+      "name": "order_commission_snapshots",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "policy_version_id": {
+          "name": "policy_version_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "event_key": {
+          "name": "event_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "total_fen": {
+          "name": "total_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "calculation_snapshot": {
+          "name": "calculation_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "order_commission_snapshots_order_unique": {
+          "name": "order_commission_snapshots_order_unique",
+          "columns": [
+            "order_id"
+          ],
+          "isUnique": true
+        },
+        "order_commission_snapshots_event_key_unique": {
+          "name": "order_commission_snapshots_event_key_unique",
+          "columns": [
+            "event_key"
+          ],
+          "isUnique": true
+        },
+        "order_commission_snapshots_policy_idx": {
+          "name": "order_commission_snapshots_policy_idx",
+          "columns": [
+            "policy_version_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "order_commission_snapshots_order_id_orders_id_fk": {
+          "name": "order_commission_snapshots_order_id_orders_id_fk",
+          "tableFrom": "order_commission_snapshots",
+          "tableTo": "orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "order_commission_snapshots_policy_version_id_commission_policy_versions_id_fk": {
+          "name": "order_commission_snapshots_policy_version_id_commission_policy_versions_id_fk",
+          "tableFrom": "order_commission_snapshots",
+          "tableTo": "commission_policy_versions",
+          "columnsFrom": [
+            "policy_version_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "order_commission_snapshots_total_nonnegative": {
+          "name": "order_commission_snapshots_total_nonnegative",
+          "value": "\"order_commission_snapshots\".\"total_fen\" >= 0"
+        }
+      }
+    },
+    "order_lines": {
+      "name": "order_lines",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quote_line_id": {
+          "name": "quote_line_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "line_type": {
+          "name": "line_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sku": {
+          "name": "sku",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "unit": {
+          "name": "unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "one_time_unit_fen": {
+          "name": "one_time_unit_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "monthly_unit_fen": {
+          "name": "monthly_unit_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "one_time_subtotal_fen": {
+          "name": "one_time_subtotal_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "monthly_subtotal_fen": {
+          "name": "monthly_subtotal_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "locations": {
+          "name": "locations",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[]'"
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "line_snapshot": {
+          "name": "line_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "order_lines_order_idx": {
+          "name": "order_lines_order_idx",
+          "columns": [
+            "order_id"
+          ],
+          "isUnique": false
+        },
+        "order_lines_sku_idx": {
+          "name": "order_lines_sku_idx",
+          "columns": [
+            "sku"
+          ],
+          "isUnique": false
+        },
+        "order_lines_id_quantity_unique": {
+          "name": "order_lines_id_quantity_unique",
+          "columns": [
+            "id",
+            "quantity"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "order_lines_order_id_orders_id_fk": {
+          "name": "order_lines_order_id_orders_id_fk",
+          "tableFrom": "order_lines",
+          "tableTo": "orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "order_lines_quote_line_id_quote_lines_id_fk": {
+          "name": "order_lines_quote_line_id_quote_lines_id_fk",
+          "tableFrom": "order_lines",
+          "tableTo": "quote_lines",
+          "columnsFrom": [
+            "quote_line_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "order_lines_quantity_positive": {
+          "name": "order_lines_quantity_positive",
+          "value": "\"order_lines\".\"quantity\" > 0"
+        },
+        "order_lines_amounts_nonnegative": {
+          "name": "order_lines_amounts_nonnegative",
+          "value": "\"order_lines\".\"one_time_unit_fen\" >= 0 AND \"order_lines\".\"monthly_unit_fen\" >= 0 AND \"order_lines\".\"one_time_subtotal_fen\" >= 0 AND \"order_lines\".\"monthly_subtotal_fen\" >= 0"
+        }
+      }
+    },
+    "orders": {
+      "name": "orders",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "order_no": {
+          "name": "order_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quote_id": {
+          "name": "quote_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "store_id": {
+          "name": "store_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "seller_id": {
+          "name": "seller_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payment_mode": {
+          "name": "payment_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fttr_kind": {
+          "name": "fttr_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fttr_plan": {
+          "name": "fttr_plan",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "custom_fttr_note": {
+          "name": "custom_fttr_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "fttr_monthly_fen": {
+          "name": "fttr_monthly_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "heart_monthly_fen": {
+          "name": "heart_monthly_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "one_time_fen": {
+          "name": "one_time_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "monthly_total_fen": {
+          "name": "monthly_total_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contract_36_fen": {
+          "name": "contract_36_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "refunded_fen": {
+          "name": "refunded_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "catalog_version": {
+          "name": "catalog_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "catalog_snapshot": {
+          "name": "catalog_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "customer_snapshot": {
+          "name": "customer_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quote_snapshot": {
+          "name": "quote_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "store_snapshot": {
+          "name": "store_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "seller_snapshot": {
+          "name": "seller_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "accepted_at": {
+          "name": "accepted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "activated_at": {
+          "name": "activated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "cancelled_at": {
+          "name": "cancelled_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "orders_order_no_unique": {
+          "name": "orders_order_no_unique",
+          "columns": [
+            "order_no"
+          ],
+          "isUnique": true
+        },
+        "orders_idempotency_key_unique": {
+          "name": "orders_idempotency_key_unique",
+          "columns": [
+            "idempotency_key"
+          ],
+          "isUnique": true
+        },
+        "orders_quote_id_unique": {
+          "name": "orders_quote_id_unique",
+          "columns": [
+            "quote_id"
+          ],
+          "isUnique": true
+        },
+        "orders_store_seller_created_idx": {
+          "name": "orders_store_seller_created_idx",
+          "columns": [
+            "store_id",
+            "seller_id",
+            "created_at"
+          ],
+          "isUnique": false
+        },
+        "orders_customer_idx": {
+          "name": "orders_customer_idx",
+          "columns": [
+            "customer_id"
+          ],
+          "isUnique": false
+        },
+        "orders_status_created_idx": {
+          "name": "orders_status_created_idx",
+          "columns": [
+            "status",
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "orders_quote_id_quotes_id_fk": {
+          "name": "orders_quote_id_quotes_id_fk",
+          "tableFrom": "orders",
+          "tableTo": "quotes",
+          "columnsFrom": [
+            "quote_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "orders_customer_id_customers_id_fk": {
+          "name": "orders_customer_id_customers_id_fk",
+          "tableFrom": "orders",
+          "tableTo": "customers",
+          "columnsFrom": [
+            "customer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "orders_store_id_stores_id_fk": {
+          "name": "orders_store_id_stores_id_fk",
+          "tableFrom": "orders",
+          "tableTo": "stores",
+          "columnsFrom": [
+            "store_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "orders_seller_id_users_id_fk": {
+          "name": "orders_seller_id_users_id_fk",
+          "tableFrom": "orders",
+          "tableTo": "users",
+          "columnsFrom": [
+            "seller_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "orders_created_by_users_id_fk": {
+          "name": "orders_created_by_users_id_fk",
+          "tableFrom": "orders",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "orders_amounts_nonnegative": {
+          "name": "orders_amounts_nonnegative",
+          "value": "\"orders\".\"fttr_monthly_fen\" >= 0 AND \"orders\".\"heart_monthly_fen\" >= 0 AND \"orders\".\"one_time_fen\" >= 0 AND \"orders\".\"monthly_total_fen\" >= 0 AND \"orders\".\"contract_36_fen\" >= 0 AND \"orders\".\"refunded_fen\" >= 0"
+        },
+        "orders_fttr_state_consistent": {
+          "name": "orders_fttr_state_consistent",
+          "value": "(\n        \"orders\".\"fttr_kind\" = 'none'\n        AND \"orders\".\"fttr_plan\" IS NULL\n        AND \"orders\".\"fttr_monthly_fen\" = 0\n        AND \"orders\".\"custom_fttr_note\" IS NULL\n      ) OR (\n        \"orders\".\"fttr_kind\" = 'standard'\n        AND \"orders\".\"fttr_plan\" IN (129, 159, 199, 239, 299, 399)\n        AND \"orders\".\"fttr_monthly_fen\" = \"orders\".\"fttr_plan\" * 100\n        AND \"orders\".\"custom_fttr_note\" IS NULL\n      ) OR (\n        \"orders\".\"fttr_kind\" = 'custom'\n        AND \"orders\".\"fttr_plan\" BETWEEN 1 AND 9999\n        AND \"orders\".\"fttr_monthly_fen\" = \"orders\".\"fttr_plan\" * 100\n        AND NULLIF(BTRIM(\"orders\".\"custom_fttr_note\"), '') IS NOT NULL\n      )"
+        },
+        "orders_version_positive": {
+          "name": "orders_version_positive",
+          "value": "\"orders\".\"version\" >= 1"
+        }
+      }
+    },
+    "print_events": {
+      "name": "print_events",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quote_id": {
+          "name": "quote_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "print_events_quote_idx": {
+          "name": "print_events_quote_idx",
+          "columns": [
+            "quote_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "print_events_quote_id_quotes_id_fk": {
+          "name": "print_events_quote_id_quotes_id_fk",
+          "tableFrom": "print_events",
+          "tableTo": "quotes",
+          "columnsFrom": [
+            "quote_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "print_events_user_id_users_id_fk": {
+          "name": "print_events_user_id_users_id_fk",
+          "tableFrom": "print_events",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "quote_lines": {
+      "name": "quote_lines",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quote_id": {
+          "name": "quote_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "line_type": {
+          "name": "line_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sku": {
+          "name": "sku",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "unit": {
+          "name": "unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "one_time_unit_fen": {
+          "name": "one_time_unit_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "monthly_unit_fen": {
+          "name": "monthly_unit_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "one_time_subtotal_fen": {
+          "name": "one_time_subtotal_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "monthly_subtotal_fen": {
+          "name": "monthly_subtotal_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "locations": {
+          "name": "locations",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[]'"
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "quote_lines_quote_idx": {
+          "name": "quote_lines_quote_idx",
+          "columns": [
+            "quote_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "quote_lines_quote_id_quotes_id_fk": {
+          "name": "quote_lines_quote_id_quotes_id_fk",
+          "tableFrom": "quote_lines",
+          "tableTo": "quotes",
+          "columnsFrom": [
+            "quote_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "quote_lines_quantity_positive": {
+          "name": "quote_lines_quantity_positive",
+          "value": "\"quote_lines\".\"quantity\" > 0"
+        },
+        "quote_lines_amounts_nonnegative": {
+          "name": "quote_lines_amounts_nonnegative",
+          "value": "\"quote_lines\".\"one_time_unit_fen\" >= 0 AND \"quote_lines\".\"monthly_unit_fen\" >= 0 AND \"quote_lines\".\"one_time_subtotal_fen\" >= 0 AND \"quote_lines\".\"monthly_subtotal_fen\" >= 0"
+        }
+      }
+    },
+    "quotes": {
+      "name": "quotes",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quote_no": {
+          "name": "quote_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "store_id": {
+          "name": "store_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "seller_id": {
+          "name": "seller_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payment_mode": {
+          "name": "payment_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fttr_kind": {
+          "name": "fttr_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "fttr_plan": {
+          "name": "fttr_plan",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "custom_fttr_note": {
+          "name": "custom_fttr_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "fttr_monthly_fen": {
+          "name": "fttr_monthly_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "heart_monthly_fen": {
+          "name": "heart_monthly_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "one_time_fen": {
+          "name": "one_time_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "monthly_total_fen": {
+          "name": "monthly_total_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contract_36_fen": {
+          "name": "contract_36_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "catalog_version": {
+          "name": "catalog_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "customer_snapshot": {
+          "name": "customer_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quote_snapshot": {
+          "name": "quote_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "confirmed_at": {
+          "name": "confirmed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "quotes_quote_no_unique": {
+          "name": "quotes_quote_no_unique",
+          "columns": [
+            "quote_no"
+          ],
+          "isUnique": true
+        },
+        "quotes_idempotency_key_unique": {
+          "name": "quotes_idempotency_key_unique",
+          "columns": [
+            "idempotency_key"
+          ],
+          "isUnique": true
+        },
+        "quotes_store_seller_idx": {
+          "name": "quotes_store_seller_idx",
+          "columns": [
+            "store_id",
+            "seller_id"
+          ],
+          "isUnique": false
+        },
+        "quotes_customer_idx": {
+          "name": "quotes_customer_idx",
+          "columns": [
+            "customer_id"
+          ],
+          "isUnique": false
+        },
+        "quotes_confirmed_at_idx": {
+          "name": "quotes_confirmed_at_idx",
+          "columns": [
+            "confirmed_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "quotes_customer_id_customers_id_fk": {
+          "name": "quotes_customer_id_customers_id_fk",
+          "tableFrom": "quotes",
+          "tableTo": "customers",
+          "columnsFrom": [
+            "customer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "quotes_store_id_stores_id_fk": {
+          "name": "quotes_store_id_stores_id_fk",
+          "tableFrom": "quotes",
+          "tableTo": "stores",
+          "columnsFrom": [
+            "store_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "quotes_seller_id_users_id_fk": {
+          "name": "quotes_seller_id_users_id_fk",
+          "tableFrom": "quotes",
+          "tableTo": "users",
+          "columnsFrom": [
+            "seller_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "quotes_amounts_nonnegative": {
+          "name": "quotes_amounts_nonnegative",
+          "value": "\"quotes\".\"fttr_monthly_fen\" >= 0 AND \"quotes\".\"heart_monthly_fen\" >= 0 AND \"quotes\".\"one_time_fen\" >= 0 AND \"quotes\".\"monthly_total_fen\" >= 0 AND \"quotes\".\"contract_36_fen\" >= 0"
+        },
+        "quotes_fttr_state_consistent": {
+          "name": "quotes_fttr_state_consistent",
+          "value": "(\n        \"quotes\".\"fttr_kind\" = 'none'\n        AND \"quotes\".\"fttr_plan\" IS NULL\n        AND \"quotes\".\"fttr_monthly_fen\" = 0\n        AND \"quotes\".\"custom_fttr_note\" IS NULL\n      ) OR (\n        \"quotes\".\"fttr_kind\" = 'standard'\n        AND \"quotes\".\"fttr_plan\" IN (129, 159, 199, 239, 299, 399)\n        AND \"quotes\".\"fttr_monthly_fen\" = \"quotes\".\"fttr_plan\" * 100\n        AND \"quotes\".\"custom_fttr_note\" IS NULL\n      ) OR (\n        \"quotes\".\"fttr_kind\" = 'custom'\n        AND \"quotes\".\"fttr_plan\" BETWEEN 1 AND 9999\n        AND \"quotes\".\"fttr_monthly_fen\" = \"quotes\".\"fttr_plan\" * 100\n        AND NULLIF(BTRIM(\"quotes\".\"custom_fttr_note\"), '') IS NOT NULL\n      )"
+        },
+        "quotes_version_positive": {
+          "name": "quotes_version_positive",
+          "value": "\"quotes\".\"version\" >= 1"
+        }
+      }
+    },
+    "return_items": {
+      "name": "return_items",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "return_id": {
+          "name": "return_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "order_line_id": {
+          "name": "order_line_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "order_line_quantity": {
+          "name": "order_line_quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sku": {
+          "name": "sku",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "refund_fen": {
+          "name": "refund_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "item_snapshot": {
+          "name": "item_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "return_items_return_line_unique": {
+          "name": "return_items_return_line_unique",
+          "columns": [
+            "return_id",
+            "order_line_id"
+          ],
+          "isUnique": true
+        },
+        "return_items_order_line_idx": {
+          "name": "return_items_order_line_idx",
+          "columns": [
+            "order_line_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "return_items_return_id_returns_id_fk": {
+          "name": "return_items_return_id_returns_id_fk",
+          "tableFrom": "return_items",
+          "tableTo": "returns",
+          "columnsFrom": [
+            "return_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "return_items_order_line_quantity_fk": {
+          "name": "return_items_order_line_quantity_fk",
+          "tableFrom": "return_items",
+          "tableTo": "order_lines",
+          "columnsFrom": [
+            "order_line_id",
+            "order_line_quantity"
+          ],
+          "columnsTo": [
+            "id",
+            "quantity"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "return_items_quantity_range": {
+          "name": "return_items_quantity_range",
+          "value": "\"return_items\".\"quantity\" > 0 AND \"return_items\".\"quantity\" <= \"return_items\".\"order_line_quantity\""
+        },
+        "return_items_refund_nonnegative": {
+          "name": "return_items_refund_nonnegative",
+          "value": "\"return_items\".\"refund_fen\" >= 0"
+        }
+      }
+    },
+    "returns": {
+      "name": "returns",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "return_no": {
+          "name": "return_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "completion_idempotency_key": {
+          "name": "completion_idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "return_type": {
+          "name": "return_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "requested_by": {
+          "name": "requested_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "requested_at": {
+          "name": "requested_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "decided_by": {
+          "name": "decided_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "decided_at": {
+          "name": "decided_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "decision_note": {
+          "name": "decision_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "completed_by": {
+          "name": "completed_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "refund_fen": {
+          "name": "refund_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "returns_return_no_unique": {
+          "name": "returns_return_no_unique",
+          "columns": [
+            "return_no"
+          ],
+          "isUnique": true
+        },
+        "returns_idempotency_key_unique": {
+          "name": "returns_idempotency_key_unique",
+          "columns": [
+            "idempotency_key"
+          ],
+          "isUnique": true
+        },
+        "returns_completion_idempotency_key_unique": {
+          "name": "returns_completion_idempotency_key_unique",
+          "columns": [
+            "completion_idempotency_key"
+          ],
+          "isUnique": true,
+          "where": "\"returns\".\"completion_idempotency_key\" IS NOT NULL"
+        },
+        "returns_order_status_idx": {
+          "name": "returns_order_status_idx",
+          "columns": [
+            "order_id",
+            "status"
+          ],
+          "isUnique": false
+        },
+        "returns_requested_at_idx": {
+          "name": "returns_requested_at_idx",
+          "columns": [
+            "requested_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "returns_order_id_orders_id_fk": {
+          "name": "returns_order_id_orders_id_fk",
+          "tableFrom": "returns",
+          "tableTo": "orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "returns_requested_by_users_id_fk": {
+          "name": "returns_requested_by_users_id_fk",
+          "tableFrom": "returns",
+          "tableTo": "users",
+          "columnsFrom": [
+            "requested_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "returns_decided_by_users_id_fk": {
+          "name": "returns_decided_by_users_id_fk",
+          "tableFrom": "returns",
+          "tableTo": "users",
+          "columnsFrom": [
+            "decided_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "returns_completed_by_users_id_fk": {
+          "name": "returns_completed_by_users_id_fk",
+          "tableFrom": "returns",
+          "tableTo": "users",
+          "columnsFrom": [
+            "completed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "returns_reason_present": {
+          "name": "returns_reason_present",
+          "value": "NULLIF(TRIM(\"returns\".\"reason\"), '') IS NOT NULL"
+        },
+        "returns_refund_nonnegative": {
+          "name": "returns_refund_nonnegative",
+          "value": "\"returns\".\"refund_fen\" >= 0"
+        },
+        "returns_version_positive": {
+          "name": "returns_version_positive",
+          "value": "\"returns\".\"version\" >= 1"
+        },
+        "returns_decision_state_consistent": {
+          "name": "returns_decision_state_consistent",
+          "value": "(\n        \"returns\".\"status\" = 'requested'\n        AND \"returns\".\"decided_by\" IS NULL\n        AND \"returns\".\"decided_at\" IS NULL\n        AND \"returns\".\"completed_by\" IS NULL\n        AND \"returns\".\"completed_at\" IS NULL\n      ) OR (\n        \"returns\".\"status\" IN ('approved', 'rejected')\n        AND \"returns\".\"decided_by\" IS NOT NULL\n        AND \"returns\".\"decided_at\" IS NOT NULL\n        AND \"returns\".\"completed_by\" IS NULL\n        AND \"returns\".\"completed_at\" IS NULL\n      ) OR (\n        \"returns\".\"status\" = 'completed'\n        AND \"returns\".\"decided_by\" IS NOT NULL\n        AND \"returns\".\"decided_at\" IS NOT NULL\n        AND \"returns\".\"completed_by\" IS NOT NULL\n        AND \"returns\".\"completed_at\" IS NOT NULL\n        AND \"returns\".\"completion_idempotency_key\" IS NOT NULL\n      )"
+        }
+      }
+    },
+    "sessions": {
+      "name": "sessions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "sessions_token_hash_unique": {
+          "name": "sessions_token_hash_unique",
+          "columns": [
+            "token_hash"
+          ],
+          "isUnique": true
+        },
+        "sessions_user_idx": {
+          "name": "sessions_user_idx",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        },
+        "sessions_expires_idx": {
+          "name": "sessions_expires_idx",
+          "columns": [
+            "expires_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "sessions_user_id_users_id_fk": {
+          "name": "sessions_user_id_users_id_fk",
+          "tableFrom": "sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "settlement_batches": {
+      "name": "settlement_batches",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "batch_no": {
+          "name": "batch_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "period_start": {
+          "name": "period_start",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "period_end": {
+          "name": "period_end",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "store_id": {
+          "name": "store_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "beneficiary_id": {
+          "name": "beneficiary_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "total_fen": {
+          "name": "total_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entry_count": {
+          "name": "entry_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "filters_snapshot": {
+          "name": "filters_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "approved_by": {
+          "name": "approved_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "paid_by": {
+          "name": "paid_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "paid_at": {
+          "name": "paid_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "settlement_batches_batch_no_unique": {
+          "name": "settlement_batches_batch_no_unique",
+          "columns": [
+            "batch_no"
+          ],
+          "isUnique": true
+        },
+        "settlement_batches_idempotency_key_unique": {
+          "name": "settlement_batches_idempotency_key_unique",
+          "columns": [
+            "idempotency_key"
+          ],
+          "isUnique": true
+        },
+        "settlement_batches_period_status_idx": {
+          "name": "settlement_batches_period_status_idx",
+          "columns": [
+            "period_start",
+            "period_end",
+            "status"
+          ],
+          "isUnique": false
+        },
+        "settlement_batches_scope_idx": {
+          "name": "settlement_batches_scope_idx",
+          "columns": [
+            "store_id",
+            "beneficiary_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "settlement_batches_store_id_stores_id_fk": {
+          "name": "settlement_batches_store_id_stores_id_fk",
+          "tableFrom": "settlement_batches",
+          "tableTo": "stores",
+          "columnsFrom": [
+            "store_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlement_batches_beneficiary_id_users_id_fk": {
+          "name": "settlement_batches_beneficiary_id_users_id_fk",
+          "tableFrom": "settlement_batches",
+          "tableTo": "users",
+          "columnsFrom": [
+            "beneficiary_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlement_batches_created_by_users_id_fk": {
+          "name": "settlement_batches_created_by_users_id_fk",
+          "tableFrom": "settlement_batches",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlement_batches_approved_by_users_id_fk": {
+          "name": "settlement_batches_approved_by_users_id_fk",
+          "tableFrom": "settlement_batches",
+          "tableTo": "users",
+          "columnsFrom": [
+            "approved_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlement_batches_paid_by_users_id_fk": {
+          "name": "settlement_batches_paid_by_users_id_fk",
+          "tableFrom": "settlement_batches",
+          "tableTo": "users",
+          "columnsFrom": [
+            "paid_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "settlement_batches_period_range": {
+          "name": "settlement_batches_period_range",
+          "value": "\"settlement_batches\".\"period_end\" > \"settlement_batches\".\"period_start\""
+        },
+        "settlement_batches_entry_count": {
+          "name": "settlement_batches_entry_count",
+          "value": "\"settlement_batches\".\"entry_count\" >= 0"
+        },
+        "settlement_batches_version_positive": {
+          "name": "settlement_batches_version_positive",
+          "value": "\"settlement_batches\".\"version\" >= 1"
+        },
+        "settlement_batches_status_consistent": {
+          "name": "settlement_batches_status_consistent",
+          "value": "(\n        \"settlement_batches\".\"status\" = 'draft'\n        AND \"settlement_batches\".\"approved_by\" IS NULL\n        AND \"settlement_batches\".\"approved_at\" IS NULL\n        AND \"settlement_batches\".\"paid_by\" IS NULL\n        AND \"settlement_batches\".\"paid_at\" IS NULL\n      ) OR (\n        \"settlement_batches\".\"status\" = 'approved'\n        AND \"settlement_batches\".\"approved_by\" IS NOT NULL\n        AND \"settlement_batches\".\"approved_at\" IS NOT NULL\n        AND \"settlement_batches\".\"paid_by\" IS NULL\n        AND \"settlement_batches\".\"paid_at\" IS NULL\n      ) OR (\n        \"settlement_batches\".\"status\" = 'paid'\n        AND \"settlement_batches\".\"approved_by\" IS NOT NULL\n        AND \"settlement_batches\".\"approved_at\" IS NOT NULL\n        AND \"settlement_batches\".\"paid_by\" IS NOT NULL\n        AND \"settlement_batches\".\"paid_at\" IS NOT NULL\n      )"
+        }
+      }
+    },
+    "settlement_items": {
+      "name": "settlement_items",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ledger_entry_id": {
+          "name": "ledger_entry_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "beneficiary_id": {
+          "name": "beneficiary_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "amount_fen": {
+          "name": "amount_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ledger_snapshot": {
+          "name": "ledger_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "settlement_items_ledger_entry_unique": {
+          "name": "settlement_items_ledger_entry_unique",
+          "columns": [
+            "ledger_entry_id"
+          ],
+          "isUnique": true
+        },
+        "settlement_items_batch_idx": {
+          "name": "settlement_items_batch_idx",
+          "columns": [
+            "batch_id"
+          ],
+          "isUnique": false
+        },
+        "settlement_items_beneficiary_idx": {
+          "name": "settlement_items_beneficiary_idx",
+          "columns": [
+            "beneficiary_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "settlement_items_batch_id_settlement_batches_id_fk": {
+          "name": "settlement_items_batch_id_settlement_batches_id_fk",
+          "tableFrom": "settlement_items",
+          "tableTo": "settlement_batches",
+          "columnsFrom": [
+            "batch_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlement_items_ledger_entry_id_commission_ledger_id_fk": {
+          "name": "settlement_items_ledger_entry_id_commission_ledger_id_fk",
+          "tableFrom": "settlement_items",
+          "tableTo": "commission_ledger",
+          "columnsFrom": [
+            "ledger_entry_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlement_items_beneficiary_id_users_id_fk": {
+          "name": "settlement_items_beneficiary_id_users_id_fk",
+          "tableFrom": "settlement_items",
+          "tableTo": "users",
+          "columnsFrom": [
+            "beneficiary_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "settlement_items_amount_nonzero": {
+          "name": "settlement_items_amount_nonzero",
+          "value": "\"settlement_items\".\"amount_fen\" <> 0"
+        }
+      }
+    },
+    "stores": {
+      "name": "stores",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "active": {
+          "name": "active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "stores_code_unique": {
+          "name": "stores_code_unique",
+          "columns": [
+            "code"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "users": {
+      "name": "users",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "work_no": {
+          "name": "work_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "phone_encrypted": {
+          "name": "phone_encrypted",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "phone_lookup_hash": {
+          "name": "phone_lookup_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "personnel_type": {
+          "name": "personnel_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "store_id": {
+          "name": "store_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "active": {
+          "name": "active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "must_change_password": {
+          "name": "must_change_password",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "last_login_at": {
+          "name": "last_login_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "users_work_no_unique": {
+          "name": "users_work_no_unique",
+          "columns": [
+            "work_no"
+          ],
+          "isUnique": true
+        },
+        "users_phone_lookup_hash_unique": {
+          "name": "users_phone_lookup_hash_unique",
+          "columns": [
+            "phone_lookup_hash"
+          ],
+          "isUnique": true,
+          "where": "\"users\".\"phone_lookup_hash\" IS NOT NULL"
+        },
+        "users_store_idx": {
+          "name": "users_store_idx",
+          "columns": [
+            "store_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "users_store_id_stores_id_fk": {
+          "name": "users_store_id_stores_id_fk",
+          "tableFrom": "users",
+          "tableTo": "stores",
+          "columnsFrom": [
+            "store_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

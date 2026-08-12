@@ -1,21 +1,21 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { drizzle } from "drizzle-orm/postgres-js";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
-import postgres from "postgres";
+import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 
-const defaultMigrationsFolder = resolve(process.cwd(), "drizzle");
+import { createDatabaseClient } from "./client.js";
+
+const defaultMigrationsFolder = resolve(process.cwd(), "drizzle-sqlite");
 
 export const migrateDatabase = async (
-  databaseUrl: string,
+  sqlitePath: string,
   migrationsFolder = process.env.MIGRATIONS_DIR ?? defaultMigrationsFolder,
 ): Promise<void> => {
-  const client = postgres(databaseUrl, { max: 1 });
+  const client = createDatabaseClient(sqlitePath);
   try {
-    await migrate(drizzle(client), { migrationsFolder });
+    migrate(client.db, { migrationsFolder });
   } finally {
-    await client.end();
+    await client.close();
   }
 };
 
@@ -24,9 +24,9 @@ const invokedPath = process.argv[1]
   : undefined;
 
 if (invokedPath === import.meta.url) {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    throw new Error("DATABASE_URL 未配置");
+  const sqlitePath = process.env.SQLITE_PATH;
+  if (!sqlitePath) {
+    throw new Error("SQLITE_PATH 未配置");
   }
-  await migrateDatabase(databaseUrl);
+  await migrateDatabase(sqlitePath);
 }

@@ -4,7 +4,7 @@ import {
   eq,
   exists,
   gte,
-  ilike,
+  like,
   inArray,
   isNotNull,
   isNull,
@@ -210,8 +210,7 @@ export class DrizzleOrderRepository implements OrderRepository {
       .select()
       .from(quotes)
       .where(and(eq(quotes.id, quoteId), quoteScope))
-      .limit(1)
-      .for("update");
+      .limit(1);
     if (!quote) return null;
 
     const [storeRows, sellerRows, lineRows] = await Promise.all([
@@ -429,7 +428,43 @@ export class DrizzleOrderRepository implements OrderRepository {
     }
     conditions.push(filters.deletedOnly ? isNotNull(orders.deletedAt) : isNull(orders.deletedAt));
     if (filters.orderNo) {
-      conditions.push(ilike(orders.orderNo, `%${filters.orderNo}%`));
+      conditions.push(like(orders.orderNo, `%${filters.orderNo}%`));
+    }
+    if (filters.storeQuery) {
+      conditions.push(
+        exists(
+          this.executor
+            .select({ id: stores.id })
+            .from(stores)
+            .where(
+              and(
+                eq(stores.id, orders.storeId),
+                or(
+                  like(stores.name, `%${filters.storeQuery}%`),
+                  like(stores.code, `%${filters.storeQuery}%`),
+                ),
+              ),
+            ),
+        ),
+      );
+    }
+    if (filters.sellerQuery) {
+      conditions.push(
+        exists(
+          this.executor
+            .select({ id: users.id })
+            .from(users)
+            .where(
+              and(
+                eq(users.id, orders.sellerId),
+                or(
+                  like(users.displayName, `%${filters.sellerQuery}%`),
+                  like(users.workNo, `%${filters.sellerQuery}%`),
+                ),
+              ),
+            ),
+        ),
+      );
     }
     if (filters.status) conditions.push(eq(orders.status, filters.status));
     if (filters.paymentMode) {

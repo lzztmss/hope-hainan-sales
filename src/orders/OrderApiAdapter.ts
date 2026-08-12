@@ -248,6 +248,8 @@ const listQueryFor = (filters: OrderListFilters) => {
       : {}),
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.paymentMode ? { paymentMode: filters.paymentMode } : {}),
+    ...(filters.storeQuery ? { storeQuery: filters.storeQuery.trim() } : {}),
+    ...(filters.sellerQuery ? { sellerQuery: filters.sellerQuery.trim() } : {}),
     limit: 100,
   };
 };
@@ -273,13 +275,7 @@ export const createOrderManagementAdapter = (
   return {
     async listOrders(filters) {
       const response = await client.listOrders(listQueryFor(filters));
-      const items = response.items
-        .map((order) => mapSummary(order, viewer))
-        .filter(
-          (order) =>
-            (!filters.storeId || order.storeId === filters.storeId) &&
-            (!filters.sellerId || order.sellerId === filters.sellerId),
-        );
+      const items = response.items.map((order) => mapSummary(order, viewer));
       return { items, total: items.length };
     },
     async getOrder(orderId) {
