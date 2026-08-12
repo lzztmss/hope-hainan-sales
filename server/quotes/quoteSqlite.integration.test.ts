@@ -118,7 +118,9 @@ describe("SQLite 报价持久化主链路", () => {
       "sqlite-order-key-another",
     );
     expect(duplicate.id).toBe(order.id);
-    expect((await service.getQuote(seller, created.id)).status).toBe("converted");
+    const converted = await service.getQuote(seller, created.id);
+    expect(converted.status).toBe("converted");
+    expect(converted.version).toBe(2);
     await expect(service.updateQuote(seller, created.id, draft(3), 2)).rejects.toThrow(
       "当前报价已锁定",
     );

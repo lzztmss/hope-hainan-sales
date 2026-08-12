@@ -21,6 +21,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx server/db/migrate.ts",
     "db:seed": "tsx server/db/seed.ts",
+    "db:seed:acceptance": "tsx server/db/seedAcceptance.ts",
     "db:backup": "tsx server/db/backup.ts backup",
     "preview": "vite preview --host 127.0.0.1",
     "package:linux": "bash scripts/build-linux-package.sh"

@@ -349,7 +349,6 @@ export class DrizzleOrderRepository implements OrderRepository {
       .set({
         status: "converted",
         updatedAt: new Date(),
-        version: sql`${quotes.version} + 1`,
       })
       .where(
         and(
