@@ -5,6 +5,7 @@ export interface AuthenticatedUser {
   displayName: string;
   role: UserRole;
   storeId: string | null;
+  storeName?: string | null;
   mustChangePassword: boolean;
 }
 

@@ -136,6 +136,7 @@ const AuthenticatedShell = () => {
       user={{
         displayName: auth.user.displayName,
         role: roleForShell(auth.user.role),
+        storeName: auth.user.storeName ?? undefined,
       }}
     >
       <Outlet />

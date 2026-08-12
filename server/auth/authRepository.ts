@@ -1,7 +1,7 @@
 import { eq, or } from "drizzle-orm";
 
 import type { AppDatabase } from "../db/client.js";
-import { sessions, users } from "../db/schema.js";
+import { sessions, stores, users } from "../db/schema.js";
 import type {
   AuthRepository,
   AuthUserRecord,
@@ -16,6 +16,7 @@ const userSelection = {
   passwordHash: users.passwordHash,
   role: users.role,
   storeId: users.storeId,
+  storeName: stores.name,
   active: users.active,
   mustChangePassword: users.mustChangePassword,
 };
@@ -27,6 +28,7 @@ export class DrizzleAuthRepository implements AuthRepository {
     const [row] = await this.db
       .select(userSelection)
       .from(users)
+      .leftJoin(stores, eq(stores.id, users.storeId))
       .where(
         or(
           eq(users.workNo, identifier),
@@ -41,6 +43,7 @@ export class DrizzleAuthRepository implements AuthRepository {
     const [row] = await this.db
       .select(userSelection)
       .from(users)
+      .leftJoin(stores, eq(stores.id, users.storeId))
       .where(eq(users.id, id))
       .limit(1);
     return row ?? null;

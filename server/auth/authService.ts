@@ -15,6 +15,7 @@ export interface AuthUserRecord {
   passwordHash: string;
   role: UserRole;
   storeId: string | null;
+  storeName: string | null;
   active: boolean;
   mustChangePassword: boolean;
 }
@@ -61,6 +62,7 @@ const toAuthenticatedUser = (user: AuthUserRecord): AuthenticatedUser => ({
   displayName: user.displayName,
   role: user.role,
   storeId: user.storeId,
+  storeName: user.storeName,
   mustChangePassword: user.mustChangePassword,
 });
 

@@ -26,6 +26,7 @@ export interface AuthenticatedUser {
   displayName: string;
   role: ApiUserRole;
   storeId: string | null;
+  storeName?: string | null;
   mustChangePassword: boolean;
 }
 
