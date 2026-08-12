@@ -2,7 +2,6 @@
 
 ARG NODE_IMAGE=node:22.17.0-bookworm-slim
 ARG NGINX_IMAGE=nginx:1.28.0-alpine3.21
-ARG POSTGRES_IMAGE=postgres:16.9-bookworm
 
 FROM ${NODE_IMAGE} AS node-base
 ENV PNPM_HOME=/pnpm
@@ -27,11 +26,12 @@ LABEL org.opencontainers.image.title="Hainan FTTR Heartlink Sales API" \
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=3001 \
-    MIGRATIONS_DIR=/app/drizzle
+    MIGRATIONS_DIR=/app/drizzle-sqlite
 WORKDIR /app
+RUN mkdir -p /app/data && chown node:node /app/data
 COPY --from=production-dependencies --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist-server ./dist-server
-COPY --from=build --chown=node:node /app/drizzle ./drizzle
+COPY --from=build --chown=node:node /app/drizzle-sqlite ./drizzle-sqlite
 COPY --chown=node:node package.json ./package.json
 USER node
 EXPOSE 3001
@@ -48,16 +48,5 @@ USER nginx
 EXPOSE 8080
 ENTRYPOINT []
 CMD ["nginx", "-g", "daemon off;"]
-
-FROM ${POSTGRES_IMAGE} AS ops
-ARG APP_VERSION=dev
-LABEL org.opencontainers.image.title="Hainan FTTR Heartlink Database Operations" \
-      org.opencontainers.image.version="${APP_VERSION}"
-USER root
-COPY deploy/linux/scripts/container-backup.sh /opt/deploy/container-backup.sh
-COPY deploy/linux/scripts/container-restore.sh /opt/deploy/container-restore.sh
-RUN chmod 0755 /opt/deploy/container-backup.sh /opt/deploy/container-restore.sh
-USER postgres
-ENTRYPOINT ["/opt/deploy/container-backup.sh"]
 
 FROM api AS final

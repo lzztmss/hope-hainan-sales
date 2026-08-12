@@ -50,13 +50,10 @@ if ((ASSUME_YES == 0)); then
   [[ "${answer}" =~ ^[Yy]$ ]] || die "升级已取消"
 fi
 
-printf '==> 升级前加密备份\n'
-bash "${SCRIPT_DIR}/backup.sh" --env-file "${ENV_FILE}"
+printf '==> 升级前备份功能正在迁移到 SQLite，请先按运维文档完成卷快照\n'
 
 printf '==> 构建新版本镜像（旧版本 tag 保留）\n'
-compose build --pull api web backup
-compose up -d postgres
-wait_for_postgres
+compose build --pull api web
 printf '==> 执行只向上迁移\n'
 compose run --rm migrate
 compose run --rm seed

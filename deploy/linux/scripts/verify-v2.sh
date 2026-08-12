@@ -52,9 +52,8 @@ curl --fail --silent --show-error --connect-timeout 5 --max-time 20 \
 grep -Fq '"status":"ok"' "${tmp_root}/health.json" || die "API 健康响应不正确"
 grep -Eqi '^Cache-Control:[[:space:]]*no-store' "${tmp_root}/api-headers" || die "API 未禁止敏感响应缓存"
 
-printf '==> 检查数据库可达与迁移记录\n'
-compose exec -T postgres sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null || die "PostgreSQL 未就绪"
-migration_count="$(compose exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc '\''SELECT count(*) FROM drizzle.__drizzle_migrations'\''' | tr -d '[:space:]')"
-[[ "${migration_count}" =~ ^[1-9][0-9]*$ ]] || die "未找到成功迁移记录"
+printf '==> 检查 SQLite 完整性与迁移记录\n'
+database_check="$(compose exec -T api node -e \"const D=require('better-sqlite3');const d=new D(process.env.SQLITE_PATH,{readonly:true});const ok=d.pragma('integrity_check')[0]?.integrity_check;const n=d.prepare('SELECT COUNT(*) n FROM __drizzle_migrations').get().n;d.close();process.stdout.write(ok+':'+n)\")"
+[[ "${database_check}" =~ ^ok:[1-9][0-9]*$ ]] || die "SQLite 完整性或迁移记录检查失败"
 
-printf 'PASS: Web、API、安全头、PostgreSQL 和迁移记录验证通过\n'
+printf 'PASS: Web、API、安全头、SQLite 和迁移记录验证通过\n'

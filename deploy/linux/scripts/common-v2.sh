@@ -68,16 +68,13 @@ validate_environment() {
   [[ -f "${env_file}" ]] || die "缺少 ${env_file}；请先复制 .env.example 或运行 install-v2.sh --generate-env"
   require_command openssl
 
-  local app_version app_origin bind_address http_port postgres_db postgres_user postgres_volume postgres_password
+  local app_version app_origin bind_address http_port sqlite_volume
   local pii_encryption pii_lookup admin_username admin_password backup_passphrase retention
   app_version="$(env_value "${env_file}" APP_VERSION)"
   app_origin="$(env_value "${env_file}" APP_ORIGIN)"
   bind_address="$(env_value "${env_file}" BIND_ADDRESS)"
   http_port="$(env_value "${env_file}" HTTP_PORT)"
-  postgres_db="$(env_value "${env_file}" POSTGRES_DB)"
-  postgres_user="$(env_value "${env_file}" POSTGRES_USER)"
-  postgres_volume="$(env_value "${env_file}" POSTGRES_VOLUME_NAME)"
-  postgres_password="$(env_value "${env_file}" POSTGRES_PASSWORD)"
+  sqlite_volume="$(env_value "${env_file}" SQLITE_VOLUME_NAME)"
   pii_encryption="$(env_value "${env_file}" PII_ENCRYPTION_KEY_BASE64)"
   pii_lookup="$(env_value "${env_file}" PII_LOOKUP_HMAC_KEY_BASE64)"
   admin_username="$(env_value "${env_file}" BOOTSTRAP_ADMIN_USERNAME)"
@@ -90,11 +87,7 @@ validate_environment() {
   [[ "${bind_address:-127.0.0.1}" == "127.0.0.1" ]] || die "BIND_ADDRESS 生产必须为 127.0.0.1，由外层 HTTPS 反向代理公开"
   [[ "${http_port:-8080}" =~ ^[0-9]{1,5}$ ]] || die "HTTP_PORT 必须为 1–65535"
   ((10#${http_port:-8080} >= 1 && 10#${http_port:-8080} <= 65535)) || die "HTTP_PORT 必须为 1–65535"
-  [[ "${postgres_db}" =~ ^[A-Za-z][A-Za-z0-9_]{2,62}$ ]] || die "POSTGRES_DB 格式无效"
-  [[ "${postgres_user}" =~ ^[A-Za-z][A-Za-z0-9_]{2,62}$ ]] || die "POSTGRES_USER 格式无效"
-  [[ "${postgres_volume:-hainan_fttr_heartlink_postgres_data}" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{2,127}$ ]] || die "POSTGRES_VOLUME_NAME 格式无效"
-  reject_placeholder POSTGRES_PASSWORD "${postgres_password}"
-  [[ "${postgres_password}" =~ ^[A-Za-z0-9_-]{24,128}$ ]] || die "POSTGRES_PASSWORD 需为 24–128 位 URL 安全随机字符"
+  [[ "${sqlite_volume:-hainan_fttr_heartlink_sqlite_data}" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]{2,127}$ ]] || die "SQLITE_VOLUME_NAME 格式无效"
 
   reject_placeholder PII_ENCRYPTION_KEY_BASE64 "${pii_encryption}"
   reject_placeholder PII_LOOKUP_HMAC_KEY_BASE64 "${pii_lookup}"
@@ -145,20 +138,11 @@ verify_package_checksums() {
   fi
 }
 
-wait_for_postgres() {
-  local attempts=0
-  until compose exec -T postgres sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null 2>&1; do
-    attempts=$((attempts + 1))
-    ((attempts < 60)) || die "PostgreSQL 在 120 秒内未就绪"
-    sleep 2
-  done
-}
-
 record_release() {
   local action="$1"
   local version migration
   version="$(env_value "${ENV_FILE}" APP_VERSION)"
-  migration="$(awk -F\" '/"tag"/{value=$4} END{print value}' "${PROJECT_ROOT}/drizzle/meta/_journal.json")"
+  migration="$(awk -F\" '/"tag"/{value=$4} END{print value}' "${PROJECT_ROOT}/drizzle-sqlite/meta/_journal.json")"
   mkdir -p "${DEPLOY_ROOT}/state"
   chmod 0700 "${DEPLOY_ROOT}/state"
   printf '%s\taction=%s\tapp=%s\tschema=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${action}" "${version}" "${migration:-unknown}" >> "${DEPLOY_ROOT}/state/release-history.log"

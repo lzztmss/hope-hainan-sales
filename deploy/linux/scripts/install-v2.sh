@@ -64,9 +64,8 @@ generate_environment() {
   require_command openssl
   mkdir -p "$(dirname "${ENV_FILE}")"
   umask 077
-  local version postgres_password pii_one pii_two admin_password backup_password
+  local version pii_one pii_two admin_password backup_password
   version="$(tr -d '[:space:]' < "${DEPLOY_ROOT}/VERSION")"
-  postgres_password="$(openssl rand -hex 32)"
   pii_one="$(openssl rand -base64 32 | tr -d '\n')"
   pii_two="$(openssl rand -base64 32 | tr -d '\n')"
   admin_password="A$(openssl rand -hex 16)a9"
@@ -76,10 +75,7 @@ APP_VERSION=${version}
 APP_ORIGIN=${APP_ORIGIN_INPUT}
 BIND_ADDRESS=127.0.0.1
 HTTP_PORT=8080
-POSTGRES_DB=hainan_fttr
-POSTGRES_USER=hainan_fttr
-POSTGRES_VOLUME_NAME=hainan_fttr_heartlink_postgres_data
-POSTGRES_PASSWORD=${postgres_password}
+SQLITE_VOLUME_NAME=hainan_fttr_heartlink_sqlite_data
 PII_ENCRYPTION_KEY_BASE64=${pii_one}
 PII_LOOKUP_HMAC_KEY_BASE64=${pii_two}
 BOOTSTRAP_ADMIN_USERNAME=ADMIN001
@@ -121,10 +117,7 @@ mkdir -p "${DEPLOY_ROOT}/backups" "${DEPLOY_ROOT}/state"
 chmod 0700 "${DEPLOY_ROOT}/backups" "${DEPLOY_ROOT}/state"
 
 printf '==> 构建版本化镜像\n'
-compose build --pull api web backup
-printf '==> 启动内网 PostgreSQL\n'
-compose up -d postgres
-wait_for_postgres
+compose build --pull api web
 printf '==> 先执行版本化迁移\n'
 compose run --rm migrate
 printf '==> 初始化管理员与默认提成规则\n'

@@ -6,45 +6,20 @@ x-api-build: &api-build
     APP_VERSION: ${APP_VERSION:?APP_VERSION 未配置}
 
 x-api-image: &api-image hainan-fttr-heartlink-api:${APP_VERSION:?APP_VERSION 未配置}
-x-database-url: &database-url postgresql://${POSTGRES_USER:?POSTGRES_USER 未配置}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 未配置}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB 未配置}
+x-sqlite-path: &sqlite-path /app/data/app.sqlite
 
 services:
-  postgres:
-    image: postgres:16.9-bookworm
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB 未配置}
-      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER 未配置}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 未配置}
-      TZ: Asia/Shanghai
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - database
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 10s
-    security_opt:
-      - no-new-privileges:true
-    stop_grace_period: 30s
-
   migrate:
     image: *api-image
     build: *api-build
     command: ["node", "dist-server/server/db/migrate.js"]
     restart: "no"
     environment:
-      DATABASE_URL: *database-url
-      MIGRATIONS_DIR: /app/drizzle
+      SQLITE_PATH: *sqlite-path
+      MIGRATIONS_DIR: /app/drizzle-sqlite
       NODE_ENV: production
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - database
+    volumes:
+      - sqlite_data:/app/data
     read_only: true
     tmpfs:
       - /tmp:size=16m,mode=1777
@@ -59,15 +34,15 @@ services:
     command: ["node", "dist-server/server/db/seed.js"]
     restart: "no"
     environment:
-      DATABASE_URL: *database-url
+      SQLITE_PATH: *sqlite-path
       BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:?BOOTSTRAP_ADMIN_USERNAME 未配置}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?BOOTSTRAP_ADMIN_PASSWORD 未配置}
       NODE_ENV: production
     depends_on:
       migrate:
         condition: service_completed_successfully
-    networks:
-      - database
+    volumes:
+      - sqlite_data:/app/data
     read_only: true
     tmpfs:
       - /tmp:size=32m,mode=1777
@@ -81,7 +56,7 @@ services:
     build: *api-build
     restart: unless-stopped
     environment:
-      DATABASE_URL: *database-url
+      SQLITE_PATH: *sqlite-path
       APP_ORIGIN: ${APP_ORIGIN:?APP_ORIGIN 未配置}
       PII_ENCRYPTION_KEY_BASE64: ${PII_ENCRYPTION_KEY_BASE64:?PII_ENCRYPTION_KEY_BASE64 未配置}
       PII_LOOKUP_HMAC_KEY_BASE64: ${PII_LOOKUP_HMAC_KEY_BASE64:?PII_LOOKUP_HMAC_KEY_BASE64 未配置}
@@ -94,6 +69,8 @@ services:
         condition: service_completed_successfully
       seed:
         condition: service_completed_successfully
+    volumes:
+      - sqlite_data:/app/data
     networks:
       - database
     healthcheck:
@@ -143,44 +120,9 @@ services:
     cap_drop:
       - ALL
 
-  backup:
-    image: hainan-fttr-heartlink-ops:${APP_VERSION:?APP_VERSION 未配置}
-    build:
-      context: ../..
-      dockerfile: Dockerfile
-      target: ops
-      args:
-        APP_VERSION: ${APP_VERSION:?APP_VERSION 未配置}
-    profiles: ["maintenance"]
-    user: "${BACKUP_RUN_UID:-1000}:${BACKUP_RUN_GID:-1000}"
-    environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB 未配置}
-      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER 未配置}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD 未配置}
-      BACKUP_ENCRYPTION_PASSPHRASE: ${BACKUP_ENCRYPTION_PASSPHRASE:?BACKUP_ENCRYPTION_PASSPHRASE 未配置}
-      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
-      APP_VERSION: ${APP_VERSION:?APP_VERSION 未配置}
-      BACKUP_DIR: /backups
-      TZ: Asia/Shanghai
-    volumes:
-      - ${BACKUP_DIR:-./backups}:/backups
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - database
-    read_only: true
-    tmpfs:
-      - /tmp:size=256m,mode=1777
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-
 volumes:
-  postgres_data:
-    name: ${POSTGRES_VOLUME_NAME:-hainan_fttr_heartlink_postgres_data}
+  sqlite_data:
+    name: ${SQLITE_VOLUME_NAME:-hainan_fttr_heartlink_sqlite_data}
 
 networks:
   frontend:
