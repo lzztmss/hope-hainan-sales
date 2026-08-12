@@ -320,6 +320,18 @@ export const createOrderService = (options: OrderServiceOptions) => {
   const randomSuffix =
     options.randomSuffix ??
     (() => randomBytes(5).toString("hex").slice(0, 6).toUpperCase());
+  const matchesPresentedOrder = (
+    order: ReturnType<typeof presentOrder>,
+    query: string,
+  ): boolean => {
+    const phoneQuery = query.replace(/\D/g, "");
+    return (
+      order.orderNo.toLocaleLowerCase("zh-CN").includes(query) ||
+      Boolean(order.customer.name?.toLocaleLowerCase("zh-CN").includes(query)) ||
+      (phoneQuery.length > 0 &&
+        Boolean(order.customer.phoneMasked?.replace(/\D/g, "").endsWith(phoneQuery)))
+    );
+  };
 
   const requireVisibleOrder = async (
     user: AuthenticatedUser,
@@ -673,11 +685,7 @@ export const createOrderService = (options: OrderServiceOptions) => {
       const presented = result.items.map((order) => presentOrder(order, options.decryptPii));
       return {
         items: query
-          ? presented.filter((order) =>
-              order.orderNo.toLocaleLowerCase("zh-CN").includes(query) ||
-              order.customer.name?.toLocaleLowerCase("zh-CN").includes(query) ||
-              order.customer.phoneMasked?.replace(/\D/g, "").endsWith(query.replace(/\D/g, "")),
-            )
+          ? presented.filter((order) => matchesPresentedOrder(order, query))
           : presented,
         nextCursor: result.nextCursor,
       };
@@ -699,11 +707,7 @@ export const createOrderService = (options: OrderServiceOptions) => {
       const presented = result.items.map((order) => presentOrder(order, options.decryptPii));
       return {
         items: query
-          ? presented.filter((order) =>
-              order.orderNo.toLocaleLowerCase("zh-CN").includes(query) ||
-              order.customer.name?.toLocaleLowerCase("zh-CN").includes(query) ||
-              order.customer.phoneMasked?.replace(/\D/g, "").endsWith(query.replace(/\D/g, "")),
-            )
+          ? presented.filter((order) => matchesPresentedOrder(order, query))
           : presented,
         nextCursor: result.nextCursor,
       };
