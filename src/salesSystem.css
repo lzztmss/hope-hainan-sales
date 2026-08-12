@@ -1,0 +1,44 @@
+@import "./styles/tokens.css";
+
+.system-state-page {
+  display: grid;
+  min-height: 100vh;
+  min-height: 100svh;
+  place-items: center;
+  padding: var(--app-space-page-inline);
+  background: var(--app-color-canvas);
+  color: var(--app-color-text);
+  font-family: var(--app-font-family);
+}
+
+.system-state-card,
+.system-notice {
+  width: min(100%, 38rem);
+  padding: var(--hfttr-space-6);
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-surface);
+  background: var(--app-color-surface);
+  box-shadow: var(--app-shadow-raised);
+}
+
+.system-state-card h1 {
+  margin-block-start: 0;
+  color: var(--app-color-primary-strong);
+}
+
+.system-state-card button {
+  min-height: var(--app-control-min-size);
+  padding-inline: var(--hfttr-space-4);
+  border: 0;
+  border-radius: var(--app-radius-control);
+  background: var(--app-color-primary);
+  color: var(--app-color-text-inverse);
+  font: inherit;
+  font-weight: var(--app-font-weight-bold);
+  cursor: pointer;
+}
+
+.system-notice {
+  width: 100%;
+  color: var(--app-color-text-muted);
+}

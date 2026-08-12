@@ -1,0 +1,4 @@
+ALTER TABLE "commission_policy_versions" DROP CONSTRAINT "commission_policy_effective_range";--> statement-breakpoint
+ALTER TABLE "commission_rules" DROP CONSTRAINT "commission_rules_effective_range";--> statement-breakpoint
+ALTER TABLE "commission_policy_versions" ADD CONSTRAINT "commission_policy_effective_range" CHECK ("commission_policy_versions"."effective_to" IS NULL OR "commission_policy_versions"."effective_to" > "commission_policy_versions"."effective_from" OR ("commission_policy_versions"."status" = 'stopped' AND "commission_policy_versions"."effective_to" = "commission_policy_versions"."effective_from"));--> statement-breakpoint
+ALTER TABLE "commission_rules" ADD CONSTRAINT "commission_rules_effective_range" CHECK ("commission_rules"."effective_to" IS NULL OR "commission_rules"."effective_to" >= "commission_rules"."effective_from");

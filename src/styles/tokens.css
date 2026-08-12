@@ -1,0 +1,132 @@
+:root {
+  /* Primitive tokens: raw brand, scale, and motion values. */
+  --hfttr-color-blue-950: #102f4a;
+  --hfttr-color-blue-900: #173b5d;
+  --hfttr-color-blue-700: #1f4e79;
+  --hfttr-color-blue-100: #d9eaf7;
+  --hfttr-color-blue-50: #eef6fc;
+  --hfttr-color-gold-700: #725421;
+  --hfttr-color-gold-500: #c8a063;
+  --hfttr-color-gold-100: #f5ead6;
+  --hfttr-color-neutral-950: #17212b;
+  --hfttr-color-neutral-700: #52606d;
+  --hfttr-color-neutral-500: #7b8794;
+  --hfttr-color-neutral-300: #d9e2ec;
+  --hfttr-color-neutral-100: #edf2f7;
+  --hfttr-color-neutral-50: #f6f8fb;
+  --hfttr-color-white: #ffffff;
+  --hfttr-color-white-a10: rgb(255 255 255 / 10%);
+  --hfttr-color-white-a20: rgb(255 255 255 / 20%);
+  --hfttr-color-white-a36: rgb(255 255 255 / 36%);
+  --hfttr-color-white-a78: rgb(255 255 255 / 78%);
+  --hfttr-color-white-a96: rgb(255 255 255 / 96%);
+  --hfttr-color-success-700: #25613d;
+  --hfttr-color-success-100: #e2f0d9;
+  --hfttr-color-danger-700: #a12b2b;
+  --hfttr-color-danger-100: #fde8e8;
+
+  --hfttr-font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --hfttr-font-size-xs: 0.75rem;
+  --hfttr-font-size-sm: 0.875rem;
+  --hfttr-font-size-md: 1rem;
+  --hfttr-font-size-lg: 1.125rem;
+  --hfttr-font-size-xl: clamp(1.5rem, 4vw, 2rem);
+  --hfttr-font-weight-medium: 600;
+  --hfttr-font-weight-bold: 700;
+
+  --hfttr-space-1: 0.25rem;
+  --hfttr-space-2: 0.5rem;
+  --hfttr-space-3: 0.75rem;
+  --hfttr-space-4: 1rem;
+  --hfttr-space-5: 1.25rem;
+  --hfttr-space-6: 1.5rem;
+  --hfttr-space-8: 2rem;
+  --hfttr-space-10: 2.5rem;
+
+  --hfttr-radius-sm: 0.5rem;
+  --hfttr-radius-md: 0.75rem;
+  --hfttr-radius-lg: 1.125rem;
+  --hfttr-radius-pill: 999px;
+  --hfttr-border-thin: 1px;
+  --hfttr-shadow-sm: 0 0.375rem 1.125rem rgb(31 78 121 / 10%);
+  --hfttr-shadow-up-sm: 0 -0.375rem 1.125rem rgb(31 78 121 / 10%);
+  --hfttr-shadow-md: 0 0.75rem 2rem rgb(16 47 74 / 14%);
+  --hfttr-duration-fast: 160ms;
+  --hfttr-size-touch-min: 44px;
+
+  /* Semantic tokens: intent shared by pages and feature components. */
+  --app-color-canvas: var(--hfttr-color-neutral-50);
+  --app-color-surface: var(--hfttr-color-white);
+  --app-color-surface-subtle: var(--hfttr-color-blue-50);
+  --app-color-primary: var(--hfttr-color-blue-700);
+  --app-color-primary-strong: var(--hfttr-color-blue-900);
+  --app-color-accent: var(--hfttr-color-gold-500);
+  --app-color-accent-strong: var(--hfttr-color-gold-700);
+  --app-color-accent-subtle: var(--hfttr-color-gold-100);
+  --app-color-on-accent: var(--hfttr-color-blue-950);
+  --app-color-text: var(--hfttr-color-neutral-950);
+  --app-color-text-muted: var(--hfttr-color-neutral-700);
+  --app-color-text-inverse: var(--hfttr-color-white);
+  --app-color-text-inverse-muted: var(--hfttr-color-white-a78);
+  --app-color-border: var(--hfttr-color-neutral-300);
+  --app-color-border-inverse: var(--hfttr-color-white-a36);
+  --app-color-border-inverse-subtle: var(--hfttr-color-white-a20);
+  --app-color-hover-inverse: var(--hfttr-color-white-a10);
+  --app-color-surface-translucent: var(--hfttr-color-white-a96);
+  --app-color-focus: var(--hfttr-color-blue-700);
+  --app-color-focus-inverse: var(--hfttr-color-gold-500);
+  --app-color-danger: var(--hfttr-color-danger-700);
+  --app-font-family: var(--hfttr-font-sans);
+  --app-font-size-caption: var(--hfttr-font-size-xs);
+  --app-font-size-body: var(--hfttr-font-size-md);
+  --app-font-size-title: var(--hfttr-font-size-xl);
+  --app-font-weight-medium: var(--hfttr-font-weight-medium);
+  --app-font-weight-bold: var(--hfttr-font-weight-bold);
+  --app-space-control: var(--hfttr-space-3);
+  --app-space-page-inline: var(--hfttr-space-4);
+  --app-space-page-block: var(--hfttr-space-5);
+  --app-space-section: var(--hfttr-space-6);
+  --app-radius-control: var(--hfttr-radius-sm);
+  --app-radius-surface: var(--hfttr-radius-lg);
+  --app-border-width: var(--hfttr-border-thin);
+  --app-control-min-size: var(--hfttr-size-touch-min);
+  --app-shadow-floating: var(--hfttr-shadow-md);
+  --app-shadow-raised: var(--hfttr-shadow-sm);
+  --app-shadow-bottom-navigation: var(--hfttr-shadow-up-sm);
+  --app-transition-duration: var(--hfttr-duration-fast);
+
+  /* Component tokens: stable customization points for layout primitives. */
+  --app-shell-header-min-height: 4.5rem;
+  --app-shell-sidebar-width: 17rem;
+  --app-shell-mobile-nav-height: 4.25rem;
+  --app-shell-content-max-width: 90rem;
+  --app-shell-control-min-size: var(--app-control-min-size);
+  --app-shell-focus-color: var(--app-color-focus);
+  --app-shell-background: var(--app-color-canvas);
+  --app-shell-header-background: var(--app-color-primary-strong);
+  --app-shell-header-text: var(--app-color-text-inverse);
+  --app-shell-header-muted-text: var(--app-color-text-inverse-muted);
+  --app-shell-control-border: var(--app-color-border-inverse);
+  --app-shell-sidebar-background: var(--app-color-primary-strong);
+  --app-shell-sidebar-text: var(--app-color-text-inverse);
+  --app-shell-sidebar-border: var(--app-color-border-inverse-subtle);
+  --app-shell-navigation-hover: var(--app-color-hover-inverse);
+  --app-shell-mobile-navigation-background: var(--app-color-surface-translucent);
+  --app-shell-mobile-navigation-shadow: var(--app-shadow-bottom-navigation);
+  --app-shell-selected-background: var(--app-color-accent-subtle);
+  --app-shell-selected-text: var(--app-color-accent-strong);
+  --app-shell-border: var(--app-color-border);
+  --app-page-header-gap: var(--app-space-section);
+  --app-page-content-gap: var(--app-space-section);
+  --app-page-aside-width: 22rem;
+  --app-page-background: var(--app-color-surface);
+}
+
+@media (min-width: 48rem) {
+  :root {
+    --app-space-page-inline: var(--hfttr-space-8);
+    --app-space-page-block: var(--hfttr-space-8);
+  }
+}

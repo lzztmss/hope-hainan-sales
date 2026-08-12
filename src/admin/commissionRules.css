@@ -1,0 +1,430 @@
+.commission-rules-route {
+  display: grid;
+  gap: 20px;
+}
+
+.commission-route-state,
+.commission-route-empty,
+.commission-draft-creator,
+.commission-version-selector {
+  border: 1px solid #dfe5ee;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.commission-route-state,
+.commission-route-empty {
+  margin: 0;
+  padding: 20px;
+}
+
+.commission-draft-creator {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+}
+
+.commission-draft-creator h2,
+.commission-draft-creator p {
+  margin: 0;
+}
+
+.commission-draft-creator p {
+  margin-top: 6px;
+  color: #667085;
+}
+
+.commission-draft-creator__fields {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1.5fr) minmax(10rem, 0.8fr) minmax(12rem, 1.5fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.commission-draft-creator__fields label,
+.commission-version-selector {
+  display: grid;
+  gap: 6px;
+  color: #263f40;
+  font-weight: 700;
+}
+
+.commission-draft-creator__fields input,
+.commission-version-selector select {
+  min-height: 44px;
+  border: 1px solid #b8c5d1;
+  border-radius: 9px;
+  padding: 9px 12px;
+  color: #17233b;
+  background: #fff;
+  font: inherit;
+}
+
+.commission-draft-creator__fields button {
+  min-height: 44px;
+}
+
+.commission-version-selector {
+  padding: 16px 20px;
+}
+
+.commission-policy-reason {
+  display: grid;
+  gap: 8px;
+  max-width: 680px;
+  padding: 16px;
+  border: 1px solid #d9e2ec;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.commission-policy-reason label {
+  font-weight: 800;
+}
+
+.commission-policy-reason input {
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 1px solid #b8c5d1;
+  border-radius: 9px;
+  font: inherit;
+}
+
+.commission-admin-page {
+  color: var(--color-text, #17233b);
+  display: grid;
+  gap: 20px;
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: 20px 16px 112px;
+}
+
+.commission-admin-page__header,
+.commission-policy-summary,
+.commission-policy-actions,
+.commission-rule-card__title,
+.commission-simulation {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.commission-admin-page__header {
+  gap: 20px;
+}
+
+.commission-admin-page__header h1,
+.commission-admin-page h2,
+.commission-admin-page h3,
+.commission-admin-page p {
+  margin: 0;
+}
+
+.commission-admin-page__header p:last-child {
+  color: #667085;
+  line-height: 1.65;
+  margin-top: 8px;
+  max-width: 760px;
+}
+
+.commission-admin-page__eyebrow {
+  color: #ad7d23;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.commission-policy-status {
+  border-radius: 999px;
+  flex: 0 0 auto;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 8px 14px;
+}
+
+.commission-policy-status.is-draft {
+  background: #fff4da;
+  color: #79520b;
+}
+
+.commission-policy-status.is-published {
+  background: #e5f7ee;
+  color: #14633c;
+}
+
+.commission-policy-status.is-stopped {
+  background: #edf0f5;
+  color: #475467;
+}
+
+.commission-policy-summary {
+  background: linear-gradient(135deg, #0b2f62, #104e91);
+  border-radius: 18px;
+  color: white;
+  gap: 24px;
+  padding: 20px 24px;
+}
+
+.commission-policy-summary div {
+  display: grid;
+  gap: 6px;
+}
+
+.commission-policy-summary span {
+  color: #d8e7fa;
+  font-size: 13px;
+}
+
+.commission-policy-summary strong {
+  font-size: 17px;
+}
+
+.commission-policy-actions {
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.commission-admin-page button,
+.commission-admin-page input {
+  font: inherit;
+}
+
+.commission-admin-page button {
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  min-height: 44px;
+  padding: 10px 18px;
+}
+
+.commission-admin-page button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.commission-admin-page .primary-action,
+.commission-rule-card > button {
+  background: #0c3d78;
+  color: white;
+}
+
+.commission-admin-page .secondary-action {
+  background: #e9f1fb;
+  color: #0c3d78;
+}
+
+.commission-admin-page .danger-action {
+  background: #fff0f0;
+  color: #b42318;
+}
+
+.commission-simulation {
+  background: #ecf8f1;
+  border: 1px solid #b8e2c9;
+  border-radius: 14px;
+  color: #155d3a;
+  gap: 14px;
+  padding: 14px 18px;
+}
+
+.commission-section-heading {
+  margin-bottom: 14px;
+}
+
+.commission-section-heading p {
+  color: #667085;
+  margin-top: 4px;
+}
+
+.commission-rule-group {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.commission-rule-group__header {
+  display: grid;
+  gap: 4px;
+}
+
+.commission-rule-group__header h3,
+.commission-rule-group__header p,
+.commission-rule-card h4 {
+  margin: 0;
+}
+
+.commission-rule-group__header h3 {
+  font-size: 17px;
+}
+
+.commission-rule-group__header p {
+  color: #667085;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.commission-rule-card h4 {
+  font-size: 16px;
+}
+
+.commission-rule-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.commission-rule-card {
+  background: white;
+  border: 1px solid #dfe5ee;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(16, 44, 82, 0.06);
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.commission-rule-card__title {
+  gap: 12px;
+}
+
+.commission-rule-card__title span {
+  color: #7a8799;
+  font-size: 12px;
+}
+
+.commission-rule-card label {
+  color: #344054;
+  display: grid;
+  font-size: 14px;
+  font-weight: 600;
+  gap: 7px;
+}
+
+.commission-rule-card input[type="text"] {
+  background: white;
+  border: 1px solid #cfd7e4;
+  border-radius: 9px;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 10px 12px;
+  width: 100%;
+}
+
+.commission-rule-card input:focus-visible,
+.commission-admin-page button:focus-visible {
+  outline: 3px solid rgba(24, 111, 201, 0.28);
+  outline-offset: 2px;
+}
+
+.commission-switch {
+  align-items: center;
+  display: flex !important;
+  grid-auto-flow: column;
+  min-height: 44px;
+}
+
+.commission-switch input {
+  height: 20px;
+  width: 20px;
+}
+
+.commission-amount-input {
+  align-items: center;
+  display: flex;
+  position: relative;
+}
+
+.commission-amount-input span {
+  color: #667085;
+  left: 12px;
+  position: absolute;
+}
+
+.commission-amount-input input {
+  padding-left: 30px !important;
+}
+
+.commission-rule-card [role="alert"],
+.commission-admin-page > [role="alert"] {
+  color: #b42318;
+  font-size: 14px;
+}
+
+.commission-rule-card__readonly {
+  background: #f5f7fa;
+  border-radius: 10px;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 10px 12px;
+}
+
+.commission-history {
+  background: white;
+  border: 1px solid #dfe5ee;
+  border-radius: 16px;
+  padding: 18px;
+}
+
+.commission-history ol {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+}
+
+.commission-history li {
+  align-items: center;
+  border-top: 1px solid #edf0f4;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 150px 120px 1fr;
+  padding-top: 10px;
+}
+
+.commission-history time {
+  color: #667085;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 700px) {
+  .commission-draft-creator__fields {
+    grid-template-columns: 1fr;
+  }
+
+  .commission-admin-page__header,
+  .commission-policy-summary,
+  .commission-simulation {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .commission-policy-status {
+    align-self: flex-start;
+  }
+
+  .commission-policy-summary {
+    gap: 16px;
+  }
+
+  .commission-rule-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .commission-policy-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .commission-policy-actions button,
+  .commission-rule-card > button {
+    width: 100%;
+  }
+
+  .commission-history li {
+    gap: 4px;
+    grid-template-columns: 1fr;
+  }
+}

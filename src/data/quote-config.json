@@ -1,0 +1,129 @@
+{
+  "version": "2026-07-15",
+  "document_title": "海南联通FTTR心连心智慧养老组合报价方案",
+  "company": {
+    "name": "上海海魄信息科技股份有限公司",
+    "brand": "心连心智能养老业务",
+    "website": "hope-m.com",
+    "phone": "021-61099397",
+    "email": "contact@hope-m.com",
+    "address": "上海国家级紫竹科技园区，紫海路88号410室"
+  },
+  "products": {
+    "gateway": {"label": "迷你网关", "unit": "个", "price": 220, "reason": "连接传感器和报警设备并上传告警数据", "default_location": "客厅路由器附近"},
+    "motion": {"label": "人体传感器（运动传感器）", "unit": "个", "price": 205, "reason": "监测长者活动状态并辅助识别长时间无活动等异常", "default_location": "按房型布点"},
+    "door": {"label": "门磁", "unit": "个", "price": 135, "reason": "识别开关门和异常外出场景", "default_location": "入户门"},
+    "portable_button": {"label": "随身报警按钮", "unit": "个", "price": 135, "reason": "身体不适或发生意外时主动求助", "default_location": "长者随身携带"},
+    "wall_button": {"label": "壁挂报警按钮", "unit": "个", "price": 175, "reason": "覆盖如厕、洗浴等高风险场景的固定求助", "default_location": "卫生间墙面"},
+    "watch": {"label": "AI健康智能手表", "unit": "块", "price": 380, "reason": "支持定位、通话、SOS与日常健康辅助管理", "default_location": "长者随身佩戴"},
+    "mattress": {"label": "睡眠监测床垫", "unit": "张", "price": 880, "reason": "辅助监测在床、离床及夜间睡眠趋势", "default_location": "长者睡眠床位"}
+  },
+  "product_order": ["watch", "mattress", "gateway", "motion", "door", "portable_button", "wall_button"],
+  "public_price_order": ["watch", "mattress", "standard_bundle", "gateway", "motion", "door", "portable_button", "wall_button"],
+  "guardian_combo_order": [
+    "travel_guard",
+    "night_guard",
+    "button_guard",
+    "home_dual_guard"
+  ],
+  "guardian_combos": {
+    "travel_guard": {
+      "name": "心连心·随行守护",
+      "quantities": {"watch": 1},
+      "summary": "提供日常联系、定位和主动 SOS 入口。",
+      "locations": {"watch": ["长者随身佩戴"]}
+    },
+    "night_guard": {
+      "name": "心连心·夜伴守护",
+      "quantities": {"mattress": 1},
+      "summary": "非接触辅助记录在床、离床及夜间睡眠趋势。",
+      "locations": {"mattress": ["长者睡眠床位"]}
+    },
+    "button_guard": {
+      "name": "心连心·一键守护",
+      "quantities": {"gateway": 1, "wall_button": 1},
+      "summary": "为卫生间等重点位置提供固定主动求助入口。",
+      "locations": {
+        "gateway": ["客厅路由器附近"],
+        "wall_button": ["卫生间墙面"]
+      }
+    },
+    "home_dual_guard": {
+      "name": "心连心·居家双护",
+      "quantities": {"gateway": 1, "motion": 1, "wall_button": 1},
+      "summary": "将被动活动关注与主动一键求助结合。",
+      "locations": {
+        "gateway": ["客厅路由器附近"],
+        "motion": ["客厅至卫生间主要活动通道"],
+        "wall_button": ["卫生间墙面"]
+      }
+    }
+  },
+  "standard_bundle": {
+    "label": "标准居家养老套装",
+    "unit": "套",
+    "quantities": {"gateway": 1, "motion": 3, "door": 1, "portable_button": 1, "wall_button": 1},
+    "motion_locations": ["长者卧室", "卫生间", "客厅"],
+    "motion_reason": "配置 3 个：分别覆盖长者卧室、卫生间和客厅，兼顾睡眠、如厕高风险与日间起居活动。"
+  },
+  "room_types": {
+    "one_bedroom": {
+      "label": "一室一厅",
+      "shared_quantities": {"gateway": 1, "wall_button": 1},
+      "motion_locations": {
+        "1": ["客厅至卫生间主要活动通道"],
+        "2": ["客厅至卫生间主要活动通道"],
+        "3": ["客厅至卫生间主要活动通道"],
+        "4": ["客厅至卫生间主要活动通道"]
+      },
+      "motion_reasons": {
+        "1": "配置 1 个：覆盖客厅至卫生间主要活动通道，用于被动关注日常活动；卫生间壁挂报警按钮用于紧急主动求助。",
+        "2": "配置 1 个：覆盖客厅至卫生间主要活动通道，用于被动关注日常活动；卫生间壁挂报警按钮用于紧急主动求助。",
+        "3": "配置 1 个：覆盖客厅至卫生间主要活动通道，用于被动关注日常活动；卫生间壁挂报警按钮用于紧急主动求助。",
+        "4": "配置 1 个：覆盖客厅至卫生间主要活动通道，用于被动关注日常活动；卫生间壁挂报警按钮用于紧急主动求助。"
+      },
+      "optional_products": ["door", "portable_button"]
+    },
+    "two_bedroom": {
+      "label": "两室一厅",
+      "shared_quantities": {"gateway": 1, "door": 1, "portable_button": 1, "wall_button": 1},
+      "motion_locations": {
+        "1": ["长者卧室", "卫生间", "客厅"],
+        "2": ["卧室 A", "卧室 B", "卫生间", "客厅"],
+        "3": ["卧室 A", "卧室 B", "卫生间", "客厅"],
+        "4": ["卧室 A", "卧室 B", "卫生间", "客厅"]
+      },
+      "motion_reasons": {
+        "1": "配置 3 个：分别覆盖长者卧室、卫生间和客厅，兼顾睡眠、如厕高风险与日间起居活动。",
+        "2": "配置 4 个：前三枚分别覆盖卧室 A、卫生间和客厅，第四枚因第二卧室（卧室 B）新增覆盖。",
+        "3": "配置 4 个：前三枚分别覆盖卧室 A、卫生间和客厅，第四枚因第二卧室（卧室 B）新增覆盖。",
+        "4": "配置 4 个：前三枚分别覆盖卧室 A、卫生间和客厅，第四枚因第二卧室（卧室 B）新增覆盖。"
+      }
+    },
+    "three_bedroom": {
+      "label": "三室一厅",
+      "shared_quantities": {"gateway": 1, "door": 1, "portable_button": 1, "wall_button": 1},
+      "motion_locations": {
+        "1": ["长者卧室", "卫生间", "客厅", "次卧/走廊"],
+        "2": ["卧室 A", "卧室 B", "卫生间", "客厅"],
+        "3": ["卧室 A", "卧室 B", "卧室 C", "卫生间", "客厅"],
+        "4": ["卧室 A", "卧室 B", "卧室 C", "卫生间", "客厅"]
+      },
+      "motion_reasons": {
+        "1": "配置 4 个：前三枚分别覆盖长者卧室、卫生间和客厅，第四枚因次卧/走廊新增覆盖。",
+        "2": "配置 4 个：前三枚分别覆盖卧室 A、卫生间和客厅，第四枚因第二卧室（卧室 B）新增覆盖。",
+        "3": "配置 5 个：前三枚分别覆盖卧室 A、卫生间和客厅，第四、第五枚分别因卧室 B、卧室 C 新增覆盖。",
+        "4": "配置 5 个：前三枚分别覆盖卧室 A、卫生间和客厅，第四、第五枚分别因卧室 B、卧室 C 新增覆盖。"
+      }
+    },
+    "custom": {
+      "label": "自定义",
+      "shared_quantities": {"gateway": 1},
+      "motion_locations": {"1": [], "2": [], "3": [], "4": []}
+    }
+  },
+  "free_services": [
+    {"label": "手机端应用", "display": "大客户专属免运维费使用"},
+    {"label": "AI大屏端管理系统", "display": "大客户专属免运维费使用"}
+  ]
+}

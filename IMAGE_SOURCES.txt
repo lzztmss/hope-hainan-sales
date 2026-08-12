@@ -1,0 +1,9 @@
+# 固定基础镜像（构建时从受控 Docker registry 拉取）
+node:22.17.0-bookworm-slim
+nginx:1.28.0-alpine3.21
+postgres:16.9-bookworm
+
+# 本地产物 tag
+hainan-fttr-heartlink-api:2.0.1-20260802
+hainan-fttr-heartlink-web:2.0.1-20260802
+hainan-fttr-heartlink-ops:2.0.1-20260802
