@@ -8,7 +8,9 @@ import type {
 } from "../../shared/pricing/types.js";
 import {
   canAccessOwnedRecord,
+  scopeForUser,
   type AuthenticatedUser,
+  type UserScope,
 } from "../auth/authorization.js";
 import { maskPhone, normalizeMainlandPhone } from "../security/pii.js";
 
@@ -75,6 +77,22 @@ export interface QuoteWriteRecord {
 export interface ConfirmedQuote extends QuoteWriteRecord {
   id: string;
   deletedAt: Date | null;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface QuoteListFilters {
+  query?: string;
+  status?: ConfirmedQuote["status"];
+  dateFrom?: Date;
+  dateTo?: Date;
+  deletedOnly?: boolean;
+  limit: number;
+}
+
+export interface QuoteListResult {
+  items: ConfirmedQuote[];
 }
 
 export interface QuotePresentation {
@@ -85,6 +103,8 @@ export interface QuotePresentation {
   storeId: string;
   confirmedAt: Date;
   deletedAt: Date | null;
+  version: number;
+  updatedAt: Date;
   customer: {
     name: string;
     phone: string;
@@ -97,6 +117,7 @@ export interface QuotePresentation {
     notes: string | null;
   };
   calculation: QuoteCalculation;
+  pricing: QuoteInput;
 }
 
 export interface QuoteRepository {
@@ -107,7 +128,20 @@ export interface QuoteRepository {
   upsertCustomer(input: CustomerWriteRecord): Promise<{ id: string }>;
   createQuote(input: QuoteWriteRecord): Promise<ConfirmedQuote>;
   findById(id: string): Promise<ConfirmedQuote | null>;
+  list(scope: UserScope, filters: QuoteListFilters): Promise<QuoteListResult>;
+  updateQuote(
+    id: string,
+    expectedVersion: number,
+    input: QuoteWriteRecord,
+  ): Promise<ConfirmedQuote | null>;
   setDeletedAt(id: string, deletedAt: Date | null): Promise<ConfirmedQuote | null>;
+  writeAudit(input: {
+    actorUserId: string;
+    storeId: string;
+    quoteId: string;
+    beforeSnapshot: Record<string, unknown>;
+    afterSnapshot: Record<string, unknown>;
+  }): Promise<void>;
   recordPrint(input: {
     quoteId: string;
     userId: string;
@@ -208,8 +242,12 @@ export const createQuoteService = (options: QuoteServiceOptions) => {
   const presentQuote = (quote: ConfirmedQuote): QuotePresentation => {
     const customer = quote.customerSnapshot;
     const calculation = quote.quoteSnapshot.calculation;
+    const pricing = quote.quoteSnapshot.pricingInput;
     if (!calculation || typeof calculation !== "object") {
       throw new Error("报价快照缺少核价结果");
+    }
+    if (!pricing || typeof pricing !== "object") {
+      throw new Error("报价快照缺少原始配置");
     }
     const decrypt = (key: string): string | null => {
       const encrypted = snapshotString(customer, key);
@@ -237,6 +275,8 @@ export const createQuoteService = (options: QuoteServiceOptions) => {
       storeId: quote.storeId,
       confirmedAt: quote.confirmedAt,
       deletedAt: quote.deletedAt,
+      version: quote.version,
+      updatedAt: quote.updatedAt,
       customer: {
         name,
         phone,
@@ -249,6 +289,80 @@ export const createQuoteService = (options: QuoteServiceOptions) => {
         notes: decrypt("notesEncrypted"),
       },
       calculation: calculation as QuoteCalculation,
+      pricing: pricing as QuoteInput,
+    };
+  };
+
+  const buildCustomerRecord = (
+    user: AuthenticatedUser,
+    customer: QuoteCustomerDraft,
+  ): { record: CustomerWriteRecord; phone: string } => {
+    if (!user.storeId) throw new Error("用户未绑定营业厅");
+    validateCustomer(customer);
+    const phone = normalizeMainlandPhone(customer.phone);
+    return {
+      phone,
+      record: {
+        storeId: user.storeId,
+        ownerUserId: user.id,
+        nameEncrypted: options.pii.encryptPii(customer.name.trim()),
+        phoneEncrypted: options.pii.encryptPii(phone),
+        phoneLookupHash: options.pii.phoneLookupHash(phone),
+        phoneTail: phone.slice(-4),
+        districtEncrypted: optionalEncrypted(customer.district, options.pii.encryptPii),
+        addressEncrypted: optionalEncrypted(customer.address, options.pii.encryptPii),
+        roomType: customer.roomType ?? null,
+        elderCount: customer.elderCount,
+        source: customer.source?.trim() || null,
+        notesEncrypted: optionalEncrypted(customer.notes, options.pii.encryptPii),
+        createdBy: user.id,
+      },
+    };
+  };
+
+  const customerSnapshot = (
+    record: CustomerWriteRecord,
+    phone: string,
+  ): Record<string, unknown> => ({
+    nameEncrypted: record.nameEncrypted,
+    phoneEncrypted: record.phoneEncrypted,
+    phoneMasked: maskPhone(phone),
+    districtEncrypted: record.districtEncrypted,
+    addressEncrypted: record.addressEncrypted,
+    roomType: record.roomType,
+    elderCount: record.elderCount,
+    source: record.source,
+    notesEncrypted: record.notesEncrypted,
+  });
+
+  const quoteValues = (
+    base: Pick<QuoteWriteRecord, "quoteNo" | "idempotencyKey" | "storeId" | "sellerId" | "confirmedAt">,
+    customerId: string,
+    draft: QuoteDraft,
+    customerRecord: CustomerWriteRecord,
+    phone: string,
+  ): QuoteWriteRecord => {
+    const calculated = calculateQuote(draft.pricing);
+    return {
+      ...base,
+      customerId,
+      status: "confirmed",
+      paymentMode: calculated.mode,
+      fttrKind: calculated.fttrKind,
+      fttrPlan: calculated.fttrPlan,
+      customFttrNote: calculated.customFttrNote,
+      fttrMonthlyFen: calculated.fttrMonthlyFen,
+      heartMonthlyFen: calculated.heartMonthlyFen,
+      oneTimeFen: calculated.oneTimeFen,
+      monthlyTotalFen: calculated.monthlyTotalFen,
+      contract36Fen: calculated.contract36Fen,
+      catalogVersion: calculated.catalogVersion,
+      customerSnapshot: customerSnapshot(customerRecord, phone),
+      quoteSnapshot: {
+        catalogVersion: calculated.catalogVersion,
+        pricingInput: structuredClone(draft.pricing),
+        calculation: structuredClone(calculated),
+      },
     };
   };
 
@@ -295,71 +409,88 @@ export const createQuoteService = (options: QuoteServiceOptions) => {
           return existingInsideTransaction;
         }
 
-        validateCustomer(draft.customer);
-        const phone = normalizeMainlandPhone(draft.customer.phone);
-        const calculated = calculateQuote(draft.pricing);
-        const customerRecord: CustomerWriteRecord = {
-          storeId,
-          ownerUserId: user.id,
-          nameEncrypted: options.pii.encryptPii(draft.customer.name.trim()),
-          phoneEncrypted: options.pii.encryptPii(phone),
-          phoneLookupHash: options.pii.phoneLookupHash(phone),
-          phoneTail: phone.slice(-4),
-          districtEncrypted: optionalEncrypted(
-            draft.customer.district,
-            options.pii.encryptPii,
-          ),
-          addressEncrypted: optionalEncrypted(
-            draft.customer.address,
-            options.pii.encryptPii,
-          ),
-          roomType: draft.customer.roomType ?? null,
-          elderCount: draft.customer.elderCount,
-          source: draft.customer.source?.trim() || null,
-          notesEncrypted: optionalEncrypted(
-            draft.customer.notes,
-            options.pii.encryptPii,
-          ),
-          createdBy: user.id,
-        };
+        const { record: customerRecord, phone } = buildCustomerRecord(user, draft.customer);
         const customer = await repository.upsertCustomer(customerRecord);
         const confirmedAt = now();
 
-        return repository.createQuote({
-          quoteNo: `XLX-${formatShanghaiDate(confirmedAt)}-${randomSuffix()}`,
-          idempotencyKey,
-          customerId: customer.id,
-          storeId,
-          sellerId: user.id,
-          status: "confirmed",
-          paymentMode: calculated.mode,
-          fttrKind: calculated.fttrKind,
-          fttrPlan: calculated.fttrPlan,
-          customFttrNote: calculated.customFttrNote,
-          fttrMonthlyFen: calculated.fttrMonthlyFen,
-          heartMonthlyFen: calculated.heartMonthlyFen,
-          oneTimeFen: calculated.oneTimeFen,
-          monthlyTotalFen: calculated.monthlyTotalFen,
-          contract36Fen: calculated.contract36Fen,
-          catalogVersion: calculated.catalogVersion,
-          customerSnapshot: {
-            nameEncrypted: customerRecord.nameEncrypted,
-            phoneEncrypted: customerRecord.phoneEncrypted,
-            phoneMasked: maskPhone(phone),
-            districtEncrypted: customerRecord.districtEncrypted,
-            addressEncrypted: customerRecord.addressEncrypted,
-            roomType: customerRecord.roomType,
-            elderCount: customerRecord.elderCount,
-            source: customerRecord.source,
-            notesEncrypted: customerRecord.notesEncrypted,
+        return repository.createQuote(
+          quoteValues(
+            {
+              quoteNo: `XLX-${formatShanghaiDate(confirmedAt)}-${randomSuffix()}`,
+              idempotencyKey,
+              storeId,
+              sellerId: user.id,
+              confirmedAt,
+            },
+            customer.id,
+            draft,
+            customerRecord,
+            phone,
+          ),
+        );
+      });
+    },
+
+    async listQuotes(
+      user: AuthenticatedUser,
+      filters: QuoteListFilters,
+    ): Promise<{ items: QuotePresentation[] }> {
+      const result = await options.repository.list(scopeForUser(user), filters);
+      const query = filters.query?.trim().toLocaleLowerCase("zh-CN");
+      const items = result.items.map(presentQuote).filter((quote) => {
+        if (!query) return true;
+        return (
+          quote.quoteNo.toLocaleLowerCase("zh-CN").includes(query) ||
+          quote.customer.name.toLocaleLowerCase("zh-CN").includes(query) ||
+          quote.customer.phone.endsWith(query)
+        );
+      });
+      return { items: items.slice(0, filters.limit) };
+    },
+
+    async updateQuote(
+      user: AuthenticatedUser,
+      quoteId: string,
+      draft: QuoteDraft,
+      expectedVersion: number,
+    ): Promise<QuotePresentation> {
+      if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+        throw new Error("报价版本不正确");
+      }
+      const existing = await requireVisibleQuote(user, quoteId);
+      if (existing.deletedAt || existing.status !== "confirmed") {
+        throw new Error("当前报价已锁定，不能修改");
+      }
+      return options.repository.runConfirmationTransaction(async (repository) => {
+        const current = await repository.findById(quoteId);
+        if (!current || current.version !== expectedVersion) {
+          throw new Error("报价已被其他人修改，请刷新后重试");
+        }
+        const { record, phone } = buildCustomerRecord(user, draft.customer);
+        const customer = await repository.upsertCustomer(record);
+        const next = quoteValues(
+          {
+            quoteNo: current.quoteNo,
+            idempotencyKey: current.idempotencyKey,
+            storeId: current.storeId,
+            sellerId: current.sellerId,
+            confirmedAt: current.confirmedAt,
           },
-          quoteSnapshot: {
-            catalogVersion: calculated.catalogVersion,
-            pricingInput: structuredClone(draft.pricing),
-            calculation: structuredClone(calculated),
-          },
-          confirmedAt,
+          customer.id,
+          draft,
+          record,
+          phone,
+        );
+        const updated = await repository.updateQuote(quoteId, expectedVersion, next);
+        if (!updated) throw new Error("报价已被其他人修改，请刷新后重试");
+        await repository.writeAudit({
+          actorUserId: user.id,
+          storeId: current.storeId,
+          quoteId,
+          beforeSnapshot: { version: current.version, quoteSnapshot: current.quoteSnapshot },
+          afterSnapshot: { version: updated.version, quoteSnapshot: updated.quoteSnapshot },
         });
+        return presentQuote(updated);
       });
     },
 

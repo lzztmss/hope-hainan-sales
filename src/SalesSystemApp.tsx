@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { type ApiClient, type ApiUserRole, apiClient } from "./api/client";
@@ -16,6 +17,8 @@ import { MyCommissionRoute } from "./commissions/MyCommissionRoute";
 import { SalesDashboardPage } from "./dashboard/SalesDashboardPage";
 import { OrderManagementRoute } from "./orders/OrderManagementRoute";
 import { QuoteWorkflowPage } from "./quote/QuoteWorkflowPage";
+import { QuoteListPage } from "./quote/QuoteListPage";
+import { QuoteDetailPage } from "./quote/QuoteDetailPage";
 import { TeamReportPage } from "./reports/TeamReportPage";
 import { ReturnManagementRoute } from "./returns/ReturnManagementRoute";
 import "./salesSystem.css";
@@ -174,6 +177,30 @@ const OrdersRoute = ({ client }: { client: ApiClient }) => {
   ) : null;
 };
 
+const QuoteDetailRoute = ({ client }: { client: ApiClient }) => {
+  const { quoteId } = useParams();
+  return quoteId ? <QuoteDetailPage client={client} quoteId={quoteId} /> : null;
+};
+
+const QuoteEditRoute = ({ client }: { client: ApiClient }) => {
+  const { quoteId } = useParams();
+  const [quote, setQuote] = useState<Awaited<ReturnType<ApiClient["getQuote"]>> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!quoteId) return;
+    setQuote(null);
+    setError(null);
+    void client.getQuote(quoteId).then((loaded) => {
+      if (loaded.status !== "confirmed" || loaded.deletedAt) {
+        throw new Error("当前报价已锁定，不能修改");
+      }
+      setQuote(loaded);
+    }).catch((reason) => setError(reason instanceof Error ? reason.message : "报价读取失败"));
+  }, [client, quoteId]);
+  if (error) return <PageLayout title="无法修改报价"><div className="system-notice" role="alert">{error}</div></PageLayout>;
+  return quote ? <QuoteWorkflowPage client={client} initialQuote={quote} /> : <PageLayout title="修改报价"><div className="system-notice" role="status">正在读取报价…</div></PageLayout>;
+};
+
 const ReturnsRoute = () => {
   const { user } = useAuth();
   return user ? <ReturnManagementRoute actor={user} /> : null;
@@ -217,8 +244,9 @@ export const SalesSystemRoutes = ({ client }: SalesSystemRoutesProps) => (
           </Route>
 
           <Route element={<RequireRole allowed={["sales", "store_manager", "admin"]} />}>
-            <Route path="/quotes" element={<PlaceholderPage title="报价管理" />} />
-            <Route path="/quotes/:quoteId" element={<PlaceholderPage title="报价详情" />} />
+            <Route path="/quotes" element={<QuoteListPage client={client} />} />
+            <Route path="/quotes/:quoteId/edit" element={<QuoteEditRoute client={client} />} />
+            <Route path="/quotes/:quoteId" element={<QuoteDetailRoute client={client} />} />
             <Route path="/customers" element={<PlaceholderPage title="客户管理" />} />
             <Route path="/orders" element={<OrdersRoute client={client} />} />
             <Route path="/orders/:orderId" element={<OrdersRoute client={client} />} />

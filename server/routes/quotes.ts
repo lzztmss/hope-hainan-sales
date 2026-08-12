@@ -65,6 +65,18 @@ const customerSchema = z.object({
 
 const previewSchema = z.object({ pricing: pricingSchema });
 const confirmSchema = z.object({ customer: customerSchema, pricing: pricingSchema });
+const updateSchema = confirmSchema.extend({
+  expectedVersion: z.number().int().min(1),
+});
+const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const listSchema = z.object({
+  query: z.string().trim().max(120).optional(),
+  status: z.enum(["confirmed", "converted", "expired", "lost", "voided"]).optional(),
+  dateFrom: dateSchema.optional(),
+  dateTo: dateSchema.optional(),
+  deletedOnly: z.enum(["true", "false"]).transform((value) => value === "true").optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
 
 const ensureTrustedOrigin = (
   request: FastifyRequest,
@@ -100,6 +112,31 @@ export const registerQuoteRoutes = async (
   app: FastifyInstance,
   options: RegisterQuoteRoutesOptions,
 ): Promise<void> => {
+  app.get("/api/quotes", async (request, reply) => {
+    const user = await resolveUser(request, reply, options.authService);
+    if (!user) return;
+    const parsed = listSchema.safeParse(request.query);
+    if (!parsed.success) return reply.status(400).send({ error: "报价查询条件不正确" });
+    const dateFrom = parsed.data.dateFrom
+      ? new Date(`${parsed.data.dateFrom}T00:00:00+08:00`)
+      : undefined;
+    const dateTo = parsed.data.dateTo
+      ? new Date(new Date(`${parsed.data.dateTo}T00:00:00+08:00`).getTime() + 86_400_000)
+      : undefined;
+    try {
+      return await options.quoteService.listQuotes(user, {
+        query: parsed.data.query,
+        status: parsed.data.status,
+        dateFrom,
+        dateTo,
+        deletedOnly: parsed.data.deletedOnly,
+        limit: parsed.data.limit,
+      });
+    } catch (error) {
+      return sendServiceError(reply, error);
+    }
+  });
+
   app.post("/api/quotes/preview", async (request, reply) => {
     if (!ensureTrustedOrigin(request, reply, options.appOrigin)) return;
     const user = await resolveUser(request, reply, options.authService);
@@ -159,6 +196,31 @@ export const registerQuoteRoutes = async (
       try {
         return await options.quoteService.getQuote(user, request.params.id);
       } catch (error) {
+        return sendServiceError(reply, error);
+      }
+    },
+  );
+
+  app.put<{ Params: { id: string } }>(
+    "/api/quotes/:id",
+    async (request, reply) => {
+      if (!ensureTrustedOrigin(request, reply, options.appOrigin)) return;
+      const user = await resolveUser(request, reply, options.authService);
+      if (!user) return;
+      const parsed = updateSchema.safeParse(request.body);
+      if (!parsed.success) return reply.status(400).send({ error: "客户或报价参数不完整" });
+      try {
+        return await options.quoteService.updateQuote(
+          user,
+          request.params.id,
+          { customer: parsed.data.customer, pricing: parsed.data.pricing },
+          parsed.data.expectedVersion,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "修改报价失败";
+        if (message.includes("其他人修改") || message.includes("锁定")) {
+          return reply.status(409).send({ error: message });
+        }
         return sendServiceError(reply, error);
       }
     },

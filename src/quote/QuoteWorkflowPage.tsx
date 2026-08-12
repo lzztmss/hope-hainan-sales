@@ -18,19 +18,21 @@ import type {
   ConfirmedQuoteSummary,
   ConfirmQuoteInput,
   OrderMutationDto,
+  QuoteDetailDto,
 } from "../api/client";
 import { PageLayout } from "../components/layout";
 import "./quoteWorkflow.css";
 
 export type QuoteWorkflowClient = Pick<
   ApiClient,
-  "confirmQuote" | "createOrderFromQuote" | "recordQuotePrint"
+  "confirmQuote" | "createOrderFromQuote" | "recordQuotePrint" | "updateQuote"
 >;
 
 export interface QuoteWorkflowPageProps {
   client: QuoteWorkflowClient;
   createIdempotencyKey?: () => string;
   createOrderIdempotencyKey?: () => string;
+  initialQuote?: QuoteDetailDto;
 }
 
 type QuantityKey = Exclude<keyof QuoteSelection, "locations">;
@@ -276,17 +278,23 @@ export const QuoteWorkflowPage = ({
   client,
   createIdempotencyKey = newIdempotencyKey,
   createOrderIdempotencyKey = newOrderIdempotencyKey,
+  initialQuote,
 }: QuoteWorkflowPageProps) => {
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [roomType, setRoomType] = useState<RoomType>("one_bedroom");
-  const [elderCount, setElderCount] = useState<1 | 2 | 3 | 4>(1);
-  const [mode, setMode] = useState<PaymentMode>("contract_36");
-  const [fttrChoice, setFttrChoice] = useState<FttrChoice>("159");
-  const [customFttr, setCustomFttr] = useState("");
-  const [customFttrNote, setCustomFttrNote] = useState("");
+  const originalPricing = initialQuote?.pricing;
+  const originalFttrPlan = originalPricing?.fttrPlan;
+  const originalFttrIsStandard = originalFttrPlan != null && ACTIVE_CATALOG.fttrPlans.some((plan) => plan === originalFttrPlan);
+  const [name, setName] = useState(initialQuote?.customer.name ?? "");
+  const [phone, setPhone] = useState(initialQuote?.customer.phone ?? "");
+  const [roomType, setRoomType] = useState<RoomType>(initialQuote?.customer.roomType ?? "one_bedroom");
+  const [elderCount, setElderCount] = useState<1 | 2 | 3 | 4>((initialQuote?.customer.elderCount ?? 1) as 1 | 2 | 3 | 4);
+  const [mode, setMode] = useState<PaymentMode>(originalPricing?.mode ?? "contract_36");
+  const [fttrChoice, setFttrChoice] = useState<FttrChoice>(
+    originalFttrPlan === null ? "none" : originalFttrIsStandard ? String(originalFttrPlan) as FttrChoice : originalFttrPlan !== undefined ? "custom" : "159",
+  );
+  const [customFttr, setCustomFttr] = useState(originalFttrPlan != null && !originalFttrIsStandard ? String(originalFttrPlan) : "");
+  const [customFttrNote, setCustomFttrNote] = useState(originalPricing?.customFttrNote ?? "");
   const [scenario, setScenario] = useState<Scenario>("custom");
-  const [selection, setSelection] = useState<QuoteSelection>(initialSelection);
+  const [selection, setSelection] = useState<QuoteSelection>(originalPricing?.selection ?? initialSelection());
   const [savedQuote, setSavedQuote] = useState<ConfirmedQuoteSummary | null>(null);
   const [createdOrder, setCreatedOrder] = useState<OrderMutationDto | null>(null);
   const [busy, setBusy] = useState(false);
@@ -381,7 +389,6 @@ export const QuoteWorkflowPage = ({
     try {
       let quote = savedQuote;
       if (!quote) {
-        idempotencyKey.current ??= createIdempotencyKey();
         const input: ConfirmQuoteInput = {
           customer: {
             name: name.trim(),
@@ -391,7 +398,22 @@ export const QuoteWorkflowPage = ({
           },
           pricing,
         };
-        quote = await client.confirmQuote(input, idempotencyKey.current);
+        if (initialQuote) {
+          const updated = await client.updateQuote(initialQuote.id, input, initialQuote.version);
+          quote = {
+            id: updated.id,
+            quoteNo: updated.quoteNo,
+            status: updated.status,
+            confirmedAt: updated.confirmedAt,
+            oneTimeFen: updated.calculation.oneTimeFen,
+            monthlyTotalFen: updated.calculation.monthlyTotalFen,
+            contract36Fen: updated.calculation.contract36Fen,
+            calculation: updated.calculation,
+          };
+        } else {
+          idempotencyKey.current ??= createIdempotencyKey();
+          quote = await client.confirmQuote(input, idempotencyKey.current);
+        }
         quoteConfirmed = true;
         flushSync(() => setSavedQuote(quote));
       }
@@ -446,9 +468,9 @@ export const QuoteWorkflowPage = ({
 
   return (
     <PageLayout
-      description="页面只展示大客户特优价；确认时服务端会用当前有效价格版本重新核价。"
+      description={initialQuote ? `正在修改报价 ${initialQuote.quoteNo}；保存时服务端会重新核价并生成新版本。` : "页面只展示大客户特优价；确认时服务端会用当前有效价格版本重新核价。"}
       eyebrow="销售报价"
-      title="新建报价"
+      title={initialQuote ? "修改报价" : "新建报价"}
     >
       <section className="quote-workflow__customer" aria-labelledby="customer-title">
         <h2 id="customer-title">客户信息</h2>
@@ -824,7 +846,9 @@ export const QuoteWorkflowPage = ({
               : "正在保存…"
             : savedQuote
               ? "重新打印已保存报价"
-              : "确认保存并打印"}
+              : initialQuote
+                ? "保存修改并打印"
+                : "确认保存并打印"}
         </button>
       </section>
     </PageLayout>

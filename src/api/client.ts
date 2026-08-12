@@ -66,6 +66,32 @@ export interface ConfirmedQuoteSummary {
   calculation: QuoteCalculation;
 }
 
+export type QuoteStatus = ConfirmedQuoteSummary["status"];
+
+export interface QuoteDetailDto {
+  id: string;
+  quoteNo: string;
+  status: QuoteStatus;
+  sellerId: string;
+  storeId: string;
+  confirmedAt: string;
+  deletedAt: string | null;
+  version: number;
+  updatedAt: string;
+  customer: QuoteCustomerInput & { phoneMasked: string };
+  calculation: QuoteCalculation;
+  pricing: QuoteInput;
+}
+
+export interface QuoteListQuery {
+  query?: string;
+  status?: QuoteStatus;
+  dateFrom?: string;
+  dateTo?: string;
+  deletedOnly?: boolean;
+  limit?: number;
+}
+
 export type CommissionPolicyStatus = "draft" | "published" | "stopped";
 
 export interface CommissionPolicyVersionDto {
@@ -300,6 +326,13 @@ export interface ApiClient {
     input: ConfirmQuoteInput,
     idempotencyKey: string,
   ): Promise<ConfirmedQuoteSummary>;
+  getQuote(quoteId: string): Promise<QuoteDetailDto>;
+  listQuotes(query?: QuoteListQuery): Promise<{ items: readonly QuoteDetailDto[] }>;
+  updateQuote(
+    quoteId: string,
+    input: ConfirmQuoteInput,
+    expectedVersion: number,
+  ): Promise<QuoteDetailDto>;
   getCurrentUser(): Promise<AuthenticatedUser>;
   getOrder(orderId: string): Promise<OrderDto>;
   getMyCommissionDashboard(
@@ -404,6 +437,23 @@ const readConfirmedQuote = (payload: unknown): ConfirmedQuoteSummary => {
   }
 
   return payload as ConfirmedQuoteSummary;
+};
+
+const readQuoteDetail = (payload: unknown): QuoteDetailDto => {
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    !("id" in payload) ||
+    typeof payload.id !== "string" ||
+    !("quoteNo" in payload) ||
+    typeof payload.quoteNo !== "string" ||
+    !("customer" in payload) ||
+    !("pricing" in payload) ||
+    !("calculation" in payload)
+  ) {
+    throw new ApiError("服务响应格式异常，请稍后重试", 500);
+  }
+  return payload as QuoteDetailDto;
 };
 
 const readProperty = <T>(payload: unknown, property: string): T => {
@@ -555,6 +605,31 @@ export const createApiClient = ({
           method: "POST",
           body: JSON.stringify(input),
           headers: { "Idempotency-Key": idempotencyKey },
+        }),
+      );
+    },
+    async getQuote(quoteId) {
+      return readQuoteDetail(
+        await request(`/api/quotes/${encodeURIComponent(quoteId)}`),
+      );
+    },
+    async listQuotes(query = {}) {
+      const parameters = new URLSearchParams();
+      if (query.query) parameters.set("query", query.query);
+      if (query.status) parameters.set("status", query.status);
+      if (query.dateFrom) parameters.set("dateFrom", query.dateFrom);
+      if (query.dateTo) parameters.set("dateTo", query.dateTo);
+      if (query.deletedOnly) parameters.set("deletedOnly", "true");
+      parameters.set("limit", String(query.limit ?? 50));
+      const payload = await request(`/api/quotes?${parameters.toString()}`);
+      const items = readProperty<unknown[]>(payload, "items").map(readQuoteDetail);
+      return { items };
+    },
+    async updateQuote(quoteId, input, expectedVersion) {
+      return readQuoteDetail(
+        await request(`/api/quotes/${encodeURIComponent(quoteId)}`, {
+          method: "PUT",
+          body: JSON.stringify({ ...input, expectedVersion }),
         }),
       );
     },

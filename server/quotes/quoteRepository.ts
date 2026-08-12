@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, isNull, lt, sql, type SQL } from "drizzle-orm";
 
 import type { QuoteCalculation } from "../../shared/pricing/types.js";
 import type {
@@ -8,6 +8,7 @@ import type {
 } from "../db/client.js";
 import {
   customers,
+  auditLogs,
   printEvents,
   quoteLines,
   quotes,
@@ -17,7 +18,9 @@ import type {
   CustomerWriteRecord,
   QuoteRepository,
   QuoteWriteRecord,
+  QuoteListFilters,
 } from "./quoteService.js";
+import type { UserScope } from "../auth/authorization.js";
 
 type QueryExecutor = AppDatabase | DbTransaction;
 type QuoteRow = typeof quotes.$inferSelect;
@@ -44,7 +47,52 @@ const mapQuote = (row: QuoteRow): ConfirmedQuote => ({
   quoteSnapshot: row.quoteSnapshot,
   confirmedAt: row.confirmedAt,
   deletedAt: row.deletedAt,
+  version: row.version,
+  createdAt: row.createdAt,
+  updatedAt: row.updatedAt,
 });
+
+const scopeCondition = (scope: UserScope): SQL | undefined => {
+  if (scope.kind === "global") return undefined;
+  if (scope.kind === "store") return eq(quotes.storeId, scope.storeId);
+  return and(eq(quotes.storeId, scope.storeId), eq(quotes.sellerId, scope.sellerId));
+};
+
+const lineValuesFor = (
+  quoteId: string,
+  snapshot: Record<string, unknown>,
+): Array<typeof quoteLines.$inferInsert> => {
+  const calculation = quoteCalculationFromSnapshot(snapshot);
+  return [
+    ...calculation.chargeLines.map((line) => ({
+      quoteId,
+      lineType: "charge" as const,
+      sku: line.sku,
+      label: line.label,
+      unit: line.unit,
+      quantity: line.quantity,
+      oneTimeUnitFen: line.oneTimeUnitFen,
+      monthlyUnitFen: line.monthlyUnitFen,
+      oneTimeSubtotalFen: line.oneTimeSubtotalFen,
+      monthlySubtotalFen: line.monthlySubtotalFen,
+      locations: [],
+    })),
+    ...calculation.componentLines.map((line) => ({
+      quoteId,
+      lineType: "component" as const,
+      sku: line.componentId,
+      label: line.label,
+      unit: line.unit,
+      quantity: line.quantity,
+      oneTimeUnitFen: 0,
+      monthlyUnitFen: 0,
+      oneTimeSubtotalFen: 0,
+      monthlySubtotalFen: 0,
+      locations: line.locations,
+      reason: line.reason,
+    })),
+  ];
+};
 
 const quoteCalculationFromSnapshot = (
   snapshot: Record<string, unknown>,
@@ -134,36 +182,7 @@ export class DrizzleQuoteRepository implements QuoteRepository {
       .returning();
     if (!created) throw new Error("报价单创建失败");
 
-    const calculation = quoteCalculationFromSnapshot(input.quoteSnapshot);
-    const lineValues: Array<typeof quoteLines.$inferInsert> = [
-      ...calculation.chargeLines.map((line) => ({
-        quoteId: created.id,
-        lineType: "charge" as const,
-        sku: line.sku,
-        label: line.label,
-        unit: line.unit,
-        quantity: line.quantity,
-        oneTimeUnitFen: line.oneTimeUnitFen,
-        monthlyUnitFen: line.monthlyUnitFen,
-        oneTimeSubtotalFen: line.oneTimeSubtotalFen,
-        monthlySubtotalFen: line.monthlySubtotalFen,
-        locations: [],
-      })),
-      ...calculation.componentLines.map((line) => ({
-        quoteId: created.id,
-        lineType: "component" as const,
-        sku: line.componentId,
-        label: line.label,
-        unit: line.unit,
-        quantity: line.quantity,
-        oneTimeUnitFen: 0,
-        monthlyUnitFen: 0,
-        oneTimeSubtotalFen: 0,
-        monthlySubtotalFen: 0,
-        locations: line.locations,
-        reason: line.reason,
-      })),
-    ];
+    const lineValues = lineValuesFor(created.id, input.quoteSnapshot);
     if (lineValues.length > 0) {
       await this.executor.insert(quoteLines).values(lineValues);
     }
@@ -177,6 +196,74 @@ export class DrizzleQuoteRepository implements QuoteRepository {
       .where(eq(quotes.id, id))
       .limit(1);
     return row ? mapQuote(row) : null;
+  }
+
+  async list(scope: UserScope, filters: QuoteListFilters) {
+    const conditions: SQL[] = [];
+    const scoped = scopeCondition(scope);
+    if (scoped) conditions.push(scoped);
+    if (filters.status) conditions.push(eq(quotes.status, filters.status));
+    conditions.push(filters.deletedOnly ? isNotNull(quotes.deletedAt) : isNull(quotes.deletedAt));
+    if (filters.dateFrom) conditions.push(gte(quotes.confirmedAt, filters.dateFrom));
+    if (filters.dateTo) conditions.push(lt(quotes.confirmedAt, filters.dateTo));
+    const rows = await this.executor
+      .select()
+      .from(quotes)
+      .where(and(...conditions))
+      .orderBy(desc(quotes.updatedAt), desc(quotes.id))
+      .limit(filters.query ? 500 : filters.limit);
+    return { items: rows.map(mapQuote) };
+  }
+
+  async updateQuote(
+    id: string,
+    expectedVersion: number,
+    input: QuoteWriteRecord,
+  ): Promise<ConfirmedQuote | null> {
+    const [row] = await this.executor
+      .update(quotes)
+      .set({
+        customerId: input.customerId,
+        paymentMode: input.paymentMode,
+        fttrKind: input.fttrKind,
+        fttrPlan: input.fttrPlan,
+        customFttrNote: input.customFttrNote,
+        fttrMonthlyFen: input.fttrMonthlyFen,
+        heartMonthlyFen: input.heartMonthlyFen,
+        oneTimeFen: input.oneTimeFen,
+        monthlyTotalFen: input.monthlyTotalFen,
+        contract36Fen: input.contract36Fen,
+        catalogVersion: input.catalogVersion,
+        customerSnapshot: input.customerSnapshot,
+        quoteSnapshot: input.quoteSnapshot,
+        updatedAt: new Date(),
+        version: sql`${quotes.version} + 1`,
+      })
+      .where(and(eq(quotes.id, id), eq(quotes.version, expectedVersion), eq(quotes.status, "confirmed"), isNull(quotes.deletedAt)))
+      .returning();
+    if (!row) return null;
+    await this.executor.delete(quoteLines).where(eq(quoteLines.quoteId, id));
+    const lineValues = lineValuesFor(id, input.quoteSnapshot);
+    if (lineValues.length > 0) await this.executor.insert(quoteLines).values(lineValues);
+    return mapQuote(row);
+  }
+
+  async writeAudit(input: {
+    actorUserId: string;
+    storeId: string;
+    quoteId: string;
+    beforeSnapshot: Record<string, unknown>;
+    afterSnapshot: Record<string, unknown>;
+  }): Promise<void> {
+    await this.executor.insert(auditLogs).values({
+      actorUserId: input.actorUserId,
+      storeId: input.storeId,
+      entityType: "quote",
+      entityId: input.quoteId,
+      action: "quote.update",
+      beforeSnapshot: input.beforeSnapshot,
+      afterSnapshot: input.afterSnapshot,
+    });
   }
 
   async setDeletedAt(
