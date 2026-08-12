@@ -32,6 +32,42 @@
 .quote-management__detail li { display: flex; justify-content: space-between; gap: var(--hfttr-space-3); padding-block: var(--hfttr-space-2); border-bottom: 1px solid var(--app-color-border); }
 .quote-management__detail li span { color: var(--app-color-text-muted); text-align: right; }
 .quote-management__actions { display: flex; flex-wrap: wrap; gap: var(--hfttr-space-3); }
+.quote-management__print-header { display: none; }
+.quote-management__print-note p { line-height: 1.65; }
 .quote-management__error { color: var(--app-color-danger); font-weight: 700; }
 @media (min-width: 64rem) { .quote-management__filters { grid-template-columns: minmax(0, 2fr) minmax(10rem, 1fr) minmax(9rem, 1fr) minmax(9rem, 1fr) auto; align-items: end; } }
-@media print { .quote-management__actions, .page-header { display: none !important; } .quote-management__detail { border: 0; box-shadow: none; padding: 0; } }
+@media print {
+  @page { size: A4; margin: 12mm; }
+  body * { visibility: hidden !important; }
+  .quote-management__print-document,
+  .quote-management__print-document * { visibility: visible !important; }
+  .quote-management__print-document {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    color: #111827;
+    font-size: 9pt;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .quote-management__print-header {
+    display: flex;
+    align-items: center;
+    gap: 5mm;
+    padding-bottom: 4mm;
+    border-bottom: 2px solid #174a7e;
+  }
+  .quote-management__print-header img { width: 15mm; height: 15mm; object-fit: contain; }
+  .quote-management__print-header h2 { margin: 1mm 0 0; font-size: 16pt; }
+  .quote-management__print-document > section { margin-top: 5mm; break-inside: auto; }
+  .quote-management__print-document > section h2 { margin: 0 0 3mm; font-size: 12pt; }
+  .quote-management__detail dl { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; border: 1px solid #cbd5e1; }
+  .quote-management__detail dl div { grid-template-columns: 34mm 1fr; padding: 2mm 3mm; border-bottom: 1px solid #e2e8f0; break-inside: avoid; }
+  .quote-management__detail li { padding-block: 2mm; break-inside: avoid; }
+  .quote-management__actions, .page-header { display: none !important; }
+  .quote-management__print-note { break-inside: avoid; }
+}
