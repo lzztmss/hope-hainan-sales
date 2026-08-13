@@ -106,6 +106,7 @@
 }
 
 .order-page__header h1 {
+  color: var(--app-color-text-inverse);
   font-size: var(--app-font-size-title);
   line-height: 1.2;
 }
