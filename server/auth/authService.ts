@@ -163,8 +163,8 @@ export const createAuthService = (options: AuthServiceOptions) => {
     ): Promise<AuthenticatedUser> {
       const user = await resolveSessionRecord(token);
       if (!user) throw new Error("请先登录");
-      if (newPassword.length < 12 || newPassword.length > 128) {
-        throw new Error("新密码长度必须为12至128位");
+      if (newPassword.length < 8 || newPassword.length > 128) {
+        throw new Error("新密码长度必须为8至128位");
       }
 
       let currentMatches = false;

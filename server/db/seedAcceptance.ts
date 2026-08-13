@@ -15,8 +15,8 @@ if (!sqlitePath) {
 if (!/(^|[/\\])acceptance(?:[.-]|$)/i.test(sqlitePath)) {
   throw new Error("验收库文件名必须以 acceptance 开头，避免误写日常数据库");
 }
-if (password.length < 12) {
-  throw new Error("ACCEPTANCE_PASSWORD 至少需要 12 个字符");
+if (password.length < 8 || password.length > 128) {
+  throw new Error("ACCEPTANCE_PASSWORD 长度必须为 8 至 128 个字符");
 }
 
 await migrateDatabase(sqlitePath);

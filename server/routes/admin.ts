@@ -47,7 +47,7 @@ const createUserSchema = z.object({
   personnelType: personnelTypeSchema,
   storeId: storeIdSchema.nullable(),
   active: z.boolean().optional(),
-  initialPassword: z.string().min(12).max(128),
+  initialPassword: z.string().min(8).max(128),
   reason: reasonSchema,
 });
 
@@ -69,7 +69,7 @@ const updateUserSchema = z
   );
 
 const resetPasswordSchema = z.object({
-  initialPassword: z.string().min(12).max(128),
+  initialPassword: z.string().min(8).max(128),
   reason: reasonSchema,
 });
 

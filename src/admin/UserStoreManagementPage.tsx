@@ -352,9 +352,9 @@ export const UserStoreManagementPage = ({
 
   const createUser = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
-    if (userDraft.initialPassword.length < 12) {
+    if (userDraft.initialPassword.length < 8 || userDraft.initialPassword.length > 128) {
       setPasswordInvalid(true);
-      setError("初始密码长度必须至少为12位");
+      setError("初始密码长度必须为8至128位");
       return;
     }
     setPasswordInvalid(false);
@@ -472,8 +472,8 @@ export const UserStoreManagementPage = ({
   const resetPassword = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
     if (!resetDraft) return;
-    if (resetDraft.initialPassword.length < 12) {
-      setError("新初始密码长度必须至少为12位");
+    if (resetDraft.initialPassword.length < 8 || resetDraft.initialPassword.length > 128) {
+      setError("新初始密码长度必须为8至128位");
       return;
     }
     if (resetDraft.reason.trim().length < 2) {
@@ -701,7 +701,7 @@ export const UserStoreManagementPage = ({
               <label>账号角色<select value={userDraft.role} onChange={(event) => changeCreateRole(event.currentTarget.value as ManagedUserRole)}><option value="sales">销售员</option><option value="store_manager">营业厅经理</option><option value="admin">管理员</option></select></label>
               <label>人员类型<select value={userDraft.personnelType} disabled={userDraft.role === "admin"} onChange={(event) => setUserDraft({ ...userDraft, personnelType: event.currentTarget.value as ManagedPersonnelType })}><option value="unicom">联通人员</option><option value="auxiliary">辅助销售</option><option value="admin">管理员</option></select></label>
               <label>所属营业厅<select required={userDraft.role !== "admin"} disabled={userDraft.role === "admin"} value={userDraft.storeId} onChange={(event) => setUserDraft({ ...userDraft, storeId: event.currentTarget.value })}><option value="">请选择营业厅</option>{activeStores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</select></label>
-              <label>初始密码<input type="password" required minLength={12} aria-invalid={passwordInvalid} aria-describedby={passwordInvalid ? "initial-password-error" : undefined} value={userDraft.initialPassword} onChange={(event) => { setPasswordInvalid(false); setUserDraft({ ...userDraft, initialPassword: event.currentTarget.value }); }} /></label>
+              <label>初始密码（8 至 128 位）<input type="password" required minLength={8} maxLength={128} aria-invalid={passwordInvalid} aria-describedby={passwordInvalid ? "initial-password-error" : undefined} value={userDraft.initialPassword} onChange={(event) => { setPasswordInvalid(false); setUserDraft({ ...userDraft, initialPassword: event.currentTarget.value }); }} /></label>
               <label className="management-wide">新增账号原因（至少 2 个字符）<input required minLength={2} value={userDraft.reason} onChange={(event) => setUserDraft({ ...userDraft, reason: event.currentTarget.value })} /></label>
               <div className="management-form-actions"><button type="submit" className="management-primary" disabled={busy || !onCreateUser}>创建账号</button></div>
             </fieldset>
@@ -747,7 +747,7 @@ export const UserStoreManagementPage = ({
       {resetDraft ? (
         <section className="management-action-panel" aria-labelledby="reset-password-title">
           <h2 id="reset-password-title">重置{resetDraft.displayName}的初始密码</h2><p>保存后该账号在所有设备上的会话会立即失效。</p>
-          <form onSubmit={(event) => void resetPassword(event)}><label>新初始密码（12 至 128 位）<input type="password" required minLength={12} maxLength={128} value={resetDraft.initialPassword} onChange={(event) => setResetDraft({ ...resetDraft, initialPassword: event.currentTarget.value })} /></label><label>重置密码原因（至少 2 个字符）<input required minLength={2} value={resetDraft.reason} onChange={(event) => setResetDraft({ ...resetDraft, reason: event.currentTarget.value })} /></label><div className="management-form-actions"><button type="button" onClick={() => setResetDraft(null)}>取消</button><button type="submit" className="management-primary" disabled={busy}>确认重置密码</button></div></form>
+          <form onSubmit={(event) => void resetPassword(event)}><label>新初始密码（8 至 128 位）<input type="password" required minLength={8} maxLength={128} value={resetDraft.initialPassword} onChange={(event) => setResetDraft({ ...resetDraft, initialPassword: event.currentTarget.value })} /></label><label>重置密码原因（至少 2 个字符）<input required minLength={2} value={resetDraft.reason} onChange={(event) => setResetDraft({ ...resetDraft, reason: event.currentTarget.value })} /></label><div className="management-form-actions"><button type="button" onClick={() => setResetDraft(null)}>取消</button><button type="submit" className="management-primary" disabled={busy}>确认重置密码</button></div></form>
         </section>
       ) : null}
     </section>

@@ -34,7 +34,7 @@ describe("营业厅与账号管理表单", () => {
     await user.type(screen.getByLabelText("工号"), "LZ");
     await user.type(screen.getByLabelText("姓名"), "lz");
     await user.selectOptions(screen.getByLabelText("所属营业厅"), store.id);
-    await user.type(screen.getByLabelText("初始密码"), "Hainan@2026Test");
+    await user.type(screen.getByLabelText("初始密码（8 至 128 位）"), "Hainan@2026Test");
     await user.type(
       screen.getByLabelText("新增账号原因（至少 2 个字符）"),
       "1",

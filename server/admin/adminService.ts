@@ -247,8 +247,8 @@ const normalizeName = (value: string, label: string, max: number): string => {
 };
 
 const validateInitialPassword = (value: string): void => {
-  if (value.length < 12 || value.length > 128) {
-    throw new AdminServiceError("初始密码长度必须为12至128位", 400);
+  if (value.length < 8 || value.length > 128) {
+    throw new AdminServiceError("初始密码长度必须为8至128位", 400);
   }
 };
 

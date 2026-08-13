@@ -33,8 +33,8 @@ export const seedBootstrapAdmin = async (
     );
   }
 
-  if (password.length < 12) {
-    throw new Error("BOOTSTRAP_ADMIN_PASSWORD 至少需要 12 个字符");
+  if (password.length < 8 || password.length > 128) {
+    throw new Error("BOOTSTRAP_ADMIN_PASSWORD 长度必须为 8 至 128 个字符");
   }
 
   const client = createDatabaseClient(sqlitePath);

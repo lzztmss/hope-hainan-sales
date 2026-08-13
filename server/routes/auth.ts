@@ -24,7 +24,7 @@ const loginBodySchema = z.object({
 
 const changePasswordBodySchema = z.object({
   currentPassword: z.string().min(1).max(128),
-  newPassword: z.string().min(12).max(128),
+  newPassword: z.string().min(8).max(128),
 });
 
 class LoginAttemptLimiter {
@@ -148,7 +148,7 @@ export const registerAuthRoutes = async (
 
     const parsed = changePasswordBodySchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.status(400).send({ error: "新密码长度必须为12至128位" });
+      return reply.status(400).send({ error: "新密码长度必须为8至128位" });
     }
     try {
       const user = await options.authService.changePassword(

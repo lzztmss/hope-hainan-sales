@@ -19,8 +19,8 @@ export const ChangePasswordPage = () => {
       setError("两次输入的新密码不一致");
       return;
     }
-    if (newPassword.length < 12) {
-      setError("新密码长度必须为12至128位");
+    if (newPassword.length < 8 || newPassword.length > 128) {
+      setError("新密码长度必须为8至128位");
       return;
     }
 
@@ -51,7 +51,7 @@ export const ChangePasswordPage = () => {
           </div>
         </div>
         <p className="auth-card__introduction">
-          为保护客户与订单数据，请先设置 12 至 128 位的新密码。
+          为保护客户与订单数据，请先设置 8 至 128 位的新密码。
         </p>
 
         <form className="auth-form" onSubmit={(event) => void submit(event)}>
@@ -59,6 +59,8 @@ export const ChangePasswordPage = () => {
           <input
             id="current-password"
             type="password"
+            minLength={8}
+            maxLength={128}
             autoComplete="current-password"
             value={currentPassword}
             disabled={submitting}
@@ -69,6 +71,8 @@ export const ChangePasswordPage = () => {
           <input
             id="new-password"
             type="password"
+            minLength={8}
+            maxLength={128}
             autoComplete="new-password"
             value={newPassword}
             disabled={submitting}
