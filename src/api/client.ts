@@ -36,7 +36,7 @@ export interface LoginInput {
 }
 
 export interface ChangePasswordInput {
-  currentPassword: string;
+  currentPassword?: string;
   newPassword: string;
 }
 

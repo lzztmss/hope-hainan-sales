@@ -79,6 +79,7 @@ export interface ResetManagedPasswordInput {
 }
 
 export interface UserStoreManagementPageProps {
+  currentUserId?: string;
   stores: readonly ManagedStoreView[];
   users: readonly ManagedUserView[];
   onCreateStore?(input: CreateManagedStoreInput): Promise<void>;
@@ -265,6 +266,7 @@ const statusBadge = (active: boolean) => (
 );
 
 export const UserStoreManagementPage = ({
+  currentUserId,
   stores,
   users,
   onCreateStore,
@@ -746,8 +748,8 @@ export const UserStoreManagementPage = ({
 
       {resetDraft ? (
         <section className="management-action-panel" aria-labelledby="reset-password-title">
-          <h2 id="reset-password-title">重置{resetDraft.displayName}的初始密码</h2><p>保存后该账号在所有设备上的会话会立即失效。</p>
-          <form onSubmit={(event) => void resetPassword(event)}><label>新初始密码（8 至 128 位）<input type="password" required minLength={8} maxLength={128} value={resetDraft.initialPassword} onChange={(event) => setResetDraft({ ...resetDraft, initialPassword: event.currentTarget.value })} /></label><label>重置密码原因（至少 2 个字符）<input required minLength={2} value={resetDraft.reason} onChange={(event) => setResetDraft({ ...resetDraft, reason: event.currentTarget.value })} /></label><div className="management-form-actions"><button type="button" onClick={() => setResetDraft(null)}>取消</button><button type="submit" className="management-primary" disabled={busy}>确认重置密码</button></div></form>
+          <h2 id="reset-password-title">{resetDraft.userId === currentUserId ? "修改本人密码" : `重置${resetDraft.displayName}的临时密码`}</h2><p>{resetDraft.userId === currentUserId ? "保存后当前会话会立即失效，请使用新密码重新登录；无需再次修改。" : "请将临时密码通过电话、当面或内部通讯单独告知本人。该账号所有会话会立即失效，登录后须设置只有本人知道的新密码。"}</p>
+          <form onSubmit={(event) => void resetPassword(event)}><label>{resetDraft.userId === currentUserId ? "新密码" : "新临时密码"}（8 至 128 位）<input aria-label={resetDraft.userId === currentUserId ? "新密码（8 至 128 位）" : "新临时密码（8 至 128 位）"} type="password" required minLength={8} maxLength={128} value={resetDraft.initialPassword} onChange={(event) => setResetDraft({ ...resetDraft, initialPassword: event.currentTarget.value })} /></label><label>重置密码原因（至少 2 个字符）<input required minLength={2} value={resetDraft.reason} onChange={(event) => setResetDraft({ ...resetDraft, reason: event.currentTarget.value })} /></label><div className="management-form-actions"><button type="button" onClick={() => setResetDraft(null)}>取消</button><button type="submit" className="management-primary" disabled={busy}>确认{resetDraft.userId === currentUserId ? "修改" : "重置"}密码</button></div></form>
         </section>
       ) : null}
     </section>

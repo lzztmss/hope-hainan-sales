@@ -699,7 +699,7 @@ export const createAdminService = (options: AdminServiceOptions) => {
         if (!existing) throw new AdminServiceError("账号不存在", 404);
         const updated = await repository.updateUser(userId, {
           passwordHash: await hashPassword(input.initialPassword),
-          mustChangePassword: true,
+          mustChangePassword: actor.id !== userId,
           updatedAt: at,
         });
         if (!updated) throw new AdminServiceError("账号不存在", 404);

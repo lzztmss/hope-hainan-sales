@@ -23,7 +23,7 @@ const loginBodySchema = z.object({
 });
 
 const changePasswordBodySchema = z.object({
-  currentPassword: z.string().min(1).max(128),
+  currentPassword: z.string().min(1).max(128).optional(),
   newPassword: z.string().min(8).max(128),
 });
 

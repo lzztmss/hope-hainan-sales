@@ -7,6 +7,7 @@ import "./auth.css";
 export const ChangePasswordPage = () => {
   const auth = useAuth();
   const navigate = useNavigate();
+  const requiresTemporaryChange = Boolean(auth.user?.mustChangePassword);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
@@ -27,7 +28,10 @@ export const ChangePasswordPage = () => {
     setSubmitting(true);
     setError(null);
     try {
-      await auth.changePassword({ currentPassword, newPassword });
+      await auth.changePassword({
+        ...(requiresTemporaryChange ? {} : { currentPassword }),
+        newPassword,
+      });
       navigate("/", { replace: true });
     } catch (changeError) {
       setError(
@@ -46,26 +50,32 @@ export const ChangePasswordPage = () => {
         <div className="auth-card__brand">
           <img src="/haipo-logo.jpg" alt="海魄科技" />
           <div>
-            <p>首次登录安全验证</p>
-            <h1 id="change-password-title">修改初始密码</h1>
+            <p>{requiresTemporaryChange ? "临时密码安全验证" : "账号安全"}</p>
+            <h1 id="change-password-title">{requiresTemporaryChange ? "设置个人密码" : "修改密码"}</h1>
           </div>
         </div>
         <p className="auth-card__introduction">
-          为保护客户与订单数据，请先设置 8 至 128 位的新密码。
+          {requiresTemporaryChange
+            ? "你正在使用管理员设置的临时密码。请设置 8 至 128 位、只有你本人知道的新密码。"
+            : "请输入当前密码，并设置 8 至 128 位的新密码。"}
         </p>
 
         <form className="auth-form" onSubmit={(event) => void submit(event)}>
-          <label htmlFor="current-password">当前密码</label>
-          <input
-            id="current-password"
-            type="password"
-            minLength={8}
-            maxLength={128}
-            autoComplete="current-password"
-            value={currentPassword}
-            disabled={submitting}
-            onChange={(event) => setCurrentPassword(event.currentTarget.value)}
-          />
+          {!requiresTemporaryChange ? (
+            <>
+              <label htmlFor="current-password">当前密码</label>
+              <input
+                id="current-password"
+                type="password"
+                minLength={8}
+                maxLength={128}
+                autoComplete="current-password"
+                value={currentPassword}
+                disabled={submitting}
+                onChange={(event) => setCurrentPassword(event.currentTarget.value)}
+              />
+            </>
+          ) : null}
 
           <label htmlFor="new-password">新密码</label>
           <input
@@ -83,6 +93,8 @@ export const ChangePasswordPage = () => {
           <input
             id="confirm-password"
             type="password"
+            minLength={8}
+            maxLength={128}
             autoComplete="new-password"
             value={confirmation}
             disabled={submitting}

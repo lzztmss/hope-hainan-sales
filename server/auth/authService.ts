@@ -158,7 +158,7 @@ export const createAuthService = (options: AuthServiceOptions) => {
 
     async changePassword(
       token: string,
-      currentPassword: string,
+      currentPassword: string | undefined,
       newPassword: string,
     ): Promise<AuthenticatedUser> {
       const user = await resolveSessionRecord(token);
@@ -167,13 +167,16 @@ export const createAuthService = (options: AuthServiceOptions) => {
         throw new Error("新密码长度必须为8至128位");
       }
 
-      let currentMatches = false;
-      try {
-        currentMatches = await verify(user.passwordHash, currentPassword);
-      } catch {
-        currentMatches = false;
+      if (!user.mustChangePassword) {
+        if (!currentPassword) throw new Error("请输入当前密码");
+        let currentMatches = false;
+        try {
+          currentMatches = await verify(user.passwordHash, currentPassword);
+        } catch {
+          currentMatches = false;
+        }
+        if (!currentMatches) throw new Error("当前密码不正确");
       }
-      if (!currentMatches) throw new Error("当前密码不正确");
 
       const nextHash = await hash(newPassword, options.passwordHashOptions);
       await options.repository.updatePassword(user.id, nextHash);

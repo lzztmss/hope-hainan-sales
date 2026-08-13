@@ -79,6 +79,7 @@ export const UserStoreManagementRoute = ({
 
   return (
     <UserStoreManagementPage
+      currentUserId={currentUserId}
       stores={stores}
       users={users}
       onCreateStore={(input) => refreshAfter(() => api.createStore(input))}

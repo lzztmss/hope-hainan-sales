@@ -38,10 +38,13 @@ export const LoginPage = () => {
       navigate(safeDestination(location.state), { replace: true });
     } catch (loginError) {
       setPassword("");
+      const message = loginError instanceof Error
+        ? loginError.message
+        : "登录失败，请稍后重试";
       setError(
-        loginError instanceof Error
-          ? loginError.message
-          : "登录失败，请稍后重试",
+        message === "账号或密码错误"
+          ? "账号或密码错误；如密码近期被管理员重置，请联系管理员获取临时密码。"
+          : message,
       );
     } finally {
       setSubmitting(false);
@@ -61,7 +64,7 @@ export const LoginPage = () => {
           </div>
         </div>
         <p className="auth-card__introduction">
-          使用管理员分配的工号或手机号登录。系统不开放公开注册。
+          使用工号或手机号登录。管理员重置密码后，请使用管理员单独提供的临时密码；登录成功后系统会引导你设置个人密码。
         </p>
 
         <form className="auth-form" onSubmit={(event) => void submit(event)}>

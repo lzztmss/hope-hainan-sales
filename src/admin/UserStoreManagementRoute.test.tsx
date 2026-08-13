@@ -50,10 +50,7 @@ describe("营业厅与账号路由", () => {
       updatedAt: "2026-08-13T00:00:00.000Z",
     };
     vi.mocked(managementApi.listUsers).mockResolvedValue([administrator]);
-    vi.mocked(managementApi.resetPassword).mockResolvedValue({
-      ...administrator,
-      mustChangePassword: true,
-    });
+    vi.mocked(managementApi.resetPassword).mockResolvedValue(administrator);
     const onCurrentUserPasswordReset = vi.fn();
 
     render(
@@ -66,9 +63,10 @@ describe("营业厅与账号路由", () => {
 
     await screen.findByRole("heading", { name: "营业厅与账号管理" });
     await user.click(screen.getByRole("button", { name: "重置密码" }));
-    await user.type(screen.getByLabelText("新初始密码（8 至 128 位）"), "NewPass88");
+    expect(screen.getByText(/无需再次修改/)).toBeInTheDocument();
+    await user.type(screen.getByLabelText("新密码（8 至 128 位）"), "NewPass88");
     await user.type(screen.getByLabelText("重置密码原因（至少 2 个字符）"), "本人改密");
-    await user.click(screen.getByRole("button", { name: "确认重置密码" }));
+    await user.click(screen.getByRole("button", { name: "确认修改密码" }));
 
     await waitFor(() => expect(onCurrentUserPasswordReset).toHaveBeenCalledOnce());
     expect(managementApi.listStores).toHaveBeenCalledTimes(1);
