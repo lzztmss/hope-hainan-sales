@@ -66,13 +66,14 @@ export const ReportFilters = ({
               <select
                 aria-label="营业厅"
                 value={value.storeId ?? ""}
-                onChange={(event) =>
+                onChange={(event) => {
+                  const storeId = event.currentTarget.value || undefined;
                   setValue((current) => ({
                     ...current,
-                    storeId: event.currentTarget.value || undefined,
+                    storeId,
                     sellerId: undefined,
-                  }))
-                }
+                  }));
+                }}
               >
                 <option value="">全部可见营业厅</option>
                 {stores.map((store) => <option key={store.id} value={store.id}>{store.label}</option>)}

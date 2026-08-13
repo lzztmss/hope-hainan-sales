@@ -20,7 +20,7 @@ export class AppErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error): void {
-    console.error("报价应用加载失败", error);
+    console.error("系统页面运行失败", error);
   }
 
   render() {
@@ -29,8 +29,8 @@ export class AppErrorBoundary extends Component<
         <main className="config-error">
           <section aria-labelledby="config-error-title">
             <p className="config-error-mark" aria-hidden="true">!</p>
-            <h1 id="config-error-title">报价配置暂不可用</h1>
-            <p>请刷新后重试；如仍无法使用，请联系项目工作人员。</p>
+            <h1 id="config-error-title">当前页面暂时无法使用</h1>
+            <p>页面运行时遇到问题，请刷新后重试；如仍无法使用，请联系项目工作人员。</p>
             <button
               type="button"
               onClick={
