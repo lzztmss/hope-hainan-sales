@@ -17,8 +17,15 @@ const scopeCondition = (scope: UserScope): SQL | undefined => {
 export class DrizzleCustomerRepository implements CustomerRepository {
   constructor(private readonly client: DbClient) {}
 
-  async list(scope: UserScope, limit: number): Promise<readonly CustomerListRecord[]> {
+  async list(
+    scope: UserScope,
+    filters: { storeId?: string; ownerUserId?: string },
+    limit: number,
+  ): Promise<readonly CustomerListRecord[]> {
     const scoped = scopeCondition(scope);
+    const ownershipFilters = [scoped];
+    if (filters.storeId) ownershipFilters.push(eq(customers.storeId, filters.storeId));
+    if (filters.ownerUserId) ownershipFilters.push(eq(customers.ownerUserId, filters.ownerUserId));
     const rows = await this.client.db
       .select({
         id: customers.id,
@@ -40,7 +47,7 @@ export class DrizzleCustomerRepository implements CustomerRepository {
       .innerJoin(users, eq(users.id, customers.ownerUserId))
       .leftJoin(quotes, and(eq(quotes.customerId, customers.id), isNull(quotes.deletedAt)))
       .leftJoin(orders, and(eq(orders.customerId, customers.id), isNull(orders.deletedAt)))
-      .where(and(isNull(customers.deletedAt), scoped))
+      .where(and(isNull(customers.deletedAt), ...ownershipFilters))
       .groupBy(customers.id, stores.name, users.displayName)
       .orderBy(desc(customers.updatedAt), desc(customers.id))
       .limit(limit);

@@ -52,7 +52,7 @@
 .quote-order-confirm li[data-kind="package"] { border-left: 4px solid var(--app-color-primary); background: var(--app-color-surface-subtle); }
 .quote-order-confirm button { min-height: var(--app-control-min-size); padding-inline: var(--hfttr-space-4); border: 1px solid var(--app-color-border); border-radius: var(--app-radius-control); background: white; font: inherit; font-weight: 700; }
 .quote-order-confirm button.is-primary { border-color: var(--app-color-primary); background: var(--app-color-primary); color: white; }
-@media (min-width: 64rem) { .quote-management__filters { grid-template-columns: minmax(0, 2fr) minmax(10rem, 1fr) minmax(9rem, 1fr) minmax(9rem, 1fr) auto; align-items: end; } }
+@media (min-width: 64rem) { .quote-management__filters { grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); align-items: end; } }
 @media print {
   @page { size: A4; margin: 12mm; }
   body > :not(.quote-print-root) { display: none !important; }

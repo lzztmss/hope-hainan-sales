@@ -43,6 +43,8 @@ const completionSchema = z.object({
 });
 const listSchema = z.object({
   status: z.enum(["requested", "approved", "rejected", "completed"]).optional(),
+  storeId: z.string().uuid().optional(),
+  sellerId: z.string().uuid().optional(),
 });
 
 const trustedOrigin = (
@@ -93,7 +95,7 @@ export const registerReturnRoutes = async (
     }
     try {
       return {
-        items: await options.returnService.listReturns(user, parsed.data.status),
+        items: await options.returnService.listReturns(user, parsed.data),
       };
     } catch (error) {
       return serviceError(reply, error);

@@ -87,10 +87,18 @@ export interface QuoteDetailDto {
 export interface QuoteListQuery {
   query?: string;
   status?: QuoteStatus;
+  storeId?: string;
+  sellerId?: string;
   dateFrom?: string;
   dateTo?: string;
   deletedOnly?: boolean;
   limit?: number;
+}
+
+export interface CustomerListQuery {
+  query?: string;
+  storeId?: string;
+  sellerId?: string;
 }
 
 export interface CustomerListItemDto {
@@ -353,7 +361,7 @@ export interface ApiClient {
   ): Promise<ConfirmedQuoteSummary>;
   getQuote(quoteId: string): Promise<QuoteDetailDto>;
   listQuotes(query?: QuoteListQuery): Promise<{ items: readonly QuoteDetailDto[] }>;
-  listCustomers(query?: string): Promise<{ items: readonly CustomerListItemDto[] }>;
+  listCustomers(query?: CustomerListQuery): Promise<{ items: readonly CustomerListItemDto[] }>;
   updateQuote(
     quoteId: string,
     input: ConfirmQuoteInput,
@@ -645,6 +653,8 @@ export const createApiClient = ({
       if (query.query) parameters.set("query", query.query);
       if (query.query) parameters.set("query", query.query);
       if (query.status) parameters.set("status", query.status);
+      if (query.storeId) parameters.set("storeId", query.storeId);
+      if (query.sellerId) parameters.set("sellerId", query.sellerId);
       if (query.dateFrom) parameters.set("dateFrom", query.dateFrom);
       if (query.dateTo) parameters.set("dateTo", query.dateTo);
       if (query.deletedOnly) parameters.set("deletedOnly", "true");
@@ -653,9 +663,11 @@ export const createApiClient = ({
       const items = readProperty<unknown[]>(payload, "items").map(readQuoteDetail);
       return { items };
     },
-    async listCustomers(query = "") {
+    async listCustomers(query = {}) {
       const parameters = new URLSearchParams({ limit: "100" });
-      if (query.trim()) parameters.set("query", query.trim());
+      if (query.query?.trim()) parameters.set("query", query.query.trim());
+      if (query.storeId) parameters.set("storeId", query.storeId);
+      if (query.sellerId) parameters.set("sellerId", query.sellerId);
       return (await request(`/api/customers?${parameters.toString()}`)) as {
         items: readonly CustomerListItemDto[];
       };

@@ -85,6 +85,8 @@ const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const listSchema = z.object({
   query: z.string().trim().max(120).optional(),
   status: z.enum(["confirmed", "converted", "expired", "lost", "voided"]).optional(),
+  storeId: z.string().uuid().optional(),
+  sellerId: z.string().uuid().optional(),
   dateFrom: dateSchema.optional(),
   dateTo: dateSchema.optional(),
   deletedOnly: z.enum(["true", "false"]).transform((value) => value === "true").optional(),
@@ -140,6 +142,8 @@ export const registerQuoteRoutes = async (
       return await options.quoteService.listQuotes(user, {
         query: parsed.data.query,
         status: parsed.data.status,
+        storeId: parsed.data.storeId,
+        sellerId: parsed.data.sellerId,
         dateFrom,
         dateTo,
         deletedOnly: parsed.data.deletedOnly,

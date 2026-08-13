@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import type { ApiClient, QuoteDetailDto, QuoteStatus } from "../api/client";
+import type { ApiClient, AuthenticatedUser, OrderFilterOptionsApiResponse, QuoteDetailDto, QuoteStatus } from "../api/client";
 import { PageLayout } from "../components/layout";
 import "./quoteManagement.css";
 
@@ -16,7 +16,7 @@ const STATUS_LABELS: Record<QuoteStatus, string> = {
 const money = (fen: number) =>
   `¥${(fen / 100).toLocaleString("zh-CN", { minimumFractionDigits: 2 })}`;
 
-export const QuoteListPage = ({ client }: { client: ApiClient }) => {
+export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: AuthenticatedUser }) => {
   const [searchParams] = useSearchParams();
   const initialQuery = searchParams.get("query") ?? "";
   const [items, setItems] = useState<readonly QuoteDetailDto[]>([]);
@@ -24,16 +24,21 @@ export const QuoteListPage = ({ client }: { client: ApiClient }) => {
   const [status, setStatus] = useState<QuoteStatus | "">("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [storeId, setStoreId] = useState("");
+  const [sellerId, setSellerId] = useState("");
+  const [options, setOptions] = useState<OrderFilterOptionsApiResponse>({ stores: [], sellers: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (nextQuery: string, nextStatus: QuoteStatus | "", nextFrom = "", nextTo = "") => {
+  const load = useCallback(async (nextQuery: string, nextStatus: QuoteStatus | "", nextFrom = "", nextTo = "", nextStoreId = "", nextSellerId = "") => {
     setLoading(true);
     setError(null);
     try {
       const result = await client.listQuotes({
         query: nextQuery.trim() || undefined,
         status: nextStatus || undefined,
+        storeId: nextStoreId || undefined,
+        sellerId: nextSellerId || undefined,
         dateFrom: nextFrom || undefined,
         dateTo: nextTo || undefined,
       });
@@ -46,17 +51,21 @@ export const QuoteListPage = ({ client }: { client: ApiClient }) => {
   }, [client]);
 
   useEffect(() => { void load(initialQuery, ""); }, [initialQuery, load]);
+  useEffect(() => {
+    if (viewer.role === "sales") return;
+    void client.listOrderFilterOptions().then(setOptions).catch(() => setOptions({ stores: [], sellers: [] }));
+  }, [client, viewer.role]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    void load(query, status, dateFrom, dateTo);
+    void load(query, status, dateFrom, dateTo, storeId, sellerId);
   };
 
   return (
     <PageLayout
       eyebrow="销售报价"
-      title="我的报价"
-      description="查询已保存报价，未转订单的报价可以继续修改、打印或转为订单。"
+      title={viewer.role === "admin" ? "全部报价" : viewer.role === "store_manager" ? "本厅报价" : "我的报价"}
+      description={viewer.role === "admin" ? "查询全部营业厅报价，可按营业厅和销售员筛选。" : viewer.role === "store_manager" ? "仅展示本营业厅报价，可按本厅销售员筛选。" : "查询已保存报价，未转订单的报价可以继续修改、打印或转为订单。"}
       actions={<Link className="quote-management__primary-link" to="/quotes/new">新建报价</Link>}
     >
       <form className="quote-management__filters" onSubmit={submit}>
@@ -69,6 +78,8 @@ export const QuoteListPage = ({ client }: { client: ApiClient }) => {
             onChange={(event) => setQuery(event.currentTarget.value)}
           />
         </label>
+        {viewer.role === "admin" ? <label><span>营业厅</span><select value={storeId} onChange={(event) => { setStoreId(event.currentTarget.value); setSellerId(""); }}><option value="">全部营业厅</option>{options.stores.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
+        {viewer.role !== "sales" ? <label><span>销售员</span><select value={sellerId} onChange={(event) => setSellerId(event.currentTarget.value)}><option value="">全部可见销售员</option>{options.sellers.filter((option) => !storeId || option.storeId === storeId).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
         <label>
           <span>报价状态</span>
           <select value={status} onChange={(event) => setStatus(event.currentTarget.value as QuoteStatus | "")}>
@@ -106,6 +117,7 @@ export const QuoteListPage = ({ client }: { client: ApiClient }) => {
             </header>
             <dl>
               <div><dt>客户情况</dt><dd>{quote.customer.elderCount} 位长者</dd></div>
+              {viewer.role !== "sales" ? <div><dt>销售归属</dt><dd>{options.stores.find((option) => option.id === quote.storeId)?.label ?? viewer.storeName ?? "营业厅"} · {options.sellers.find((option) => option.id === quote.sellerId)?.label ?? "销售员"}</dd></div> : null}
               <div><dt>每月合计</dt><dd>{money(quote.calculation.monthlyTotalFen)}</dd></div>
               <div><dt>一次性费用</dt><dd>{money(quote.calculation.oneTimeFen)}</dd></div>
               <div><dt>更新时间</dt><dd>{new Date(quote.updatedAt).toLocaleString("zh-CN")}</dd></div>

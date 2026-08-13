@@ -17,16 +17,32 @@ export interface CustomerListRecord {
 }
 
 export interface CustomerRepository {
-  list(scope: UserScope, limit: number): Promise<readonly CustomerListRecord[]>;
+  list(
+    scope: UserScope,
+    filters: { storeId?: string; ownerUserId?: string },
+    limit: number,
+  ): Promise<readonly CustomerListRecord[]>;
+}
+
+export interface CustomerListFilters {
+  query?: string;
+  storeId?: string;
+  sellerId?: string;
+  limit?: number;
 }
 
 export const createCustomerService = (options: {
   repository: CustomerRepository;
   decryptPii(value: string): string;
 }) => ({
-  async listCustomers(user: AuthenticatedUser, query?: string, limit = 100) {
-    const normalized = query?.trim().toLocaleLowerCase("zh-CN") ?? "";
-    const rows = await options.repository.list(scopeForUser(user), normalized ? 500 : limit);
+  async listCustomers(user: AuthenticatedUser, filters: CustomerListFilters = {}) {
+    const normalized = filters.query?.trim().toLocaleLowerCase("zh-CN") ?? "";
+    const limit = filters.limit ?? 100;
+    const rows = await options.repository.list(
+      scopeForUser(user),
+      { storeId: filters.storeId, ownerUserId: filters.sellerId },
+      normalized ? 500 : limit,
+    );
     return {
       items: rows
         .map((row) => {

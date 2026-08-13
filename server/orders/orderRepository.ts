@@ -550,8 +550,8 @@ export class DrizzleOrderRepository implements OrderRepository {
     const storeCondition = scope.kind === "store" ? eq(stores.id, scope.storeId) : eq(stores.active, true);
     const sellerCondition =
       scope.kind === "store"
-        ? and(eq(users.storeId, scope.storeId), eq(users.active, true))
-        : and(eq(users.active, true), isNotNull(users.storeId));
+        ? and(eq(users.storeId, scope.storeId), eq(users.active, true), inArray(users.role, ["sales", "store_manager"]))
+        : and(eq(users.active, true), isNotNull(users.storeId), inArray(users.role, ["sales", "store_manager"]));
     const [storeRows, sellerRows] = await Promise.all([
       this.executor
         .select({ id: stores.id, code: stores.code, name: stores.name })

@@ -202,6 +202,8 @@ export class DrizzleQuoteRepository implements QuoteRepository {
     const conditions: SQL[] = [];
     const scoped = scopeCondition(scope);
     if (scoped) conditions.push(scoped);
+    if (filters.storeId) conditions.push(eq(quotes.storeId, filters.storeId));
+    if (filters.sellerId) conditions.push(eq(quotes.sellerId, filters.sellerId));
     if (filters.status) conditions.push(eq(quotes.status, filters.status));
     conditions.push(filters.deletedOnly ? isNotNull(quotes.deletedAt) : isNull(quotes.deletedAt));
     if (filters.dateFrom) conditions.push(gte(quotes.confirmedAt, filters.dateFrom));

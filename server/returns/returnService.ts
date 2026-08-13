@@ -126,7 +126,7 @@ export interface ReturnRepository {
   findRequestById(id: string): Promise<ReturnRequestRecord | null>;
   listRequests(
     scope: UserScope,
-    filters: { orderId?: string; status?: ReturnRequestStatus },
+    filters: { orderId?: string; status?: ReturnRequestStatus; storeId?: string; sellerId?: string },
   ): Promise<ReturnRequestRecord[]>;
   saveDecision(
     id: string,
@@ -272,9 +272,9 @@ export const createReturnService = (options: ReturnServiceOptions) => {
   return {
     async listReturns(
       actor: AuthenticatedUser,
-      status?: ReturnRequestStatus,
+      filters: { status?: ReturnRequestStatus; storeId?: string; sellerId?: string } = {},
     ): Promise<ReturnRequestRecord[]> {
-      return options.repository.listRequests(scopeForUser(actor), { status });
+      return options.repository.listRequests(scopeForUser(actor), filters);
     },
 
     async listOrderReturns(

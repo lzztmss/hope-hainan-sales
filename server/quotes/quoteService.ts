@@ -85,6 +85,8 @@ export interface ConfirmedQuote extends QuoteWriteRecord {
 export interface QuoteListFilters {
   query?: string;
   status?: ConfirmedQuote["status"];
+  storeId?: string;
+  sellerId?: string;
   dateFrom?: Date;
   dateTo?: Date;
   deletedOnly?: boolean;

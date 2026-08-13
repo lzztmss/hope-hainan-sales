@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type {
+  ApiClient,
   AuthenticatedUser,
   ReturnRecordDto,
 } from "../api/client";
@@ -13,6 +14,7 @@ import {
 
 export interface ReturnManagementRouteProps {
   actor: AuthenticatedUser;
+  client: Pick<ApiClient, "listOrderFilterOptions">;
   api?: ReturnManagementApi;
 }
 
@@ -21,10 +23,14 @@ const errorMessage = (error: unknown): string =>
 
 export const ReturnManagementRoute = ({
   actor,
+  client,
   api = returnManagementApi,
 }: ReturnManagementRouteProps) => {
   const [items, setItems] = useState<readonly ReturnRecordDto[]>([]);
   const [status, setStatus] = useState<ReturnStatus | "">("");
+  const [storeId, setStoreId] = useState("");
+  const [sellerId, setSellerId] = useState("");
+  const [filterOptions, setFilterOptions] = useState<{ stores: Array<{ id: string; label: string }>; sellers: Array<{ id: string; label: string; storeId: string }> }>({ stores: [], sellers: [] });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadVersion, setReloadVersion] = useState(0);
@@ -33,14 +39,18 @@ export const ReturnManagementRoute = ({
     setLoading(true);
     setLoadError(null);
     try {
-      setItems(await api.listReturns(status || undefined));
+      setItems(await api.listReturns({ status: status || undefined, storeId: storeId || undefined, sellerId: sellerId || undefined }));
     } catch (error) {
       setItems([]);
       setLoadError(errorMessage(error));
     } finally {
       setLoading(false);
     }
-  }, [api, status]);
+  }, [api, sellerId, status, storeId]);
+
+  useEffect(() => {
+    void client.listOrderFilterOptions().then(setFilterOptions).catch(() => setFilterOptions({ stores: [], sellers: [] }));
+  }, [client]);
 
   useEffect(() => {
     void load();
@@ -66,6 +76,12 @@ export const ReturnManagementRoute = ({
       }}
       onReload={() => setReloadVersion((version) => version + 1)}
       onStatusChange={setStatus}
+      onStoreChange={(value) => { setStoreId(value); setSellerId(""); }}
+      onSellerChange={setSellerId}
+      storeId={storeId}
+      sellerId={sellerId}
+      stores={filterOptions.stores}
+      sellers={filterOptions.sellers}
       status={status}
     />
   );

@@ -5,9 +5,11 @@ import { createCustomerService, type CustomerRepository } from "./customerServic
 
 class RecordingRepository implements CustomerRepository {
   scope: UserScope | null = null;
+  filters: { storeId?: string; ownerUserId?: string } | null = null;
 
-  async list(scope: UserScope) {
+  async list(scope: UserScope, filters: { storeId?: string; ownerUserId?: string }) {
     this.scope = scope;
+    this.filters = filters;
     return [
       {
         id: "customer-1",
@@ -58,7 +60,14 @@ describe("客户列表权限与查询", () => {
   it("支持按手机后四位查询", async () => {
     const repository = new RecordingRepository();
     const service = createCustomerService({ repository, decryptPii: (value) => value });
-    expect((await service.listCustomers(user("sales"), "8000")).items).toHaveLength(1);
-    expect((await service.listCustomers(user("sales"), "9999")).items).toHaveLength(0);
+    expect((await service.listCustomers(user("sales"), { query: "8000" })).items).toHaveLength(1);
+    expect((await service.listCustomers(user("sales"), { query: "9999" })).items).toHaveLength(0);
+  });
+
+  it("把管理员选择的营业厅和销售员交给数据层筛选", async () => {
+    const repository = new RecordingRepository();
+    const service = createCustomerService({ repository, decryptPii: (value) => value });
+    await service.listCustomers(user("admin"), { storeId: "store-1", sellerId: "seller-1" });
+    expect(repository.filters).toEqual({ storeId: "store-1", ownerUserId: "seller-1" });
   });
 });

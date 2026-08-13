@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
-import type { ApiClient, CustomerListItemDto } from "../api/client";
+import type { ApiClient, AuthenticatedUser, CustomerListItemDto, OrderFilterOptionsApiResponse } from "../api/client";
 import { PageLayout } from "../components/layout";
 import "./customers.css";
 
@@ -11,17 +11,20 @@ const ROOM_LABELS: Record<string, string> = {
   three_bedroom: "三室户型",
 };
 
-export const CustomerListPage = ({ client }: { client: ApiClient }) => {
+export const CustomerListPage = ({ client, viewer }: { client: ApiClient; viewer: AuthenticatedUser }) => {
   const [items, setItems] = useState<readonly CustomerListItemDto[]>([]);
   const [query, setQuery] = useState("");
+  const [storeId, setStoreId] = useState("");
+  const [sellerId, setSellerId] = useState("");
+  const [options, setOptions] = useState<OrderFilterOptionsApiResponse>({ stores: [], sellers: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (nextQuery = "") => {
+  const load = useCallback(async (nextQuery = "", nextStoreId = "", nextSellerId = "") => {
     setLoading(true);
     setError(null);
     try {
-      setItems((await client.listCustomers(nextQuery)).items);
+      setItems((await client.listCustomers({ query: nextQuery, storeId: nextStoreId || undefined, sellerId: nextSellerId || undefined })).items);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "客户读取失败");
     } finally {
@@ -30,17 +33,21 @@ export const CustomerListPage = ({ client }: { client: ApiClient }) => {
   }, [client]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (viewer.role === "sales") return;
+    void client.listOrderFilterOptions().then(setOptions).catch(() => setOptions({ stores: [], sellers: [] }));
+  }, [client, viewer.role]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    void load(query);
+    void load(query, storeId, sellerId);
   };
 
   return (
     <PageLayout
       eyebrow="客户档案"
       title="客户管理"
-      description="客户由正式报价自动建档，可查看归属、报价和订单情况。"
+      description={viewer.role === "admin" ? "查看全部客户，可按营业厅和销售员筛选。" : viewer.role === "store_manager" ? "仅展示本营业厅客户，可按本厅销售员筛选。" : "客户由正式报价自动建档，可查看归属、报价和订单情况。"}
     >
       <form className="customer-list__filters" onSubmit={submit}>
         <label>
@@ -52,6 +59,8 @@ export const CustomerListPage = ({ client }: { client: ApiClient }) => {
             onChange={(event) => setQuery(event.currentTarget.value)}
           />
         </label>
+        {viewer.role === "admin" ? <label><span>营业厅</span><select value={storeId} onChange={(event) => { setStoreId(event.currentTarget.value); setSellerId(""); }}><option value="">全部营业厅</option>{options.stores.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
+        {viewer.role !== "sales" ? <label><span>销售员</span><select value={sellerId} onChange={(event) => setSellerId(event.currentTarget.value)}><option value="">全部可见销售员</option>{options.sellers.filter((option) => !storeId || option.storeId === storeId).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
         <button disabled={loading} type="submit">查询</button>
       </form>
 

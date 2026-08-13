@@ -12,7 +12,7 @@
 
 .customer-list__filters label { display: grid; gap: .45rem; }
 .customer-list__filters span { color: #42556b; font-weight: 700; }
-.customer-list__filters input { min-height: 2.75rem; padding: 0 .85rem; border: 1px solid #cbd8e6; border-radius: .65rem; }
+.customer-list__filters input, .customer-list__filters select { min-height: 2.75rem; padding: 0 .85rem; border: 1px solid #cbd8e6; border-radius: .65rem; background: #fff; font: inherit; }
 .customer-list__filters button { min-height: 2.75rem; padding: 0 1.4rem; border: 0; border-radius: .65rem; background: #174c82; color: #fff; font-weight: 700; }
 .customer-list__error { color: #b42318; }
 .customer-list__empty { padding: 2rem; text-align: center; color: #617187; background: #fff; border-radius: 1rem; }

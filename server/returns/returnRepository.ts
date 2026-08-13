@@ -229,7 +229,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
 
   async listRequests(
     scope: UserScope,
-    filters: { orderId?: string; status?: ReturnRequestRecord["status"] },
+    filters: { orderId?: string; status?: ReturnRequestRecord["status"]; storeId?: string; sellerId?: string },
   ): Promise<ReturnRequestRecord[]> {
     const conditions = [];
     if (scope.kind === "store") conditions.push(eq(orders.storeId, scope.storeId));
@@ -241,6 +241,8 @@ export class DrizzleReturnRepository implements ReturnRepository {
     }
     if (filters.orderId) conditions.push(eq(returnTable.orderId, filters.orderId));
     if (filters.status) conditions.push(eq(returnTable.status, filters.status));
+    if (filters.storeId) conditions.push(eq(orders.storeId, filters.storeId));
+    if (filters.sellerId) conditions.push(eq(orders.sellerId, filters.sellerId));
     const rows = await this.executor
       .select({ request: returnTable })
       .from(returnTable)

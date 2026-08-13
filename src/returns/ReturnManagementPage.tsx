@@ -20,6 +20,12 @@ export interface ReturnManagementPageProps {
   loading?: boolean;
   loadError?: string | null;
   onStatusChange?(status: ReturnStatus | ""): void;
+  onStoreChange?(storeId: string): void;
+  onSellerChange?(sellerId: string): void;
+  storeId?: string;
+  sellerId?: string;
+  stores?: readonly { id: string; label: string }[];
+  sellers?: readonly { id: string; label: string; storeId: string }[];
   onReload?(): void;
   onDecide(input: DecideManagedReturnInput): Promise<void>;
   onComplete(input: CompleteManagedReturnInput): Promise<void>;
@@ -309,6 +315,12 @@ export const ReturnManagementPage = ({
   onDecide,
   onReload,
   onStatusChange,
+  onStoreChange,
+  onSellerChange,
+  storeId = "",
+  sellerId = "",
+  stores = [],
+  sellers = [],
   status = "",
 }: ReturnManagementPageProps) => {
   const [approval, setApproval] = useState<ReturnRecordDto | null>(null);
@@ -360,6 +372,8 @@ export const ReturnManagementPage = ({
             )}
           </select>
         </label>
+        {actor.role === "admin" ? <label><span>营业厅</span><select disabled={loading} value={storeId} onChange={(event) => onStoreChange?.(event.currentTarget.value)}><option value="">全部营业厅</option>{stores.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
+        <label><span>销售员</span><select disabled={loading} value={sellerId} onChange={(event) => onSellerChange?.(event.currentTarget.value)}><option value="">全部可见销售员</option>{sellers.filter((option) => !storeId || option.storeId === storeId).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>
         <p><strong>{items.length}</strong> 笔退单</p>
       </section>
 

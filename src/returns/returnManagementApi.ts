@@ -16,7 +16,7 @@ export interface CompleteManagedReturnInput {
 }
 
 export interface ReturnManagementApi {
-  listReturns(status?: ReturnStatus): Promise<readonly ReturnRecordDto[]>;
+  listReturns(filters?: { status?: ReturnStatus; storeId?: string; sellerId?: string }): Promise<readonly ReturnRecordDto[]>;
   decideReturn(input: DecideManagedReturnInput): Promise<ReturnRecordDto>;
   completeReturn(input: CompleteManagedReturnInput): Promise<ReturnRecordDto>;
 }
@@ -127,8 +127,12 @@ export const createReturnManagementApi = ({
   };
 
   return {
-    async listReturns(status) {
-      const query = status ? `?status=${encodeURIComponent(status)}` : "";
+    async listReturns(filters = {}) {
+      const parameters = new URLSearchParams();
+      if (filters.status) parameters.set("status", filters.status);
+      if (filters.storeId) parameters.set("storeId", filters.storeId);
+      if (filters.sellerId) parameters.set("sellerId", filters.sellerId);
+      const query = parameters.size ? `?${parameters.toString()}` : "";
       return readReturns(await request(`/api/returns${query}`));
     },
     async decideReturn(input) {

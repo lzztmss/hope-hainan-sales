@@ -7,6 +7,8 @@ import { SESSION_COOKIE_NAME } from "./auth.js";
 
 const querySchema = z.object({
   query: z.string().trim().max(120).optional(),
+  storeId: z.string().uuid().optional(),
+  sellerId: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(100),
 });
 
@@ -32,8 +34,12 @@ export const registerCustomerRoutes = async (
     if (!parsed.success) return reply.status(400).send({ error: "客户查询条件不正确" });
     return options.customerService.listCustomers(
       user,
-      parsed.data.query,
-      parsed.data.limit,
+      {
+        query: parsed.data.query,
+        storeId: parsed.data.storeId,
+        sellerId: parsed.data.sellerId,
+        limit: parsed.data.limit,
+      },
     );
   });
 };
