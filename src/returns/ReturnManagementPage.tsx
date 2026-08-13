@@ -270,7 +270,9 @@ const CompletionDialog = ({ onClose, onComplete, record }: CompletionDialogProps
               value={actualYuan}
             />
           </label>
-          <p className="returns-audit-note">确认后将计入退单、销售净额和提成冲销记录。</p>
+          <p className="returns-audit-note">
+            此处只填写实际退给客户的金额，不是销售提成。确认后，系统会按本次退回商品及其原提成快照自动扣回销售提成；即使客户退款为 0 元，提成仍可能发生扣回。
+          </p>
           {error ? <p className="returns-form-error" role="alert">{error}</p> : null}
         </div>
         <footer>

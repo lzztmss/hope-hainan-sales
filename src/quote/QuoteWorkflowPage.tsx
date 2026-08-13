@@ -426,6 +426,9 @@ export const QuoteWorkflowPage = ({
       }
 
       await client.recordQuotePrint(quote.id);
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
       window.print();
     } catch (submitError) {
       setError(

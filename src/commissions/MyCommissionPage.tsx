@@ -87,6 +87,9 @@ export const MyCommissionPage = ({ dashboard }: MyCommissionPageProps) => (
         </article>
       ))}
     </section>
+    <p className="commission-summary-note">
+      已计提净额为本月已计提提成减本月退单扣回；累计净提成为历史全部已计提提成减全部退单扣回。客户实际退款与提成扣回分别核算。
+    </p>
 
     {dashboard.unconfiguredOrders > 0 ? (
       <div className="commission-unconfigured" role="status">

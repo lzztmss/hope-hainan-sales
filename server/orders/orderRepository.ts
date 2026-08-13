@@ -440,6 +440,7 @@ export class DrizzleOrderRepository implements OrderRepository {
               and(
                 eq(stores.id, orders.storeId),
                 or(
+                  eq(stores.id, filters.storeQuery),
                   like(stores.name, `%${filters.storeQuery}%`),
                   like(stores.code, `%${filters.storeQuery}%`),
                 ),
@@ -458,6 +459,7 @@ export class DrizzleOrderRepository implements OrderRepository {
               and(
                 eq(users.id, orders.sellerId),
                 or(
+                  eq(users.id, filters.sellerQuery),
                   like(users.displayName, `%${filters.sellerQuery}%`),
                   like(users.workNo, `%${filters.sellerQuery}%`),
                 ),

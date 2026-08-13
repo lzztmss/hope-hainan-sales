@@ -33,6 +33,9 @@ export const QuoteDetailPage = ({ client, quoteId }: { client: ApiClient; quoteI
     setBusy(true);
     try {
       await client.recordQuotePrint(quote.id);
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
       window.print();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "打印准备失败");

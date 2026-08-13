@@ -142,12 +142,6 @@ export const OrderListPage = ({
     setDetail(nextDetail);
   };
 
-  const submitFilters = (event: FormEvent): void => {
-    event.preventDefault();
-    setAppliedFilters(normaliseFilters(draftFilters));
-    setFilterOpen(false);
-  };
-
   const setFilter = <Key extends keyof OrderListFilters>(
     key: Key,
     value: OrderListFilters[Key],
@@ -159,6 +153,17 @@ export const OrderListPage = ({
     if (appliedFilters.recycleBin) return `回收站内共 ${items.length} 笔订单`;
     return `共 ${items.length} 笔可见订单`;
   }, [appliedFilters.recycleBin, items.length]);
+
+  const submitFiltersWithResolvedOwnership = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    const next = normaliseFilters(draftFilters);
+    const store = availableStores.find((option) => option.label === next.storeQuery);
+    const seller = availableSellers.find((option) => option.label === next.sellerQuery);
+    if (store) next.storeQuery = store.id;
+    if (seller) next.sellerQuery = seller.id;
+    setAppliedFilters(next);
+    setFilterOpen(false);
+  };
 
   const availableStores = useMemo(() => {
     const options = new Map(storeOptions.map((option) => [option.id, option]));
@@ -223,7 +228,7 @@ export const OrderListPage = ({
         className="order-filter-panel"
         data-open={filterOpen ? "true" : "false"}
         id="order-filter-panel"
-        onSubmit={submitFilters}
+        onSubmit={submitFiltersWithResolvedOwnership}
       >
         <header>
           <div>

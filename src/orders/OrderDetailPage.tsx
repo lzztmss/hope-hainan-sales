@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import { isNonReturnablePackageSku } from "../../shared/pricing/returnPolicy";
+
 import { formatOrderMoney, formatOrderPrice } from "./formatters";
 import {
   ORDER_STATUS_LABELS,
@@ -202,6 +204,9 @@ const ReturnCompletion = ({
           value={actualYuan}
         />
       </label>
+      <p className="return-completion__note">
+        此金额是实际退给客户的钱，不是销售提成。销售提成会按退回商品的原提成快照自动扣回，与这里填写的退款金额分别核算。
+      </p>
       {error ? <p className="order-form-error" role="alert">{error}</p> : null}
       <div>
         <button disabled={busy} onClick={() => setOpen(false)} type="button">取消</button>
@@ -283,7 +288,10 @@ export const OrderDetailPage = ({
     order.permissions.canRequestReturn &&
     ["activated", "completed", "partially_returned"].includes(order.status) &&
     order.lines.some(
-      (line) => line.lineType === "charge" && line.refundableQuantity > 0,
+      (line) =>
+        line.lineType === "charge" &&
+        !isNonReturnablePackageSku(line.sku) &&
+        line.refundableQuantity > 0,
     ) &&
     Boolean(onOpenReturn);
   const transitions = onTransition ? availableTransitions(order, viewer) : [];
@@ -372,15 +380,25 @@ export const OrderDetailPage = ({
         <h3 id="order-lines-title">商品与安装明细</h3>
         <div className="order-detail-lines">
           {order.lines.length === 0 ? <p>暂无商品明细</p> : null}
-          {order.lines.map((line) => (
+          {[...order.lines]
+            .sort((left, right) => Number(left.lineType === "component") - Number(right.lineType === "component"))
+            .map((line) => (
             <article className="order-detail-line" data-line-type={line.lineType} key={line.id}>
               <div>
-                <span>{line.lineType === "charge" ? "计价商品" : "套装设备"}</span>
+                <span>
+                  {line.lineType === "component"
+                    ? "套餐内设备"
+                    : isNonReturnablePackageSku(line.sku)
+                      ? "计价套餐 · 不可退"
+                      : "计价商品"}
+                </span>
                 <strong>{line.label}×{line.quantity}{line.unit}</strong>
               </div>
               <div>
                 <span>
-                  {line.monthlySubtotalFen > 0
+                  {line.lineType === "component"
+                    ? "套餐内含 · 不另收费"
+                    : line.monthlySubtotalFen > 0
                     ? `${formatOrderMoney(line.monthlySubtotalFen)}/月`
                     : formatOrderMoney(line.oneTimeSubtotalFen)}
                 </span>

@@ -38,9 +38,9 @@
 @media (min-width: 64rem) { .quote-management__filters { grid-template-columns: minmax(0, 2fr) minmax(10rem, 1fr) minmax(9rem, 1fr) minmax(9rem, 1fr) auto; align-items: end; } }
 @media print {
   @page { size: A4; margin: 12mm; }
-  body * { visibility: hidden !important; }
-  .quote-management__print-document,
-  .quote-management__print-document * { visibility: visible !important; }
+  body:has(.quote-management__print-document) * { visibility: hidden !important; }
+  body:has(.quote-management__print-document) .quote-management__print-document,
+  body:has(.quote-management__print-document) .quote-management__print-document * { visibility: visible !important; }
   .quote-management__print-document {
     position: absolute;
     inset: 0;

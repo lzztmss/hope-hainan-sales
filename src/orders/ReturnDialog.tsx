@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
+import { isNonReturnablePackageSku } from "../../shared/pricing/returnPolicy";
 import { formatOrderMoney } from "./formatters";
 import type {
   OrderDetail,
@@ -23,7 +24,12 @@ interface PartialLineState {
 const buildPartialState = (order: OrderDetail): Record<string, PartialLineState> =>
   Object.fromEntries(
     order.lines
-      .filter((line) => line.lineType === "charge" && line.refundableQuantity > 0)
+      .filter(
+        (line) =>
+          line.lineType === "charge" &&
+          !isNonReturnablePackageSku(line.sku) &&
+          line.refundableQuantity > 0,
+      )
       .map((line) => [line.id, { selected: false, quantity: "1" }]),
   );
 
@@ -33,7 +39,13 @@ export const ReturnDialog = ({
   open,
   order,
 }: ReturnDialogProps) => {
-  const [type, setType] = useState<ReturnType>("full");
+  const hasPackage = order.lines.some(
+    (line) =>
+      line.lineType === "charge" &&
+      isNonReturnablePackageSku(line.sku) &&
+      line.refundableQuantity > 0,
+  );
+  const [type, setType] = useState<ReturnType>(hasPackage ? "partial" : "full");
   const [partial, setPartial] = useState(() => buildPartialState(order));
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -41,23 +53,32 @@ export const ReturnDialog = ({
 
   useEffect(() => {
     if (!open) return;
-    setType("full");
+    setType(hasPackage ? "partial" : "full");
     setPartial(buildPartialState(order));
     setReason("");
     setError(null);
     setSubmitting(false);
-  }, [open, order.id, order.version]);
+  }, [hasPackage, open, order.id, order.version]);
 
   const returnableLines = useMemo(
     () =>
       order.lines.filter(
-        (line) => line.lineType === "charge" && line.refundableQuantity > 0,
+        (line) =>
+          line.lineType === "charge" &&
+          !isNonReturnablePackageSku(line.sku) &&
+          line.refundableQuantity > 0,
       ),
     [order.lines],
   );
   const componentCount = order.lines.filter(
     (line) => line.lineType === "component",
   ).length;
+  const packageLines = order.lines.filter(
+    (line) =>
+      line.lineType === "charge" &&
+      isNonReturnablePackageSku(line.sku) &&
+      line.refundableQuantity > 0,
+  );
 
   const selectedItems = useMemo(() => {
     if (type === "full") {
@@ -154,6 +175,7 @@ export const ReturnDialog = ({
               <input
                 aria-label="整单退单"
                 checked={type === "full"}
+                disabled={hasPackage}
                 name="return-type"
                 onChange={() => {
                   setType("full");
@@ -163,7 +185,7 @@ export const ReturnDialog = ({
               />
               <span>
                 <strong>整单退单</strong>
-                <small>退回所有剩余可退计价商品</small>
+                <small>{hasPackage ? "订单含不可退套餐，不能整单退单" : "退回所有剩余可退计价商品"}</small>
               </span>
             </label>
             <label>
@@ -245,6 +267,14 @@ export const ReturnDialog = ({
             })}
           </section>
 
+          {packageLines.length > 0 ? (
+            <section className="return-package-note" aria-label="不可退套餐">
+              <strong>以下套餐不可申请退单</strong>
+              <span>{packageLines.map((line) => line.label).join("、")}</span>
+              <small>套餐及套餐内设备按完整方案交付，当前不支持整套或拆分退回。</small>
+            </section>
+          ) : null}
+
           {componentCount > 0 ? (
             <p className="return-component-note">
               套装内物理设备不可单独退回
@@ -252,8 +282,8 @@ export const ReturnDialog = ({
           ) : null}
 
           <div className="return-refund-summary">
-            <strong>预计退款 {formatOrderMoney(refundFen)}</strong>
-            <small>最终退款以审批和服务端核算为准</small>
+            <strong>客户最高可退 {formatOrderMoney(refundFen)}</strong>
+            <small>这是客户退款上限，不是销售提成；提成将在退单完成后按所退商品原提成自动扣回。</small>
           </div>
 
           <label className="return-reason-field">
