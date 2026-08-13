@@ -354,8 +354,8 @@ export const UserStoreManagementPage = ({
       return;
     }
     setPasswordInvalid(false);
-    if (!userDraft.reason.trim()) {
-      setError("请填写新增账号原因");
+    if (userDraft.reason.trim().length < 2) {
+      setError("新增账号原因至少填写 2 个字符");
       return;
     }
     if (userDraft.role !== "admin" && !userDraft.storeId) {
@@ -690,7 +690,7 @@ export const UserStoreManagementPage = ({
               <label>人员类型<select value={userDraft.personnelType} disabled={userDraft.role === "admin"} onChange={(event) => setUserDraft({ ...userDraft, personnelType: event.currentTarget.value as ManagedPersonnelType })}><option value="unicom">联通人员</option><option value="auxiliary">辅助销售</option><option value="admin">管理员</option></select></label>
               <label>所属营业厅<select required={userDraft.role !== "admin"} disabled={userDraft.role === "admin"} value={userDraft.storeId} onChange={(event) => setUserDraft({ ...userDraft, storeId: event.currentTarget.value })}><option value="">请选择营业厅</option>{activeStores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</select></label>
               <label>初始密码<input type="password" required minLength={12} aria-invalid={passwordInvalid} aria-describedby={passwordInvalid ? "initial-password-error" : undefined} value={userDraft.initialPassword} onChange={(event) => { setPasswordInvalid(false); setUserDraft({ ...userDraft, initialPassword: event.currentTarget.value }); }} /></label>
-              <label className="management-wide">新增账号原因<input required value={userDraft.reason} onChange={(event) => setUserDraft({ ...userDraft, reason: event.currentTarget.value })} /></label>
+              <label className="management-wide">新增账号原因（至少 2 个字符）<input required minLength={2} value={userDraft.reason} onChange={(event) => setUserDraft({ ...userDraft, reason: event.currentTarget.value })} /></label>
               <div className="management-form-actions"><button type="submit" className="management-primary" disabled={busy || !onCreateUser}>创建账号</button></div>
             </fieldset>
           </form>

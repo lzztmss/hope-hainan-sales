@@ -131,6 +131,26 @@ const sendServiceError = (reply: FastifyReply, error: unknown) => {
 const invalidPayload = (reply: FastifyReply) =>
   reply.status(400).send({ error: "营业厅或账号参数不完整" });
 
+const invalidUserPayload = (
+  reply: FastifyReply,
+  error: z.ZodError,
+) => {
+  const field = error.issues[0]?.path[0];
+  const messages: Record<string, string> = {
+    workNo: "工号至少填写 2 个字符",
+    displayName: "请填写账号姓名",
+    phone: "手机号格式不正确",
+    role: "请选择账号角色",
+    personnelType: "请选择人员类型",
+    storeId: "请选择有效的所属营业厅",
+    initialPassword: "初始密码长度必须为 12 至 128 位",
+    reason: "新增账号原因至少填写 2 个字符",
+  };
+  return reply.status(400).send({
+    error: typeof field === "string" ? messages[field] ?? "账号参数不正确" : "账号参数不正确",
+  });
+};
+
 const validId = (value: string): boolean => z.string().uuid().safeParse(value).success;
 
 export const registerAdminRoutes = async (
@@ -203,7 +223,7 @@ export const registerAdminRoutes = async (
     const actor = await resolveAdmin(request, reply, options.authService);
     if (!actor) return;
     const parsed = createUserSchema.safeParse(request.body);
-    if (!parsed.success) return invalidPayload(reply);
+    if (!parsed.success) return invalidUserPayload(reply, parsed.error);
     try {
       const user = await options.adminService.createUser(actor, parsed.data);
       return reply.status(201).send({ user });
