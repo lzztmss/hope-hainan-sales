@@ -316,8 +316,12 @@ export const UserStoreManagementPage = ({
 
   const createStore = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
-    if (!storeDraft.reason.trim()) {
-      setError("请填写新增营业厅原因");
+    if (storeDraft.code.trim().length < 2) {
+      setError("营业厅编码至少填写 2 个字符");
+      return;
+    }
+    if (storeDraft.reason.trim().length < 2) {
+      setError("新增营业厅原因至少填写 2 个字符");
       return;
     }
     begin();
@@ -404,8 +408,12 @@ export const UserStoreManagementPage = ({
   const saveEdit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
     if (!editDraft) return;
-    if (!editDraft.reason.trim()) {
-      setError("请填写编辑账号原因");
+    if (editDraft.workNo.trim().length < 2) {
+      setError("工号至少填写 2 个字符");
+      return;
+    }
+    if (editDraft.reason.trim().length < 2) {
+      setError("编辑账号原因至少填写 2 个字符");
       return;
     }
     if (editDraft.role !== "admin" && !editDraft.storeId) {
@@ -435,8 +443,8 @@ export const UserStoreManagementPage = ({
   const runStatusAction = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
     if (!statusAction) return;
-    if (!statusAction.reason.trim()) {
-      setError("请填写启停原因");
+    if (statusAction.reason.trim().length < 2) {
+      setError("启停原因至少填写 2 个字符");
       return;
     }
     begin();
@@ -468,8 +476,8 @@ export const UserStoreManagementPage = ({
       setError("新初始密码长度必须至少为12位");
       return;
     }
-    if (!resetDraft.reason.trim()) {
-      setError("请填写重置密码原因");
+    if (resetDraft.reason.trim().length < 2) {
+      setError("重置密码原因至少填写 2 个字符");
       return;
     }
     begin();
@@ -489,8 +497,12 @@ export const UserStoreManagementPage = ({
 
   const saveStoreManager = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
-    if (!managerStoreId || !managerReason.trim()) {
-      setError("请填写指定营业厅经理的原因");
+    if (!managerStoreId) {
+      setError("请先选择需要设置主经理的营业厅");
+      return;
+    }
+    if (managerReason.trim().length < 2) {
+      setError("指定营业厅经理的原因至少填写 2 个字符");
       return;
     }
     begin();
@@ -627,9 +639,9 @@ export const UserStoreManagementPage = ({
         {showStoreForm ? (
           <form className="management-form" onSubmit={(event) => void createStore(event)}>
             <fieldset><legend>新增营业厅资料</legend>
-              <label>营业厅编码<input required value={storeDraft.code} onChange={(event) => setStoreDraft({ ...storeDraft, code: event.currentTarget.value.toUpperCase() })} /></label>
+              <label>营业厅编码（至少 2 个字符）<input required minLength={2} value={storeDraft.code} onChange={(event) => setStoreDraft({ ...storeDraft, code: event.currentTarget.value.toUpperCase() })} /></label>
               <label>营业厅名称<input required value={storeDraft.name} onChange={(event) => setStoreDraft({ ...storeDraft, name: event.currentTarget.value })} /></label>
-              <label className="management-wide">新增营业厅原因<input required value={storeDraft.reason} onChange={(event) => setStoreDraft({ ...storeDraft, reason: event.currentTarget.value })} /></label>
+              <label className="management-wide">新增营业厅原因（至少 2 个字符）<input required minLength={2} value={storeDraft.reason} onChange={(event) => setStoreDraft({ ...storeDraft, reason: event.currentTarget.value })} /></label>
               <div className="management-form-actions"><button type="submit" className="management-primary" disabled={busy || !onCreateStore}>创建营业厅</button></div>
             </fieldset>
           </form>
@@ -657,7 +669,7 @@ export const UserStoreManagementPage = ({
           <h2 id="manager-action-title">指定营业厅主经理</h2>
           <form onSubmit={(event) => void saveStoreManager(event)}>
             <label>主经理<select value={managerUserId} onChange={(event) => setManagerUserId(event.currentTarget.value)}><option value="">暂不指定</option>{users.filter((user) => user.storeId === managerStoreId && user.role === "store_manager" && user.active).map((user) => <option key={user.id} value={user.id}>{user.displayName}（{user.workNo}）</option>)}</select></label>
-            <label>变更原因<input required value={managerReason} onChange={(event) => setManagerReason(event.currentTarget.value)} /></label>
+            <label>变更原因（至少 2 个字符）<input required minLength={2} value={managerReason} onChange={(event) => setManagerReason(event.currentTarget.value)} /></label>
             <div className="management-form-actions"><button type="button" onClick={() => setManagerStoreId(null)}>取消</button><button className="management-primary" disabled={busy} type="submit">确认指定</button></div>
           </form>
         </section>
@@ -668,7 +680,7 @@ export const UserStoreManagementPage = ({
           <h2 id="status-action-title">{statusAction.nextActive ? "启用" : "停用"}{statusAction.kind === "store" ? "营业厅" : "账号"}</h2>
           <p>{statusAction.name} · 所有启停操作都会写入审计记录。</p>
           <form onSubmit={(event) => void runStatusAction(event)}>
-            <label>{`${statusAction.nextActive ? "启用" : "停用"}${statusAction.name}的原因`}<input required value={statusAction.reason} onChange={(event) => setStatusAction({ ...statusAction, reason: event.currentTarget.value })} /></label>
+            <label>{`${statusAction.nextActive ? "启用" : "停用"}${statusAction.name}的原因（至少 2 个字符）`}<input required minLength={2} value={statusAction.reason} onChange={(event) => setStatusAction({ ...statusAction, reason: event.currentTarget.value })} /></label>
             <div className="management-form-actions"><button type="button" onClick={() => setStatusAction(null)}>取消</button><button type="submit" className={statusAction.nextActive ? "management-primary" : "management-danger"} disabled={busy}>{`确认${statusAction.nextActive ? "启用" : "停用"}${statusAction.kind === "store" ? "营业厅" : "账号"}`}</button></div>
           </form>
         </section>
@@ -726,7 +738,7 @@ export const UserStoreManagementPage = ({
             <label>编辑角色<select value={editDraft.role} onChange={(event) => { const role = event.currentTarget.value as ManagedUserRole; setEditDraft({ ...editDraft, role, personnelType: role === "admin" ? "admin" : editDraft.personnelType === "admin" ? "unicom" : editDraft.personnelType, storeId: role === "admin" ? "" : editDraft.storeId }); }}><option value="sales">销售员</option><option value="store_manager">营业厅经理</option><option value="admin">管理员</option></select></label>
             <label>编辑人员类型<select disabled={editDraft.role === "admin"} value={editDraft.personnelType} onChange={(event) => setEditDraft({ ...editDraft, personnelType: event.currentTarget.value as ManagedPersonnelType })}><option value="unicom">联通人员</option><option value="auxiliary">辅助销售</option><option value="admin">管理员</option></select></label>
             <label>编辑所属营业厅<select disabled={editDraft.role === "admin"} required={editDraft.role !== "admin"} value={editDraft.storeId} onChange={(event) => setEditDraft({ ...editDraft, storeId: event.currentTarget.value })}><option value="">请选择营业厅</option>{stores.map((store) => <option key={store.id} value={store.id}>{store.name}{store.active ? "" : "（已停用）"}</option>)}</select></label>
-            <label className="management-wide">编辑账号原因<input required value={editDraft.reason} onChange={(event) => setEditDraft({ ...editDraft, reason: event.currentTarget.value })} /></label>
+            <label className="management-wide">编辑账号原因（至少 2 个字符）<input required minLength={2} value={editDraft.reason} onChange={(event) => setEditDraft({ ...editDraft, reason: event.currentTarget.value })} /></label>
             <div className="management-form-actions"><button type="button" onClick={() => setEditDraft(null)}>取消</button><button type="submit" className="management-primary" disabled={busy}>保存账号修改</button></div>
           </fieldset></form>
         </section>
@@ -735,7 +747,7 @@ export const UserStoreManagementPage = ({
       {resetDraft ? (
         <section className="management-action-panel" aria-labelledby="reset-password-title">
           <h2 id="reset-password-title">重置{resetDraft.displayName}的初始密码</h2><p>保存后该账号在所有设备上的会话会立即失效。</p>
-          <form onSubmit={(event) => void resetPassword(event)}><label>新初始密码<input type="password" required minLength={12} value={resetDraft.initialPassword} onChange={(event) => setResetDraft({ ...resetDraft, initialPassword: event.currentTarget.value })} /></label><label>重置密码原因<input required value={resetDraft.reason} onChange={(event) => setResetDraft({ ...resetDraft, reason: event.currentTarget.value })} /></label><div className="management-form-actions"><button type="button" onClick={() => setResetDraft(null)}>取消</button><button type="submit" className="management-primary" disabled={busy}>确认重置密码</button></div></form>
+          <form onSubmit={(event) => void resetPassword(event)}><label>新初始密码（12 至 128 位）<input type="password" required minLength={12} maxLength={128} value={resetDraft.initialPassword} onChange={(event) => setResetDraft({ ...resetDraft, initialPassword: event.currentTarget.value })} /></label><label>重置密码原因（至少 2 个字符）<input required minLength={2} value={resetDraft.reason} onChange={(event) => setResetDraft({ ...resetDraft, reason: event.currentTarget.value })} /></label><div className="management-form-actions"><button type="button" onClick={() => setResetDraft(null)}>取消</button><button type="submit" className="management-primary" disabled={busy}>确认重置密码</button></div></form>
         </section>
       ) : null}
     </section>

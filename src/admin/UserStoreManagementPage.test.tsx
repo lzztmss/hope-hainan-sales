@@ -1,8 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { UserStoreManagementPage, type ManagedStoreView } from "./UserStoreManagementPage";
+
+afterEach(cleanup);
 
 const store: ManagedStoreView = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -43,5 +45,33 @@ describe("营业厅与账号管理表单", () => {
       "新增账号原因至少填写 2 个字符",
     );
     expect(onCreateUser).not.toHaveBeenCalled();
+  });
+
+  it("指定营业厅主经理时明确提示原因最小长度", async () => {
+    const user = userEvent.setup();
+    const onUpdateStore = vi.fn();
+    render(
+      <UserStoreManagementPage
+        stores={[store]}
+        users={[]}
+        onUpdateStore={onUpdateStore}
+      />,
+    );
+
+    const managerButton = screen
+      .getAllByRole("button", { name: "指定经理" })
+      .find((button) => !(button as HTMLButtonElement).disabled);
+    expect(managerButton).toBeDefined();
+    await user.click(managerButton!);
+    await user.type(
+      screen.getByLabelText("变更原因（至少 2 个字符）"),
+      "1",
+    );
+    await user.click(screen.getByRole("button", { name: "确认指定" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "指定营业厅经理的原因至少填写 2 个字符",
+    );
+    expect(onUpdateStore).not.toHaveBeenCalled();
   });
 });

@@ -83,8 +83,8 @@ export const ReturnDialog = ({
   const submit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
     setError(null);
-    if (!reason.trim()) {
-      setError("请填写退单原因");
+    if (reason.trim().length < 2) {
+      setError("退单原因至少填写 2 个字符");
       return;
     }
     if (selectedItems.length === 0) {
@@ -257,8 +257,9 @@ export const ReturnDialog = ({
           </div>
 
           <label className="return-reason-field">
-            <span>退单原因</span>
+            <span>退单原因（至少 2 个字符）</span>
             <textarea
+              minLength={2}
               maxLength={500}
               onChange={(event) => {
                 setReason(event.currentTarget.value);

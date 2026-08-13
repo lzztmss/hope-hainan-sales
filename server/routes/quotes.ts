@@ -5,6 +5,19 @@ import type { AuthService } from "../auth/authService.js";
 import type { AuthenticatedUser } from "../auth/authorization.js";
 import type { QuoteService } from "../quotes/quoteService.js";
 import { SESSION_COOKIE_NAME } from "./auth.js";
+import { sendValidationError } from "./validationError.js";
+
+const quoteFieldLabels = {
+  customer: "客户信息",
+  pricing: "报价配置",
+  name: "客户姓名",
+  phone: "客户手机号",
+  elderCount: "长者人数",
+  mode: "支付方式",
+  fttrPlan: "FTTR 档位",
+  selection: "商品数量",
+  expectedVersion: "报价版本",
+} as const;
 
 export interface RegisterQuoteRoutesOptions {
   authService: AuthService;
@@ -143,7 +156,7 @@ export const registerQuoteRoutes = async (
     if (!user) return;
     const parsed = previewSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.status(400).send({ error: "报价参数不完整" });
+      return sendValidationError(reply, parsed.error, quoteFieldLabels, "请检查报价配置");
     }
     try {
       return options.quoteService.previewQuote(parsed.data);
@@ -158,7 +171,7 @@ export const registerQuoteRoutes = async (
     if (!user) return;
     const parsed = confirmSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.status(400).send({ error: "客户或报价参数不完整" });
+      return sendValidationError(reply, parsed.error, quoteFieldLabels, "请检查客户和报价信息");
     }
     const keyHeader = request.headers["idempotency-key"];
     const idempotencyKey = Array.isArray(keyHeader) ? keyHeader[0] : keyHeader;
@@ -208,7 +221,7 @@ export const registerQuoteRoutes = async (
       const user = await resolveUser(request, reply, options.authService);
       if (!user) return;
       const parsed = updateSchema.safeParse(request.body);
-      if (!parsed.success) return reply.status(400).send({ error: "客户或报价参数不完整" });
+      if (!parsed.success) return sendValidationError(reply, parsed.error, quoteFieldLabels, "请检查客户和报价信息");
       try {
         return await options.quoteService.updateQuote(
           user,

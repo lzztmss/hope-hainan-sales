@@ -5,6 +5,16 @@ import type { AuthService } from "../auth/authService.js";
 import type { AuthenticatedUser } from "../auth/authorization.js";
 import type { ReturnService } from "../returns/returnService.js";
 import { SESSION_COOKIE_NAME } from "./auth.js";
+import { sendValidationError } from "./validationError.js";
+
+const returnFieldLabels = {
+  type: "退单类型",
+  reason: "退单原因",
+  items: "退货商品",
+  decision: "审批结果",
+  note: "审批意见",
+  refundFen: "退款金额",
+} as const;
 
 export interface RegisterReturnRoutesOptions {
   authService: AuthService;
@@ -116,7 +126,7 @@ export const registerReturnRoutes = async (
       if (!user) return;
       const parsed = requestSchema.safeParse(request.body);
       if (!parsed.success) {
-        return reply.status(400).send({ error: "退单申请参数不完整" });
+        return sendValidationError(reply, parsed.error, returnFieldLabels, "请检查退单申请信息");
       }
       const key = idempotencyKey(request);
       if (!key) return reply.status(400).send({ error: "缺少幂等键" });
@@ -142,7 +152,7 @@ export const registerReturnRoutes = async (
       if (!user) return;
       const parsed = decisionSchema.safeParse(request.body);
       if (!parsed.success) {
-        return reply.status(400).send({ error: "请填写审批决定和意见" });
+        return sendValidationError(reply, parsed.error, returnFieldLabels, "请填写审批结果和意见");
       }
       try {
         return await options.returnService.decideReturn(
@@ -165,7 +175,7 @@ export const registerReturnRoutes = async (
       if (!user) return;
       const parsed = completionSchema.safeParse(request.body);
       if (!parsed.success) {
-        return reply.status(400).send({ error: "退款金额必须使用整数分" });
+        return sendValidationError(reply, parsed.error, returnFieldLabels, "请检查退款金额");
       }
       const key = idempotencyKey(request);
       if (!key) return reply.status(400).send({ error: "缺少幂等键" });

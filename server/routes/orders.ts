@@ -10,6 +10,14 @@ import {
   type OrderService,
 } from "../orders/orderService.js";
 import { SESSION_COOKIE_NAME } from "./auth.js";
+import { sendValidationError } from "./validationError.js";
+
+const orderFieldLabels = {
+  quoteId: "报价单",
+  attributions: "销售归属",
+  command: "订单状态操作",
+  expectedVersion: "订单版本",
+} as const;
 
 export interface RegisterOrderRoutesOptions {
   authService: AuthService;
@@ -176,7 +184,7 @@ export const registerOrderRoutes = async (
     if (!user) return;
     const parsed = createSchema.safeParse(request.body);
     if (!parsed.success) {
-      return reply.status(400).send({ error: "订单参数不完整" });
+      return sendValidationError(reply, parsed.error, orderFieldLabels, "请检查订单信息");
     }
     const keyHeader = request.headers["idempotency-key"];
     const idempotencyKey = Array.isArray(keyHeader) ? keyHeader[0] : keyHeader;
@@ -255,7 +263,7 @@ export const registerOrderRoutes = async (
       if (!user) return;
       const parsed = transitionSchema.safeParse(request.body);
       if (!parsed.success) {
-        return reply.status(400).send({ error: "订单状态操作参数不正确" });
+        return sendValidationError(reply, parsed.error, orderFieldLabels, "请检查订单状态操作");
       }
       try {
         return mutationResponse(

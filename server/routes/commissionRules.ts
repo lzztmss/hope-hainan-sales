@@ -5,6 +5,7 @@ import type { AuthService } from "../auth/authService.js";
 import type { AuthenticatedUser } from "../auth/authorization.js";
 import type { CommissionRuleService } from "../commissions/ruleService.js";
 import { SESSION_COOKIE_NAME } from "./auth.js";
+import { sendValidationError } from "./validationError.js";
 
 export interface RegisterCommissionRuleRoutesOptions {
   authService: AuthService;
@@ -133,8 +134,18 @@ const sendServiceError = (reply: FastifyReply, error: unknown) => {
   return reply.status(statusCode).send({ error: message });
 };
 
-const invalidPayload = (reply: FastifyReply) =>
-  reply.status(400).send({ error: "提成规则参数不完整或格式不正确" });
+const commissionFieldLabels = {
+  name: "版本名称",
+  effectiveFrom: "计划生效日期",
+  effectiveTo: "计划失效日期",
+  rules: "提成规则",
+  amountFen: "提成金额",
+  enabled: "启用状态",
+  expectedRevision: "规则版本",
+  reason: "操作原因",
+  orderLines: "模拟订单商品",
+  sellerContext: "模拟销售归属",
+} as const;
 
 export const registerCommissionRuleRoutes = async (
   app: FastifyInstance,
@@ -155,7 +166,7 @@ export const registerCommissionRuleRoutes = async (
     const actor = await resolveAdmin(request, reply, options.authService);
     if (!actor) return;
     const parsed = createDraftSchema.safeParse(request.body);
-    if (!parsed.success) return invalidPayload(reply);
+    if (!parsed.success) return sendValidationError(reply, parsed.error, commissionFieldLabels, "请检查提成草稿信息");
     try {
       const version = await options.ruleService.createDraft(actor, parsed.data);
       return reply.status(201).send({ version });
@@ -173,7 +184,7 @@ export const registerCommissionRuleRoutes = async (
       const actor = await resolveAdmin(request, reply, options.authService);
       if (!actor) return;
       const parsed = updateRuleSchema.safeParse(request.body);
-      if (!parsed.success) return invalidPayload(reply);
+      if (!parsed.success) return sendValidationError(reply, parsed.error, commissionFieldLabels, "请检查提成规则信息");
       try {
         const version = await options.ruleService.updateRule(
           actor,
@@ -193,7 +204,7 @@ export const registerCommissionRuleRoutes = async (
     const actor = await resolveAdmin(request, reply, options.authService);
     if (!actor) return;
     const parsed = simulationSchema.safeParse(request.body);
-    if (!parsed.success) return invalidPayload(reply);
+    if (!parsed.success) return sendValidationError(reply, parsed.error, commissionFieldLabels, "请检查模拟订单信息");
     try {
       return await options.ruleService.simulate(actor, {
         ...parsed.data,
@@ -211,7 +222,7 @@ export const registerCommissionRuleRoutes = async (
       const actor = await resolveAdmin(request, reply, options.authService);
       if (!actor) return;
       const parsed = lifecycleSchema.safeParse(request.body);
-      if (!parsed.success) return invalidPayload(reply);
+      if (!parsed.success) return sendValidationError(reply, parsed.error, commissionFieldLabels, "请填写发布原因");
       try {
         return {
           version: await options.ruleService.publish(
@@ -233,7 +244,7 @@ export const registerCommissionRuleRoutes = async (
       const actor = await resolveAdmin(request, reply, options.authService);
       if (!actor) return;
       const parsed = lifecycleSchema.safeParse(request.body);
-      if (!parsed.success) return invalidPayload(reply);
+      if (!parsed.success) return sendValidationError(reply, parsed.error, commissionFieldLabels, "请填写停用原因");
       try {
         return {
           version: await options.ruleService.stop(
@@ -255,7 +266,7 @@ export const registerCommissionRuleRoutes = async (
       const actor = await resolveAdmin(request, reply, options.authService);
       if (!actor) return;
       const parsed = copySchema.safeParse(request.body);
-      if (!parsed.success) return invalidPayload(reply);
+      if (!parsed.success) return sendValidationError(reply, parsed.error, commissionFieldLabels, "请检查复制版本信息");
       try {
         const version = await options.ruleService.copyVersion(
           actor,

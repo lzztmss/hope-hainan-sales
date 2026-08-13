@@ -6,6 +6,7 @@ import { AdminServiceError } from "../admin/adminService.js";
 import type { AuthService } from "../auth/authService.js";
 import type { AuthenticatedUser } from "../auth/authorization.js";
 import { SESSION_COOKIE_NAME } from "./auth.js";
+import { sendValidationError } from "./validationError.js";
 
 export interface RegisterAdminRoutesOptions {
   authService: AuthService;
@@ -128,28 +129,22 @@ const sendServiceError = (reply: FastifyReply, error: unknown) => {
   return reply.status(statusCode).send({ error: message });
 };
 
-const invalidPayload = (reply: FastifyReply) =>
-  reply.status(400).send({ error: "营业厅或账号参数不完整" });
+const adminFieldLabels = {
+  code: "营业厅编码",
+  name: "营业厅名称",
+  managerUserId: "营业厅主经理",
+  workNo: "工号",
+  displayName: "账号姓名",
+  phone: "手机号",
+  role: "账号角色",
+  personnelType: "人员类型",
+  storeId: "所属营业厅",
+  initialPassword: "初始密码",
+  reason: "操作原因",
+} as const;
 
-const invalidUserPayload = (
-  reply: FastifyReply,
-  error: z.ZodError,
-) => {
-  const field = error.issues[0]?.path[0];
-  const messages: Record<string, string> = {
-    workNo: "工号至少填写 2 个字符",
-    displayName: "请填写账号姓名",
-    phone: "手机号格式不正确",
-    role: "请选择账号角色",
-    personnelType: "请选择人员类型",
-    storeId: "请选择有效的所属营业厅",
-    initialPassword: "初始密码长度必须为 12 至 128 位",
-    reason: "新增账号原因至少填写 2 个字符",
-  };
-  return reply.status(400).send({
-    error: typeof field === "string" ? messages[field] ?? "账号参数不正确" : "账号参数不正确",
-  });
-};
+const invalidPayload = (reply: FastifyReply) =>
+  reply.status(400).send({ error: "请检查营业厅或账号信息" });
 
 const validId = (value: string): boolean => z.string().uuid().safeParse(value).success;
 
@@ -172,7 +167,7 @@ export const registerAdminRoutes = async (
     const actor = await resolveAdmin(request, reply, options.authService);
     if (!actor) return;
     const parsed = createStoreSchema.safeParse(request.body);
-    if (!parsed.success) return invalidPayload(reply);
+    if (!parsed.success) return sendValidationError(reply, parsed.error, adminFieldLabels, "请检查新增营业厅信息");
     try {
       const store = await options.adminService.createStore(actor, parsed.data);
       return reply.status(201).send({ store });
@@ -189,7 +184,7 @@ export const registerAdminRoutes = async (
       if (!actor) return;
       if (!validId(request.params.id)) return invalidPayload(reply);
       const parsed = updateStoreSchema.safeParse(request.body);
-      if (!parsed.success) return invalidPayload(reply);
+      if (!parsed.success) return sendValidationError(reply, parsed.error, adminFieldLabels, "请检查营业厅变更信息");
       try {
         return {
           store: await options.adminService.updateStore(
@@ -223,7 +218,7 @@ export const registerAdminRoutes = async (
     const actor = await resolveAdmin(request, reply, options.authService);
     if (!actor) return;
     const parsed = createUserSchema.safeParse(request.body);
-    if (!parsed.success) return invalidUserPayload(reply, parsed.error);
+    if (!parsed.success) return sendValidationError(reply, parsed.error, adminFieldLabels, "请检查新增账号信息");
     try {
       const user = await options.adminService.createUser(actor, parsed.data);
       return reply.status(201).send({ user });
@@ -240,7 +235,7 @@ export const registerAdminRoutes = async (
       if (!actor) return;
       if (!validId(request.params.id)) return invalidPayload(reply);
       const parsed = updateUserSchema.safeParse(request.body);
-      if (!parsed.success) return invalidPayload(reply);
+      if (!parsed.success) return sendValidationError(reply, parsed.error, adminFieldLabels, "请检查账号修改信息");
       try {
         return {
           user: await options.adminService.updateUser(
@@ -263,7 +258,7 @@ export const registerAdminRoutes = async (
       if (!actor) return;
       if (!validId(request.params.id)) return invalidPayload(reply);
       const parsed = resetPasswordSchema.safeParse(request.body);
-      if (!parsed.success) return invalidPayload(reply);
+      if (!parsed.success) return sendValidationError(reply, parsed.error, adminFieldLabels, "请检查密码重置信息");
       try {
         return {
           user: await options.adminService.resetUserPassword(
