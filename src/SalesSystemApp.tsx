@@ -19,6 +19,7 @@ import { OrderManagementRoute } from "./orders/OrderManagementRoute";
 import { QuoteWorkflowPage } from "./quote/QuoteWorkflowPage";
 import { QuoteListPage } from "./quote/QuoteListPage";
 import { QuoteDetailPage } from "./quote/QuoteDetailPage";
+import { QuoteStandalonePrintPage } from "./quote/QuoteStandalonePrintPage";
 import { TeamReportPage } from "./reports/TeamReportPage";
 import { ReturnManagementRoute } from "./returns/ReturnManagementRoute";
 import { CustomerListPage } from "./customers/CustomerListPage";
@@ -202,6 +203,18 @@ const QuoteDetailRoute = ({ client }: { client: ApiClient }) => {
   return quoteId ? <QuoteDetailPage client={client} quoteId={quoteId} /> : null;
 };
 
+const QuotePrintRoute = ({ client }: { client: ApiClient }) => {
+  const { quoteId } = useParams();
+  const location = useLocation();
+  return quoteId ? (
+    <QuoteStandalonePrintPage
+      autoPrint={new URLSearchParams(location.search).get("autoprint") === "1"}
+      client={client}
+      quoteId={quoteId}
+    />
+  ) : null;
+};
+
 const QuoteListRoute = ({ client }: { client: ApiClient }) => {
   const { user } = useAuth();
   return user ? <QuoteListPage client={client} viewer={user} /> : null;
@@ -265,6 +278,7 @@ export const SalesSystemRoutes = ({ client }: SalesSystemRoutesProps) => (
     <Route element={<RequireAuthentication />}>
       <Route path="/change-password" element={<ChangePasswordPage />} />
       <Route element={<RequirePasswordReady />}>
+        <Route path="/quotes/:quoteId/print" element={<QuotePrintRoute client={client} />} />
         <Route element={<AuthenticatedShell />}>
           <Route path="/" element={<HomeRoute />} />
 

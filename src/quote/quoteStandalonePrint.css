@@ -1,0 +1,196 @@
+.standalone-quote-print-page {
+  min-height: 100vh;
+  padding: 2rem;
+  background: #e8edf3;
+  color: #111827;
+  font-family: "PingFang SC", "STHeiti", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+}
+
+.standalone-quote-print-page .quote-management__print-document {
+  width: min(210mm, 100%);
+  min-height: 297mm;
+  margin: 0 auto;
+  border-radius: 0;
+  box-shadow: 0 1rem 3rem rgb(15 35 55 / 18%);
+}
+
+.standalone-quote-print-page .quote-management__print-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #174a7e;
+}
+
+.standalone-quote-print-page .quote-management__print-header img {
+  width: 4rem;
+  height: 4rem;
+  object-fit: contain;
+}
+
+.standalone-quote-print-actions {
+  position: sticky;
+  z-index: 2;
+  top: 1rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: .75rem;
+  width: min(210mm, 100%);
+  margin: 0 auto 1rem;
+}
+
+.standalone-quote-print-actions a,
+.standalone-quote-print-actions button {
+  min-height: 2.75rem;
+  padding: .65rem 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: .5rem;
+  background: white;
+  color: #174a7e;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.standalone-quote-print-actions button { background: #174a7e; color: white; }
+.standalone-quote-print-error { color: #a12b2b; text-align: center; }
+
+@media print {
+  @page { size: A4; margin: 12mm; }
+
+  html,
+  body,
+  #root,
+  .standalone-quote-print-page {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .standalone-quote-print-actions,
+  .standalone-quote-print-error { display: none !important; }
+
+  .standalone-quote-print-page,
+  .standalone-quote-print-page * {
+    font-family: "PingFang SC", "STHeiti", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif !important;
+    font-synthesis: weight style !important;
+    -webkit-text-fill-color: currentColor !important;
+  }
+
+  .standalone-quote-print-page .quote-management__print-document {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    color: #111827 !important;
+    font-size: 9pt !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .standalone-quote-print-page .quote-management__print-header {
+    display: flex !important;
+    gap: 5mm !important;
+    padding-bottom: 4mm !important;
+    border-bottom: 2px solid #174a7e !important;
+  }
+
+  .standalone-quote-print-page .quote-management__print-header img {
+    display: block !important;
+    width: 15mm !important;
+    height: 15mm !important;
+  }
+
+  .standalone-quote-print-page .quote-management__print-header strong,
+  .standalone-quote-print-page .quote-management__detail li strong {
+    display: block !important;
+    color: #111827 !important;
+  }
+
+  .standalone-quote-print-page .quote-management__print-header h2 {
+    display: block !important;
+    margin: 1mm 0 0 !important;
+    color: #174a7e !important;
+    font-size: 16pt !important;
+  }
+
+  .standalone-quote-print-page .quote-management__print-document > section {
+    display: block !important;
+    margin-top: 5mm !important;
+  }
+
+  .standalone-quote-print-page .quote-management__print-document > section h2 {
+    display: block !important;
+    margin: 0 0 3mm !important;
+    color: #174a7e !important;
+    font-size: 12pt !important;
+  }
+
+  .standalone-quote-print-page .quote-management__detail dl {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 0 !important;
+    margin: 0 !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+
+  .standalone-quote-print-page .quote-management__detail dl div {
+    display: grid !important;
+    grid-template-columns: 34mm minmax(0, 1fr) !important;
+    gap: 0 !important;
+    padding: 2mm 3mm !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    break-inside: avoid;
+  }
+
+  .standalone-quote-print-page .quote-management__detail dt {
+    display: block !important;
+    color: #64748b !important;
+  }
+
+  .standalone-quote-print-page .quote-management__detail dd {
+    display: block !important;
+    margin: 0 !important;
+    color: #111827 !important;
+    font-weight: 700 !important;
+  }
+
+  .standalone-quote-print-page .quote-management__detail ul {
+    display: grid !important;
+    gap: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    list-style: none !important;
+  }
+
+  .standalone-quote-print-page .quote-management__detail li {
+    display: flex !important;
+    justify-content: space-between !important;
+    gap: 4mm !important;
+    padding-block: 2mm !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    break-inside: avoid;
+  }
+
+  .standalone-quote-print-page .quote-management__detail li span {
+    display: block !important;
+    color: #475569 !important;
+    text-align: right !important;
+  }
+
+  .standalone-quote-print-page .quote-management__print-note {
+    break-inside: avoid;
+  }
+
+  .standalone-quote-print-page .quote-management__print-note p {
+    color: #334155 !important;
+  }
+}

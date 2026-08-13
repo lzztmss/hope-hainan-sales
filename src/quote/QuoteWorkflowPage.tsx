@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import { flushSync } from "react-dom";
+import { useNavigate } from "react-router-dom";
 
 import { ACTIVE_CATALOG } from "../../shared/pricing/catalog";
 import { calculateQuote } from "../../shared/pricing/quoteEngine";
@@ -22,7 +23,6 @@ import type {
 } from "../api/client";
 import { PageLayout } from "../components/layout";
 import { QuotePrintDocument } from "./QuotePrintDocument";
-import { QuotePrintPortal } from "./QuotePrintPortal";
 import { OrderCompositionDialog } from "./OrderCompositionDialog";
 import "./quoteWorkflow.css";
 
@@ -264,6 +264,7 @@ export const QuoteWorkflowPage = ({
   createOrderIdempotencyKey = newOrderIdempotencyKey,
   initialQuote,
 }: QuoteWorkflowPageProps) => {
+  const navigate = useNavigate();
   const originalPricing = initialQuote?.pricing;
   const originalFttrPlan = originalPricing?.fttrPlan;
   const originalFttrIsStandard = originalFttrPlan != null && ACTIVE_CATALOG.fttrPlans.some((plan) => plan === originalFttrPlan);
@@ -426,19 +427,7 @@ export const QuoteWorkflowPage = ({
 
   const printSavedQuote = async (): Promise<void> => {
     if (!savedQuote || busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await client.recordQuotePrint(savedQuote.id);
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-      });
-      window.print();
-    } catch (printError) {
-      setError(`打印未完成：${messageFor(printError)}`);
-    } finally {
-      setBusy(false);
-    }
+    navigate(`/quotes/${savedQuote.id}/print?autoprint=1`);
   };
 
   const documentVersion = initialQuote ? initialQuote.version + 1 : 1;
@@ -680,17 +669,6 @@ export const QuoteWorkflowPage = ({
               <button type="button" onClick={() => setPrintPreviewOpen(true)}>预览报价单</button>
               <button className="is-primary" disabled={busy} type="button" onClick={() => void printSavedQuote()}>打印报价</button>
             </>}
-          />
-          <QuotePrintPortal
-            calculation={savedQuote.calculation}
-            confirmedAt={savedQuote.confirmedAt}
-            customFttrNote={customFttrNote.trim() || undefined}
-            customerName={name.trim()}
-            elderCount={elderCount}
-            phoneMasked={maskPhone(phone)}
-            quoteNo={savedQuote.quoteNo}
-            roomType={roomType}
-            version={documentVersion}
           />
         </>
       ) : (

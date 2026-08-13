@@ -4,7 +4,6 @@ import { Link, useNavigate } from "react-router-dom";
 import type { ApiClient, OrderMutationDto, QuoteDetailDto } from "../api/client";
 import { PageLayout } from "../components/layout";
 import { QuotePrintDocument } from "./QuotePrintDocument";
-import { QuotePrintPortal } from "./QuotePrintPortal";
 import { OrderCompositionDialog } from "./OrderCompositionDialog";
 import "./quoteManagement.css";
 
@@ -28,18 +27,7 @@ export const QuoteDetailPage = ({ client, quoteId }: { client: ApiClient; quoteI
 
   const print = async () => {
     if (!quote) return;
-    setBusy(true);
-    try {
-      await client.recordQuotePrint(quote.id);
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-      });
-      window.print();
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "打印准备失败");
-    } finally {
-      setBusy(false);
-    }
+    navigate(`/quotes/${quote.id}/print?autoprint=1`);
   };
 
   const convert = async () => {
@@ -90,17 +78,6 @@ export const QuoteDetailPage = ({ client, quoteId }: { client: ApiClient; quoteI
               ) : null}
               {order ? <Link to={`/orders/${order.id}`}>查看订单 {order.orderNo}</Link> : null}
             </>}
-          />
-          <QuotePrintPortal
-            calculation={quote.calculation}
-            confirmedAt={quote.confirmedAt}
-            customFttrNote={quote.pricing.customFttrNote}
-            customerName={quote.customer.name}
-            elderCount={quote.customer.elderCount}
-            phoneMasked={quote.customer.phoneMasked}
-            quoteNo={quote.quoteNo}
-            roomType={quote.customer.roomType}
-            version={quote.version}
           />
         </>
       ) : null}
