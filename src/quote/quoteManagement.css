@@ -34,6 +34,7 @@
 .quote-management__actions { display: flex; flex-wrap: wrap; gap: var(--hfttr-space-3); }
 .quote-management__print-header { display: none; }
 .quote-management__print-note p { line-height: 1.65; }
+.quote-print-root { display: none; }
 .quote-management__error { color: var(--app-color-danger); font-weight: 700; }
 .quote-preview-backdrop { position: fixed; z-index: 80; inset: 0; overflow: auto; padding: clamp(1rem, 4vw, 3rem); background: rgb(15 35 55 / .72); }
 .quote-preview-dialog { width: min(210mm, 100%); min-height: 297mm; margin: 0 auto; }
@@ -54,40 +55,51 @@
 @media (min-width: 64rem) { .quote-management__filters { grid-template-columns: minmax(0, 2fr) minmax(10rem, 1fr) minmax(9rem, 1fr) minmax(9rem, 1fr) auto; align-items: end; } }
 @media print {
   @page { size: A4; margin: 12mm; }
-  body:has(.quote-management__print-document) * { visibility: hidden !important; }
-  body:has(.quote-management__print-document) .quote-management__print-document,
-  body:has(.quote-management__print-document) .quote-management__print-document * { visibility: visible !important; }
-  body:has(.quote-preview-dialog) .quote-management__print-document:not(.quote-management__print-document--preview),
-  body:has(.quote-preview-dialog) .quote-management__print-document:not(.quote-management__print-document--preview) * { visibility: hidden !important; }
-  .quote-preview-backdrop { position: static; overflow: visible; padding: 0; background: transparent; }
-  .quote-preview-dialog { width: 100%; min-height: 0; }
-  .quote-management__print-document {
-    position: absolute;
-    inset: 0;
-    display: block;
+  body > :not(.quote-print-root) { display: none !important; }
+  body > .quote-print-root {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+  body > .quote-print-root .quote-management__print-document {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
     width: 100%;
-    padding: 0;
-    border: 0;
-    box-shadow: none;
-    color: #111827;
-    font-size: 9pt;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    color: #111827 !important;
+    font-size: 9pt !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
-  .quote-management__print-header {
-    display: flex;
-    align-items: center;
-    gap: 5mm;
-    padding-bottom: 4mm;
-    border-bottom: 2px solid #174a7e;
+  body > .quote-print-root .quote-management__print-header {
+    display: flex !important;
+    align-items: center !important;
+    gap: 5mm !important;
+    padding-bottom: 4mm !important;
+    border-bottom: 2px solid #174a7e !important;
   }
-  .quote-management__print-header img { width: 15mm; height: 15mm; object-fit: contain; }
-  .quote-management__print-header h2 { margin: 1mm 0 0; font-size: 16pt; }
-  .quote-management__print-document > section { margin-top: 5mm; break-inside: auto; }
-  .quote-management__print-document > section h2 { margin: 0 0 3mm; font-size: 12pt; }
-  .quote-management__detail dl { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; border: 1px solid #cbd5e1; }
-  .quote-management__detail dl div { grid-template-columns: 34mm 1fr; padding: 2mm 3mm; border-bottom: 1px solid #e2e8f0; break-inside: avoid; }
-  .quote-management__detail li { padding-block: 2mm; break-inside: avoid; }
-  .quote-management__actions, .page-header { display: none !important; }
-  .quote-management__print-note { break-inside: avoid; }
+  body > .quote-print-root .quote-management__print-header img { display: block !important; width: 15mm !important; height: 15mm !important; object-fit: contain; }
+  body > .quote-print-root .quote-management__print-header strong { display: block !important; color: #334155 !important; }
+  body > .quote-print-root .quote-management__print-header h2 { display: block !important; margin: 1mm 0 0 !important; color: #174a7e !important; font-size: 16pt !important; }
+  body > .quote-print-root .quote-management__print-document > section { display: block !important; margin-top: 5mm !important; break-inside: auto; }
+  body > .quote-print-root .quote-management__print-document > section h2 { display: block !important; margin: 0 0 3mm !important; color: #174a7e !important; font-size: 12pt !important; }
+  body > .quote-print-root .quote-management__detail dl { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 0 !important; margin: 0 !important; border: 1px solid #cbd5e1 !important; }
+  body > .quote-print-root .quote-management__detail dl div { display: grid !important; grid-template-columns: 34mm 1fr !important; gap: 0 !important; padding: 2mm 3mm !important; border-bottom: 1px solid #e2e8f0 !important; break-inside: avoid; }
+  body > .quote-print-root .quote-management__detail dt { display: block !important; color: #64748b !important; }
+  body > .quote-print-root .quote-management__detail dd { display: block !important; margin: 0 !important; color: #111827 !important; font-weight: 700 !important; }
+  body > .quote-print-root .quote-management__detail ul { display: grid !important; gap: 0 !important; margin: 0 !important; padding: 0 !important; list-style: none !important; }
+  body > .quote-print-root .quote-management__detail li { display: flex !important; justify-content: space-between !important; gap: 4mm !important; padding-block: 2mm !important; border-bottom: 1px solid #e2e8f0 !important; break-inside: avoid; }
+  body > .quote-print-root .quote-management__detail li strong { display: block !important; color: #111827 !important; }
+  body > .quote-print-root .quote-management__detail li span { display: block !important; color: #475569 !important; text-align: right !important; }
+  body > .quote-print-root .quote-management__actions { display: none !important; }
+  body > .quote-print-root .quote-management__print-note { break-inside: avoid; }
+  body > .quote-print-root .quote-management__print-note p { color: #334155 !important; }
 }

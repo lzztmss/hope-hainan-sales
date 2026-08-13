@@ -22,6 +22,7 @@ import type {
 } from "../api/client";
 import { PageLayout } from "../components/layout";
 import { QuotePrintDocument } from "./QuotePrintDocument";
+import { QuotePrintPortal } from "./QuotePrintPortal";
 import { OrderCompositionDialog } from "./OrderCompositionDialog";
 import "./quoteWorkflow.css";
 
@@ -664,21 +665,34 @@ export const QuoteWorkflowPage = ({
       </section>
 
       {savedQuote ? (
-        <QuotePrintDocument
-          calculation={savedQuote.calculation}
-          confirmedAt={savedQuote.confirmedAt}
-          customFttrNote={customFttrNote.trim() || undefined}
-          customerName={name.trim()}
-          elderCount={elderCount}
-          phoneMasked={maskPhone(phone)}
-          quoteNo={savedQuote.quoteNo}
-          roomType={roomType}
-          version={documentVersion}
-          actions={<>
-            <button type="button" onClick={() => setPrintPreviewOpen(true)}>预览报价单</button>
-            <button className="is-primary" disabled={busy} type="button" onClick={() => void printSavedQuote()}>打印报价</button>
-          </>}
-        />
+        <>
+          <QuotePrintDocument
+            calculation={savedQuote.calculation}
+            confirmedAt={savedQuote.confirmedAt}
+            customFttrNote={customFttrNote.trim() || undefined}
+            customerName={name.trim()}
+            elderCount={elderCount}
+            phoneMasked={maskPhone(phone)}
+            quoteNo={savedQuote.quoteNo}
+            roomType={roomType}
+            version={documentVersion}
+            actions={<>
+              <button type="button" onClick={() => setPrintPreviewOpen(true)}>预览报价单</button>
+              <button className="is-primary" disabled={busy} type="button" onClick={() => void printSavedQuote()}>打印报价</button>
+            </>}
+          />
+          <QuotePrintPortal
+            calculation={savedQuote.calculation}
+            confirmedAt={savedQuote.confirmedAt}
+            customFttrNote={customFttrNote.trim() || undefined}
+            customerName={name.trim()}
+            elderCount={elderCount}
+            phoneMasked={maskPhone(phone)}
+            quoteNo={savedQuote.quoteNo}
+            roomType={roomType}
+            version={documentVersion}
+          />
+        </>
       ) : (
         <section
           className="quote-workflow__preview quote-workflow__draft"

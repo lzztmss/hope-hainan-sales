@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import type { ApiClient, OrderMutationDto, QuoteDetailDto } from "../api/client";
 import { PageLayout } from "../components/layout";
 import { QuotePrintDocument } from "./QuotePrintDocument";
+import { QuotePrintPortal } from "./QuotePrintPortal";
 import { OrderCompositionDialog } from "./OrderCompositionDialog";
 import "./quoteManagement.css";
 
@@ -67,28 +68,41 @@ export const QuoteDetailPage = ({ client, quoteId }: { client: ApiClient; quoteI
       {error ? <p className="quote-management__error" role="alert">{error}</p> : null}
       {!quote && !error ? <p role="status">正在读取报价…</p> : null}
       {quote ? (
-        <QuotePrintDocument
-          calculation={quote.calculation}
-          confirmedAt={quote.confirmedAt}
-          customFttrNote={quote.pricing.customFttrNote}
-          customerName={quote.customer.name}
-          elderCount={quote.customer.elderCount}
-          phoneMasked={quote.customer.phoneMasked}
-          quoteNo={quote.quoteNo}
-          roomType={quote.customer.roomType}
-          version={quote.version}
-          actions={<>
-            {quote.status === "confirmed" ? (
-              <button type="button" onClick={() => navigate(`/quotes/${quote.id}/edit`)}>修改报价</button>
-            ) : null}
-            <button type="button" onClick={() => setPreviewOpen(true)}>预览报价单</button>
-            <button type="button" onClick={() => void print()} disabled={busy}>打印报价</button>
-            {quote.status === "confirmed" ? (
-              <button className="is-primary" type="button" onClick={() => setOrderCompositionOpen(true)} disabled={busy}>转为订单</button>
-            ) : null}
-            {order ? <Link to={`/orders/${order.id}`}>查看订单 {order.orderNo}</Link> : null}
-          </>}
-        />
+        <>
+          <QuotePrintDocument
+            calculation={quote.calculation}
+            confirmedAt={quote.confirmedAt}
+            customFttrNote={quote.pricing.customFttrNote}
+            customerName={quote.customer.name}
+            elderCount={quote.customer.elderCount}
+            phoneMasked={quote.customer.phoneMasked}
+            quoteNo={quote.quoteNo}
+            roomType={quote.customer.roomType}
+            version={quote.version}
+            actions={<>
+              {quote.status === "confirmed" ? (
+                <button type="button" onClick={() => navigate(`/quotes/${quote.id}/edit`)}>修改报价</button>
+              ) : null}
+              <button type="button" onClick={() => setPreviewOpen(true)}>预览报价单</button>
+              <button type="button" onClick={() => void print()} disabled={busy}>打印报价</button>
+              {quote.status === "confirmed" ? (
+                <button className="is-primary" type="button" onClick={() => setOrderCompositionOpen(true)} disabled={busy}>转为订单</button>
+              ) : null}
+              {order ? <Link to={`/orders/${order.id}`}>查看订单 {order.orderNo}</Link> : null}
+            </>}
+          />
+          <QuotePrintPortal
+            calculation={quote.calculation}
+            confirmedAt={quote.confirmedAt}
+            customFttrNote={quote.pricing.customFttrNote}
+            customerName={quote.customer.name}
+            elderCount={quote.customer.elderCount}
+            phoneMasked={quote.customer.phoneMasked}
+            quoteNo={quote.quoteNo}
+            roomType={quote.customer.roomType}
+            version={quote.version}
+          />
+        </>
       ) : null}
       {quote && previewOpen ? (
         <div className="quote-preview-backdrop" role="presentation">
