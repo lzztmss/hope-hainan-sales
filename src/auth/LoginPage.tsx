@@ -6,6 +6,7 @@ import "./auth.css";
 
 type LoginLocationState = {
   from?: unknown;
+  notice?: unknown;
 };
 
 const safeDestination = (state: unknown): string => {
@@ -21,6 +22,7 @@ export const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const notice = (location.state as LoginLocationState | null)?.notice;
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -85,6 +87,7 @@ export const LoginPage = () => {
             onChange={(event) => setPassword(event.currentTarget.value)}
           />
 
+          {typeof notice === "string" ? <p role="status">{notice}</p> : null}
           {error ? <p role="alert">{error}</p> : null}
           <button type="submit" disabled={submitting}>
             {submitting ? "正在登录…" : "登录"}

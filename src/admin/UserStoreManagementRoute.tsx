@@ -10,6 +10,8 @@ import {
 
 export interface UserStoreManagementRouteProps {
   api?: UserStoreManagementApi;
+  currentUserId?: string;
+  onCurrentUserPasswordReset?(): Promise<void> | void;
 }
 
 const messageFor = (error: unknown): string =>
@@ -17,6 +19,8 @@ const messageFor = (error: unknown): string =>
 
 export const UserStoreManagementRoute = ({
   api: providedApi,
+  currentUserId,
+  onCurrentUserPasswordReset,
 }: UserStoreManagementRouteProps) => {
   const api = useMemo(
     () => providedApi ?? createUserStoreManagementApi(),
@@ -86,7 +90,11 @@ export const UserStoreManagementRoute = ({
         refreshAfter(() => api.updateUser(id, input))
       }
       onResetPassword={(id, input) =>
-        refreshAfter(() => api.resetPassword(id, input))
+        id === currentUserId
+          ? api.resetPassword(id, input).then(async () => {
+              await onCurrentUserPasswordReset?.();
+            })
+          : refreshAfter(() => api.resetPassword(id, input))
       }
     />
   );

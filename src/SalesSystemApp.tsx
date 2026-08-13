@@ -77,6 +77,24 @@ const LoginRoute = () => {
   return <LoginPage />;
 };
 
+const AdminUsersRoute = () => {
+  const auth = useAuth();
+  const navigate = useNavigate();
+
+  return (
+    <UserStoreManagementRoute
+      currentUserId={auth.user?.id}
+      onCurrentUserPasswordReset={async () => {
+        await auth.refresh();
+        navigate("/login", {
+          replace: true,
+          state: { notice: "密码已重置，请使用新密码重新登录。" },
+        });
+      }}
+    />
+  );
+};
+
 const RequireAuthentication = () => {
   const auth = useAuth();
   const location = useLocation();
@@ -266,7 +284,7 @@ export const SalesSystemRoutes = ({ client }: SalesSystemRoutesProps) => (
 
           <Route element={<RequireRole allowed={["admin"]} />}>
             <Route path="/reports" element={<TeamReportPage />} />
-            <Route path="/admin/users" element={<UserStoreManagementRoute />} />
+            <Route path="/admin/users" element={<AdminUsersRoute />} />
             <Route path="/admin/pricing" element={<PlaceholderPage title="价格版本" />} />
             <Route path="/admin/commissions" element={<AdminCommissionRoute client={client} />} />
             <Route path="/admin/settlements" element={<PlaceholderPage title="结算批次" />} />
