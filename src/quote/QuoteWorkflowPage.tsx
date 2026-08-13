@@ -21,6 +21,7 @@ import type {
   QuoteDetailDto,
 } from "../api/client";
 import { PageLayout } from "../components/layout";
+import { QuotePrintDocument } from "./QuotePrintDocument";
 import "./quoteWorkflow.css";
 
 export type QuoteWorkflowClient = Pick<
@@ -43,11 +44,6 @@ const ROOM_LABELS: Record<RoomType, string> = {
   one_bedroom: "一室一厅",
   two_bedroom: "两室一厅",
   three_bedroom: "三室一厅",
-};
-
-const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
-  contract_36: "36 个月月付",
-  one_time: "设备一次性购买",
 };
 
 const PRODUCT_CONTROLS: readonly {
@@ -212,20 +208,6 @@ const DraftChargeBreakdown = ({
   );
 };
 
-const formatShanghaiDate = (value: string | Date): string => {
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return typeof value === "string" ? value : "";
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-  const read = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value ?? "";
-  return `${read("year")}-${read("month")}-${read("day")}`;
-};
-
 const maskPhone = (value: string): string => {
   const normalized = value.trim();
   return /^\d{11}$/.test(normalized)
@@ -302,6 +284,7 @@ export const QuoteWorkflowPage = ({
   const [orderBusy, setOrderBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderError, setOrderError] = useState<string | null>(null);
+  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
   const inFlight = useRef(false);
   const idempotencyKey = useRef<string | null>(null);
   const orderIdempotencyKey = useRef<string | null>(null);
@@ -425,11 +408,7 @@ export const QuoteWorkflowPage = ({
         flushSync(() => setSavedQuote(quote));
       }
 
-      await client.recordQuotePrint(quote.id);
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-      });
-      window.print();
+      setPrintPreviewOpen(true);
     } catch (submitError) {
       setError(
         quoteConfirmed
@@ -442,16 +421,24 @@ export const QuoteWorkflowPage = ({
     }
   };
 
-  const documentFttr =
-    fttrChoice === "none"
-      ? "不新增 FTTR"
-      : fttrChoice === "custom"
-        ? `${customFttr || "--"} 元/月（${customFttrNote.trim() || "待补充说明"}）`
-        : `${fttrChoice} 元/月`;
-  const documentQuoteDate = formatShanghaiDate(
-    savedQuote?.confirmedAt ?? new Date(),
-  );
-  const documentCalculation = savedQuote?.calculation ?? preview.calculation;
+  const printSavedQuote = async (): Promise<void> => {
+    if (!savedQuote || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await client.recordQuotePrint(savedQuote.id);
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+      window.print();
+    } catch (printError) {
+      setError(`打印未完成：${messageFor(printError)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const documentVersion = initialQuote ? initialQuote.version + 1 : 1;
 
   const convertToOrder = async (): Promise<void> => {
     if (!savedQuote || createdOrder || orderBusy) return;
@@ -674,120 +661,21 @@ export const QuoteWorkflowPage = ({
       </section>
 
       {savedQuote ? (
-        <section
-          className="quote-workflow__preview quote-workflow__document"
-          aria-label="正式客户报价单"
-        >
-        <header className="quote-workflow__document-header">
-          <img src="/haipo-logo.jpg" alt="海魄科技标识" />
-          <div>
-            <p className="quote-workflow__company-name">海魄科技</p>
-            <h2>海南联通 FTTR 心连心融合套餐销售报价系统</h2>
-            <p>客户报价单</p>
-          </div>
-        </header>
-
-        <dl className="quote-workflow__document-meta">
-          <div>
-            <dt>报价单号</dt>
-            <dd>{savedQuote?.quoteNo ?? "确认保存后生成"}</dd>
-          </div>
-          <div>
-            <dt>报价日期</dt>
-            <dd>{documentQuoteDate}</dd>
-          </div>
-          <div>
-            <dt>客户姓名或称呼</dt>
-            <dd>{name.trim() || "待填写"}</dd>
-          </div>
-          <div>
-            <dt>联系电话</dt>
-            <dd>{maskPhone(phone)}</dd>
-          </div>
-          <div>
-            <dt>客户户型</dt>
-            <dd>{ROOM_LABELS[roomType]}</dd>
-          </div>
-          <div>
-            <dt>长者人数</dt>
-            <dd>{elderCount} 位</dd>
-          </div>
-          <div>
-            <dt>支付方式</dt>
-            <dd>{PAYMENT_MODE_LABELS[mode]}</dd>
-          </div>
-          <div>
-            <dt>FTTR 方案</dt>
-            <dd>{documentFttr}</dd>
-          </div>
-        </dl>
-
-        {preview.error ? <p role="alert">{preview.error}</p> : null}
-        {documentCalculation ? (
-          <>
-            <p className="quote-workflow__catalog-version">
-              报价价格版本：<strong>{documentCalculation.catalogVersion}</strong>
-            </p>
-            <QuoteTotalsBreakdown calculation={documentCalculation} estimate={false} />
-            <div className="quote-workflow__preview-columns">
-              <section aria-labelledby="charge-lines-title">
-                <h3 id="charge-lines-title">计价商品</h3>
-                <ul>
-                  {documentCalculation.chargeLines.map((line) => (
-                    <li key={line.sku}>
-                      <span>
-                        <strong>{line.label}</strong>
-                        <small>
-                          数量 {line.quantity} {line.unit} · {line.monthlyUnitFen > 0
-                            ? `月付单价 ¥${formatMoney(line.monthlyUnitFen)}`
-                            : `一次性单价 ¥${formatMoney(line.oneTimeUnitFen)}`}
-                        </small>
-                      </span>
-                      <strong>
-                        {line.monthlySubtotalFen > 0
-                          ? `月付小计 ¥${formatMoney(line.monthlySubtotalFen)}`
-                          : `一次性小计 ¥${formatMoney(line.oneTimeSubtotalFen)}`}
-                      </strong>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-              <section aria-labelledby="component-lines-title">
-                <h3 id="component-lines-title">物理设备与点位</h3>
-                <ul>
-                  {documentCalculation.componentLines.map((line) => (
-                    <li key={line.componentId}>
-                      <strong>{line.label} × {line.quantity} {line.unit}</strong>
-                      <span>安装 / 使用点位：{line.locations.join("、")}</span>
-                      <small>{line.reason}</small>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            </div>
-            <div className="quote-workflow__entitlements">
-              <h3>专属权益</h3>
-              {ACTIVE_CATALOG.entitlements.map((entitlement) => (
-                <p key={entitlement.label}>
-                  <strong>{entitlement.label}</strong>：{entitlement.display}
-                </p>
-              ))}
-            </div>
-
-            <section
-              className="quote-workflow__disclaimer"
-              aria-labelledby="quote-disclaimer-title"
-            >
-              <h3 id="quote-disclaimer-title">报价说明</h3>
-              <p>
-                本报价根据上述户型、人数和产品配置生成。最终资费、业务受理、
-                网络覆盖与安装点位以海南联通现场确认及双方签署的订单为准。
-              </p>
-              <p>客户联系电话仅用于报价与服务联系，本报价单已做脱敏展示。</p>
-            </section>
-          </>
-        ) : null}
-        </section>
+        <QuotePrintDocument
+          calculation={savedQuote.calculation}
+          confirmedAt={savedQuote.confirmedAt}
+          customFttrNote={customFttrNote.trim() || undefined}
+          customerName={name.trim()}
+          elderCount={elderCount}
+          phoneMasked={maskPhone(phone)}
+          quoteNo={savedQuote.quoteNo}
+          roomType={roomType}
+          version={documentVersion}
+          actions={<>
+            <button type="button" onClick={() => setPrintPreviewOpen(true)}>预览报价单</button>
+            <button className="is-primary" disabled={busy} type="button" onClick={() => void printSavedQuote()}>打印报价</button>
+          </>}
+        />
       ) : (
         <section
           className="quote-workflow__preview quote-workflow__draft"
@@ -813,12 +701,32 @@ export const QuoteWorkflowPage = ({
         </section>
       )}
 
+      {savedQuote && printPreviewOpen ? (
+        <div className="quote-preview-backdrop" role="presentation">
+          <section aria-label="报价单预览" aria-modal="true" className="quote-preview-dialog" role="dialog">
+            <QuotePrintDocument
+              calculation={savedQuote.calculation}
+              confirmedAt={savedQuote.confirmedAt}
+              customFttrNote={customFttrNote.trim() || undefined}
+              customerName={name.trim()}
+              elderCount={elderCount}
+              phoneMasked={maskPhone(phone)}
+              quoteNo={savedQuote.quoteNo}
+              roomType={roomType}
+              version={documentVersion}
+              preview
+              actions={<><button type="button" onClick={() => setPrintPreviewOpen(false)}>关闭预览</button><button className="is-primary" disabled={busy} type="button" onClick={() => void printSavedQuote()}>打印报价</button></>}
+            />
+          </section>
+        </div>
+      ) : null}
+
       <section className="quote-workflow__confirmation" aria-label="确认报价">
         {error ? <p role="alert">{error}</p> : null}
         {orderError ? <p role="alert">{orderError}</p> : null}
         {savedQuote ? (
           <p role="status">
-            报价 {savedQuote.quoteNo} 已保存。系统打印窗口关闭或取消，不会删除这份报价。
+            报价 {savedQuote.quoteNo} 已保存。请先预览报价单，确认内容后再打印。
           </p>
         ) : null}
         {savedQuote ? (
@@ -855,13 +763,13 @@ export const QuoteWorkflowPage = ({
         >
           {busy
             ? savedQuote
-              ? "正在准备打印…"
+              ? "正在打开预览…"
               : "正在保存…"
             : savedQuote
-              ? "重新打印已保存报价"
+              ? "预览报价单"
               : initialQuote
-                ? "保存修改并打印"
-                : "确认保存并打印"}
+                ? "保存修改并预览"
+                : "确认保存并预览"}
         </button>
       </section>
     </PageLayout>

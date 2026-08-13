@@ -35,12 +35,21 @@
 .quote-management__print-header { display: none; }
 .quote-management__print-note p { line-height: 1.65; }
 .quote-management__error { color: var(--app-color-danger); font-weight: 700; }
+.quote-preview-backdrop { position: fixed; z-index: 80; inset: 0; overflow: auto; padding: clamp(1rem, 4vw, 3rem); background: rgb(15 35 55 / .72); }
+.quote-preview-dialog { width: min(210mm, 100%); min-height: 297mm; margin: 0 auto; }
+.quote-preview-dialog .quote-management__print-document { min-height: 297mm; border-radius: 0; box-shadow: 0 1rem 3rem rgb(0 0 0 / .28); }
+.quote-preview-dialog .quote-management__print-header { display: flex; align-items: center; gap: var(--hfttr-space-4); padding-bottom: var(--hfttr-space-4); border-bottom: 2px solid #174a7e; }
+.quote-preview-dialog .quote-management__print-header img { width: 4rem; height: 4rem; object-fit: contain; }
 @media (min-width: 64rem) { .quote-management__filters { grid-template-columns: minmax(0, 2fr) minmax(10rem, 1fr) minmax(9rem, 1fr) minmax(9rem, 1fr) auto; align-items: end; } }
 @media print {
   @page { size: A4; margin: 12mm; }
   body:has(.quote-management__print-document) * { visibility: hidden !important; }
   body:has(.quote-management__print-document) .quote-management__print-document,
   body:has(.quote-management__print-document) .quote-management__print-document * { visibility: visible !important; }
+  body:has(.quote-preview-dialog) .quote-management__print-document:not(.quote-management__print-document--preview),
+  body:has(.quote-preview-dialog) .quote-management__print-document:not(.quote-management__print-document--preview) * { visibility: hidden !important; }
+  .quote-preview-backdrop { position: static; overflow: visible; padding: 0; background: transparent; }
+  .quote-preview-dialog { width: 100%; min-height: 0; }
   .quote-management__print-document {
     position: absolute;
     inset: 0;
