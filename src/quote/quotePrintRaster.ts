@@ -1,63 +1,4 @@
-const XHTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
 const A4_RATIO = 297 / 210;
-
-const toDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onerror = () => reject(reader.error ?? new Error("图片读取失败"));
-  reader.onload = () => resolve(String(reader.result));
-  reader.readAsDataURL(blob);
-});
-
-const inlineImages = async (source: HTMLElement, clone: HTMLElement) => {
-  const sourceImages = [
-    ...(source instanceof HTMLImageElement ? [source] : []),
-    ...source.querySelectorAll("img"),
-  ];
-  const cloneImages = [
-    ...(clone instanceof HTMLImageElement ? [clone] : []),
-    ...clone.querySelectorAll("img"),
-  ];
-
-  await Promise.all(sourceImages.map(async (image, index) => {
-    const target = cloneImages[index];
-    if (!target || !image.currentSrc) return;
-    const response = await fetch(image.currentSrc);
-    if (!response.ok) throw new Error("报价单标识读取失败");
-    target.src = await toDataUrl(await response.blob());
-  }));
-};
-
-const copyComputedStyles = (source: HTMLElement, clone: HTMLElement) => {
-  const sourceElements = [source, ...source.querySelectorAll<HTMLElement>("*")];
-  const cloneElements = [clone, ...clone.querySelectorAll<HTMLElement>("*")];
-
-  sourceElements.forEach((element, index) => {
-    const target = cloneElements[index];
-    if (!target) return;
-    const styles = window.getComputedStyle(element);
-    for (const property of styles) {
-      target.style.setProperty(
-        property,
-        styles.getPropertyValue(property),
-        styles.getPropertyPriority(property),
-      );
-    }
-  });
-};
-
-const loadSvgAsImage = (svg: string) => new Promise<HTMLImageElement>((resolve, reject) => {
-  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
-  const image = new Image();
-  image.onload = () => {
-    URL.revokeObjectURL(url);
-    resolve(image);
-  };
-  image.onerror = () => {
-    URL.revokeObjectURL(url);
-    reject(new Error("报价单图像生成失败"));
-  };
-  image.src = url;
-});
 
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
@@ -84,28 +25,118 @@ export const getA4PageSlices = (height: number, width: number) => {
   return { pageHeight, slices };
 };
 
-export const renderQuoteToA4Images = async (element: HTMLElement, scale = 2) => {
-  if (document.fonts?.ready) await document.fonts.ready;
+const cssPixels = (value: string) => Number.parseFloat(value) || 0;
+const isTransparent = (value: string) => value === "transparent" || value === "rgba(0, 0, 0, 0)";
 
+const drawBox = (
+  context: CanvasRenderingContext2D,
+  element: HTMLElement,
+  rootBounds: DOMRect,
+  scale: number,
+) => {
+  const styles = window.getComputedStyle(element);
+  if (styles.display === "none" || styles.visibility === "hidden") return false;
+  const bounds = element.getBoundingClientRect();
+  const x = (bounds.left - rootBounds.left) * scale;
+  const y = (bounds.top - rootBounds.top) * scale;
+  const width = bounds.width * scale;
+  const height = bounds.height * scale;
+
+  context.save();
+  context.globalAlpha = Number.parseFloat(styles.opacity) || 1;
+  if (!isTransparent(styles.backgroundColor)) {
+    context.fillStyle = styles.backgroundColor;
+    context.fillRect(x, y, width, height);
+  }
+
+  const borders = [
+    ["top", styles.borderTopWidth, styles.borderTopColor],
+    ["right", styles.borderRightWidth, styles.borderRightColor],
+    ["bottom", styles.borderBottomWidth, styles.borderBottomColor],
+    ["left", styles.borderLeftWidth, styles.borderLeftColor],
+  ] as const;
+  borders.forEach(([side, borderWidth, color]) => {
+    const size = cssPixels(borderWidth) * scale;
+    if (!size || isTransparent(color)) return;
+    context.fillStyle = color;
+    if (side === "top") context.fillRect(x, y, width, size);
+    if (side === "right") context.fillRect(x + width - size, y, size, height);
+    if (side === "bottom") context.fillRect(x, y + height - size, width, size);
+    if (side === "left") context.fillRect(x, y, size, height);
+  });
+  context.restore();
+  return true;
+};
+
+const drawText = (
+  context: CanvasRenderingContext2D,
+  node: Text,
+  parent: HTMLElement,
+  rootBounds: DOMRect,
+  scale: number,
+) => {
+  const value = node.data;
+  if (!value.trim()) return;
+  const styles = window.getComputedStyle(parent);
+  const fontSize = cssPixels(styles.fontSize) * scale;
+  context.save();
+  context.globalAlpha = Number.parseFloat(styles.opacity) || 1;
+  context.fillStyle = styles.color;
+  context.font = `${styles.fontStyle} ${styles.fontWeight} ${fontSize}px ${styles.fontFamily}`;
+  context.textBaseline = "alphabetic";
+
+  let offset = 0;
+  for (const character of Array.from(value)) {
+    const nextOffset = offset + character.length;
+    const range = document.createRange();
+    range.setStart(node, offset);
+    range.setEnd(node, nextOffset);
+    const bounds = range.getBoundingClientRect();
+    if (bounds.width || bounds.height) {
+      const x = (bounds.left - rootBounds.left) * scale;
+      const y = (bounds.top - rootBounds.top) * scale
+        + (bounds.height * scale + fontSize) / 2
+        - fontSize * 0.14;
+      context.fillText(character, x, y);
+    }
+    offset = nextOffset;
+  }
+  context.restore();
+};
+
+const drawElement = async (
+  context: CanvasRenderingContext2D,
+  element: HTMLElement,
+  rootBounds: DOMRect,
+  scale: number,
+) => {
+  if (!drawBox(context, element, rootBounds, scale)) return;
+
+  if (element instanceof HTMLImageElement) {
+    await waitForImage(element);
+    const bounds = element.getBoundingClientRect();
+    context.drawImage(
+      element,
+      (bounds.left - rootBounds.left) * scale,
+      (bounds.top - rootBounds.top) * scale,
+      bounds.width * scale,
+      bounds.height * scale,
+    );
+    return;
+  }
+
+  for (const child of element.childNodes) {
+    if (child instanceof Text) drawText(context, child, element, rootBounds, scale);
+    if (child instanceof HTMLElement) await drawElement(context, child, rootBounds, scale);
+  }
+};
+
+const renderElementToCanvas = async (element: HTMLElement, scale: number) => {
   const bounds = element.getBoundingClientRect();
   const width = Math.ceil(Math.max(bounds.width, element.scrollWidth));
   const height = Math.ceil(Math.max(bounds.height, element.scrollHeight));
   if (!width || !height) throw new Error("报价单尚未完成排版");
 
-  const clone = element.cloneNode(true) as HTMLElement;
-  copyComputedStyles(element, clone);
-  clone.setAttribute("xmlns", XHTML_NAMESPACE);
-  clone.style.width = `${width}px`;
-  clone.style.height = `${height}px`;
-  clone.style.minHeight = "0";
-  clone.style.margin = "0";
-  clone.style.borderRadius = "0";
-  clone.style.boxShadow = "none";
-  await inlineImages(element, clone);
-
-  const markup = new XMLSerializer().serializeToString(clone);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><foreignObject width="100%" height="100%">${markup}</foreignObject></svg>`;
-  const image = await loadSvgAsImage(svg);
   const canvas = document.createElement("canvas");
   canvas.width = width * scale;
   canvas.height = height * scale;
@@ -113,9 +144,15 @@ export const renderQuoteToA4Images = async (element: HTMLElement, scale = 2) => 
   if (!context) throw new Error("当前浏览器无法生成打印图像");
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, canvas.width, canvas.height);
-  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  await drawElement(context, element, bounds, scale);
+  return canvas;
+};
 
+export const renderQuoteToA4Images = async (element: HTMLElement, scale = 2) => {
+  if (document.fonts?.ready) await document.fonts.ready;
+  const canvas = await renderElementToCanvas(element, scale);
   const { pageHeight, slices } = getA4PageSlices(canvas.height, canvas.width);
+
   return slices.map((slice) => {
     const page = document.createElement("canvas");
     page.width = canvas.width;
