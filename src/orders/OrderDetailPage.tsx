@@ -44,16 +44,17 @@ const ReturnApproval = ({
   const [busy, setBusy] = useState(false);
   const reviewerRole = viewer.role === "store_manager" || viewer.role === "admin";
   const isApplicant = record.requestedById === viewer.id;
+  const administratorSelfReview = isApplicant && viewer.role === "admin";
   const mayReview =
     record.status === "requested" &&
     record.canApprove &&
     reviewerRole &&
-    !isApplicant &&
+    (!isApplicant || viewer.role === "admin") &&
     Boolean(onDecideReturn);
 
   if (record.status !== "requested") return null;
-  if (isApplicant && reviewerRole) {
-    return <p className="return-self-review-note">申请人不可审批自己的退单</p>;
+  if (isApplicant && viewer.role === "store_manager") {
+    return <p className="return-self-review-note">营业厅经理不可审批自己提交的退单，请由管理员处理</p>;
   }
   if (!mayReview) return null;
 
@@ -87,6 +88,9 @@ const ReturnApproval = ({
       className="return-approval"
       role="region"
     >
+      {administratorSelfReview ? (
+        <p className="return-self-review-note">管理员正在审批自己提交的退单，本次操作会写入审计记录。</p>
+      ) : null}
       <label>
         <span>审批意见</span>
         <textarea

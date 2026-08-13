@@ -161,6 +161,35 @@ const createFixture = async (initialStatus: "activated" | "completed") => {
 };
 
 describe("退单状态与提成冲销一致性", () => {
+  it("管理员可审批自己提交的退单并保留审计", async () => {
+    const { client, order, admin } = await createFixture("completed");
+    const repository = new DrizzleReturnRepository(client);
+    const service = createReturnService({
+      repository,
+      commissionReversal: {
+        validateReversalForCompletedReturn: async () => undefined,
+        reverseForCompletedReturn: async () => undefined,
+      },
+      numberSuffix: () => "ADMIN",
+    });
+
+    const requested = await service.requestReturn(
+      admin,
+      order.id,
+      { type: "full", reason: "管理员代客户申请退货", items: [] },
+      "return-request-admin-self-001",
+    );
+    const approved = await service.decideReturn(
+      admin,
+      requested.id,
+      "approved",
+      "管理员确认客户材料完整",
+    );
+
+    expect(approved.status).toBe("approved");
+    await client.close();
+  });
+
   it("退单被驳回后恢复原订单状态", async () => {
     const { client, order, seller, admin } = await createFixture("completed");
     const repository = new DrizzleReturnRepository(client);

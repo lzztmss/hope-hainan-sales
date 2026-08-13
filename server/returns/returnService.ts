@@ -360,8 +360,8 @@ export const createReturnService = (options: ReturnServiceOptions) => {
           request.orderId,
         );
         void order;
-        if (request.requestedBy === actor.id) {
-          throw new Error("申请人不能审批自己的退单");
+        if (request.requestedBy === actor.id && actor.role !== "admin") {
+          throw new Error("营业厅经理不能审批自己提交的退单，请由管理员处理");
         }
         if (request.status !== "requested") throw new Error("退单已完成审批");
         const normalizedNote = note.trim();
@@ -379,7 +379,12 @@ export const createReturnService = (options: ReturnServiceOptions) => {
           orderId: request.orderId,
           action: `return.${decision === "approved" ? "approve" : "reject"}`,
           beforeSnapshot: { status: request.status },
-          afterSnapshot: { status: decided.status, note: normalizedNote },
+          afterSnapshot: {
+            status: decided.status,
+            note: normalizedNote,
+            administratorSelfReview:
+              actor.role === "admin" && request.requestedBy === actor.id,
+          },
           reason: normalizedNote,
         });
         return decided;

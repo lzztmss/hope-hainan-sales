@@ -168,7 +168,7 @@ const mapReturn = (
     canApprove:
       reviewer &&
       record.status === "requested" &&
-      record.requestedBy !== viewer.id,
+      (record.requestedBy !== viewer.id || viewer.role === "admin"),
     canComplete: reviewer && record.status === "approved",
     items: record.items.map((item) => ({
       orderLineId: item.orderLineId,

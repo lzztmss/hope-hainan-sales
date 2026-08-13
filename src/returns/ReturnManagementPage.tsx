@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import type {
   AuthenticatedUser,
@@ -79,8 +80,12 @@ const RecordAction = ({
   record,
 }: RecordActionProps) => {
   if (!reviewerRole(actor)) return <span className="returns-no-action">仅可查看</span>;
-  if (record.status === "requested" && record.requestedBy === actor.id) {
-    return <span className="returns-self-review">申请人不可审批自己的退单</span>;
+  if (
+    record.status === "requested" &&
+    record.requestedBy === actor.id &&
+    actor.role === "store_manager"
+  ) {
+    return <span className="returns-self-review">厅长本人申请，请由管理员审批</span>;
   }
   if (record.status === "requested") {
     return (
@@ -127,12 +132,13 @@ const ReturnItems = ({ record }: { record: ReturnRecordDto }) => (
 );
 
 interface ApprovalDialogProps {
+  actor: AuthenticatedUser;
   record: ReturnRecordDto;
   onClose(): void;
   onDecide(input: DecideManagedReturnInput): Promise<void>;
 }
 
-const ApprovalDialog = ({ onClose, onDecide, record }: ApprovalDialogProps) => {
+const ApprovalDialog = ({ actor, onClose, onDecide, record }: ApprovalDialogProps) => {
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -173,6 +179,9 @@ const ApprovalDialog = ({ onClose, onDecide, record }: ApprovalDialogProps) => {
             <strong>{record.reason}</strong>
             <span>最高可退 {formatMoney(record.maxRefundFen)}</span>
           </div>
+          {actor.role === "admin" && record.requestedBy === actor.id ? (
+            <p className="returns-audit-note">管理员正在审批自己代客户提交的退单，本次自审会单独写入审计记录。</p>
+          ) : null}
           <label>
             <span>审批意见</span>
             <textarea
@@ -371,10 +380,10 @@ export const ReturnManagementPage = ({
           <tbody>
             {items.map((record) => (
               <tr key={record.id}>
-                <td><strong>{record.returnNo}</strong><span>订单 ID：{record.orderId}</span><small>{record.returnType === "full" ? "整单退单" : "部分退单"}</small></td>
+                <td><strong>{record.returnNo}</strong><Link className="returns-order-link" to={`/orders/${record.orderId}`}>查看订单</Link><small>{record.returnType === "full" ? "整单退单" : "部分退单"}</small></td>
                 <td><strong>申请人 ID：{record.requestedBy}</strong><span>{formatDateTime(record.requestedAt)}</span></td>
                 <td><p>{record.reason}</p><ReturnItems record={record} /></td>
-                <td><strong>最高可退 {formatMoney(record.maxRefundFen)}</strong>{record.status === "completed" ? <span>实际已退 {formatMoney(record.refundFen)}</span> : null}</td>
+                <td><strong>最高可退 {formatMoney(record.maxRefundFen)}</strong>{record.maxRefundFen === 0 ? <small>月付订单暂无实收月费数据，当前仅按一次性实收金额核算</small> : null}{record.status === "completed" ? <span>实际已退 {formatMoney(record.refundFen)}</span> : null}</td>
                 <td><ReturnStatusBadge status={record.status} /></td>
                 <td>{actionFor(record)}</td>
               </tr>
@@ -388,17 +397,17 @@ export const ReturnManagementPage = ({
           <li key={record.id}>
             <article className="returns-mobile-card">
               <header><div><span>{record.returnType === "full" ? "整单退单" : "部分退单"}</span><strong>{record.returnNo}</strong></div><ReturnStatusBadge status={record.status} /></header>
-              <div className="returns-mobile-meta"><span>订单 ID：{record.orderId}</span><span>申请人 ID：{record.requestedBy}</span><span>{formatDateTime(record.requestedAt)}</span></div>
+              <div className="returns-mobile-meta"><Link className="returns-order-link" to={`/orders/${record.orderId}`}>查看订单</Link><span>申请人 ID：{record.requestedBy}</span><span>{formatDateTime(record.requestedAt)}</span></div>
               <p>{record.reason}</p>
               <ReturnItems record={record} />
-              <div className="returns-mobile-amount"><strong>最高可退 {formatMoney(record.maxRefundFen)}</strong>{record.status === "completed" ? <span>实际已退 {formatMoney(record.refundFen)}</span> : null}</div>
+              <div className="returns-mobile-amount"><strong>最高可退 {formatMoney(record.maxRefundFen)}</strong>{record.maxRefundFen === 0 ? <small>暂无实收月费数据，仅按一次性实收核算</small> : null}{record.status === "completed" ? <span>实际已退 {formatMoney(record.refundFen)}</span> : null}</div>
               <footer>{actionFor(record)}</footer>
             </article>
           </li>
         ))}
       </ul>
 
-      {approval ? <ApprovalDialog onClose={() => setApproval(null)} onDecide={onDecide} record={approval} /> : null}
+      {approval ? <ApprovalDialog actor={actor} onClose={() => setApproval(null)} onDecide={onDecide} record={approval} /> : null}
       {completion ? <CompletionDialog onClose={() => setCompletion(null)} onComplete={onComplete} record={completion} /> : null}
     </PageLayout>
   );

@@ -185,6 +185,17 @@
   font-size: var(--hfttr-font-size-xs);
 }
 
+.returns-order-link {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: var(--hfttr-space-2);
+  color: var(--app-color-primary);
+  font-size: var(--hfttr-font-size-sm);
+  font-weight: var(--app-font-weight-bold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .returns-desktop-table td > p {
   max-width: 20rem;
   margin: 0 0 var(--hfttr-space-2);
