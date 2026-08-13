@@ -11,6 +11,7 @@ import type { OrderService } from "./orders/orderService.js";
 import type { QuoteService } from "./quotes/quoteService.js";
 import type { ReturnService } from "./returns/returnService.js";
 import type { SalesReportService } from "./reports/salesReportService.js";
+import type { CustomerService } from "./customers/customerService.js";
 import { registerAdminRoutes } from "./routes/admin.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerCommissionRuleRoutes } from "./routes/commissionRules.js";
@@ -19,6 +20,7 @@ import { registerOrderRoutes } from "./routes/orders.js";
 import { registerQuoteRoutes } from "./routes/quotes.js";
 import { registerReturnRoutes } from "./routes/returns.js";
 import { registerReportRoutes } from "./routes/reports.js";
+import { registerCustomerRoutes } from "./routes/customers.js";
 
 export interface AppDependencies {
   authService?: AuthService;
@@ -29,6 +31,7 @@ export interface AppDependencies {
   returnService?: ReturnService;
   adminService?: AdminService;
   salesReportService?: SalesReportService;
+  customerService?: CustomerService;
   appOrigin?: string;
   secureCookies?: boolean;
   onClose?: () => Promise<void>;
@@ -113,6 +116,12 @@ export const buildApp = (
           authService: _dependencies.authService!,
           salesReportService: _dependencies.salesReportService,
           appOrigin: _dependencies.appOrigin ?? "http://127.0.0.1:5173",
+        });
+      }
+      if (_dependencies.customerService) {
+        await registerCustomerRoutes(securedApp, {
+          authService: _dependencies.authService!,
+          customerService: _dependencies.customerService,
         });
       }
     });

@@ -20,6 +20,8 @@ import { createReturnService } from "./returns/returnService.js";
 import { DrizzleSalesReportRepository } from "./reports/salesReportRepository.js";
 import { createSalesReportService } from "./reports/salesReportService.js";
 import { createPiiProtector } from "./security/pii.js";
+import { DrizzleCustomerRepository } from "./customers/customerRepository.js";
+import { createCustomerService } from "./customers/customerService.js";
 import { ACTIVE_CATALOG } from "../shared/pricing/catalog.js";
 
 const requiredEnvironment = (name: string): string => {
@@ -76,6 +78,10 @@ const adminService = createAdminService({
 const salesReportService = createSalesReportService({
   repository: new DrizzleSalesReportRepository(databaseClient),
 });
+const customerService = createCustomerService({
+  repository: new DrizzleCustomerRepository(databaseClient),
+  decryptPii: pii.decryptPii,
+});
 const app = buildApp({
   authService,
   quoteService,
@@ -85,6 +91,7 @@ const app = buildApp({
   returnService,
   adminService,
   salesReportService,
+  customerService,
   appOrigin: requiredEnvironment("APP_ORIGIN"),
   secureCookies: process.env.NODE_ENV === "production",
   onClose: () => databaseClient.close(),

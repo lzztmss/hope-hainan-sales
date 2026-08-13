@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import type { ApiClient, QuoteDetailDto, QuoteStatus } from "../api/client";
 import { PageLayout } from "../components/layout";
@@ -17,8 +17,10 @@ const money = (fen: number) =>
   `¥${(fen / 100).toLocaleString("zh-CN", { minimumFractionDigits: 2 })}`;
 
 export const QuoteListPage = ({ client }: { client: ApiClient }) => {
+  const [searchParams] = useSearchParams();
+  const initialQuery = searchParams.get("query") ?? "";
   const [items, setItems] = useState<readonly QuoteDetailDto[]>([]);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [status, setStatus] = useState<QuoteStatus | "">("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -43,7 +45,7 @@ export const QuoteListPage = ({ client }: { client: ApiClient }) => {
     }
   }, [client]);
 
-  useEffect(() => { void load("", ""); }, [load]);
+  useEffect(() => { void load(initialQuery, ""); }, [initialQuery, load]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();

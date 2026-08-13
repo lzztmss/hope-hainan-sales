@@ -93,6 +93,22 @@ export interface QuoteListQuery {
   limit?: number;
 }
 
+export interface CustomerListItemDto {
+  id: string;
+  storeId: string;
+  storeName: string;
+  ownerUserId: string;
+  ownerName: string;
+  name: string;
+  phoneMasked: string;
+  roomType: string | null;
+  elderCount: number;
+  quoteCount: number;
+  orderCount: number;
+  lastQuoteAt: string | null;
+  updatedAt: string;
+}
+
 export type CommissionPolicyStatus = "draft" | "published" | "stopped";
 
 export interface CommissionPolicyVersionDto {
@@ -337,6 +353,7 @@ export interface ApiClient {
   ): Promise<ConfirmedQuoteSummary>;
   getQuote(quoteId: string): Promise<QuoteDetailDto>;
   listQuotes(query?: QuoteListQuery): Promise<{ items: readonly QuoteDetailDto[] }>;
+  listCustomers(query?: string): Promise<{ items: readonly CustomerListItemDto[] }>;
   updateQuote(
     quoteId: string,
     input: ConfirmQuoteInput,
@@ -635,6 +652,13 @@ export const createApiClient = ({
       const payload = await request(`/api/quotes?${parameters.toString()}`);
       const items = readProperty<unknown[]>(payload, "items").map(readQuoteDetail);
       return { items };
+    },
+    async listCustomers(query = "") {
+      const parameters = new URLSearchParams({ limit: "100" });
+      if (query.trim()) parameters.set("query", query.trim());
+      return (await request(`/api/customers?${parameters.toString()}`)) as {
+        items: readonly CustomerListItemDto[];
+      };
     },
     async updateQuote(quoteId, input, expectedVersion) {
       return readQuoteDetail(

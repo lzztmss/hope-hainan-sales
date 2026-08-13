@@ -21,6 +21,7 @@ import { QuoteListPage } from "./quote/QuoteListPage";
 import { QuoteDetailPage } from "./quote/QuoteDetailPage";
 import { TeamReportPage } from "./reports/TeamReportPage";
 import { ReturnManagementRoute } from "./returns/ReturnManagementRoute";
+import { CustomerListPage } from "./customers/CustomerListPage";
 import "./salesSystem.css";
 
 export type SalesSystemRoutesProps = {
@@ -248,7 +249,7 @@ export const SalesSystemRoutes = ({ client }: SalesSystemRoutesProps) => (
             <Route path="/quotes" element={<QuoteListPage client={client} />} />
             <Route path="/quotes/:quoteId/edit" element={<QuoteEditRoute client={client} />} />
             <Route path="/quotes/:quoteId" element={<QuoteDetailRoute client={client} />} />
-            <Route path="/customers" element={<PlaceholderPage title="客户管理" />} />
+            <Route path="/customers" element={<CustomerListPage client={client} />} />
             <Route path="/orders" element={<OrdersRoute client={client} />} />
             <Route path="/orders/:orderId" element={<OrdersRoute client={client} />} />
             <Route path="/profile" element={<PlaceholderPage title="个人中心" />} />
