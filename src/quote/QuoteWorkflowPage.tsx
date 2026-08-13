@@ -22,6 +22,7 @@ import type {
 } from "../api/client";
 import { PageLayout } from "../components/layout";
 import { QuotePrintDocument } from "./QuotePrintDocument";
+import { OrderCompositionDialog } from "./OrderCompositionDialog";
 import "./quoteWorkflow.css";
 
 export type QuoteWorkflowClient = Pick<
@@ -285,6 +286,7 @@ export const QuoteWorkflowPage = ({
   const [error, setError] = useState<string | null>(null);
   const [orderError, setOrderError] = useState<string | null>(null);
   const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
+  const [orderCompositionOpen, setOrderCompositionOpen] = useState(false);
   const inFlight = useRef(false);
   const idempotencyKey = useRef<string | null>(null);
   const orderIdempotencyKey = useRef<string | null>(null);
@@ -452,6 +454,7 @@ export const QuoteWorkflowPage = ({
           orderIdempotencyKey.current,
         ),
       );
+      setOrderCompositionOpen(false);
     } catch (conversionError) {
       setOrderError(
         conversionError instanceof Error
@@ -743,7 +746,7 @@ export const QuoteWorkflowPage = ({
                   className="quote-workflow__order-button"
                   type="button"
                   disabled={orderBusy}
-                  onClick={() => void convertToOrder()}
+                  onClick={() => setOrderCompositionOpen(true)}
                 >
                   {orderBusy
                     ? "正在创建订单…"
@@ -772,6 +775,14 @@ export const QuoteWorkflowPage = ({
                 : "确认保存并预览"}
         </button>
       </section>
+      {savedQuote && orderCompositionOpen ? (
+        <OrderCompositionDialog
+          busy={orderBusy}
+          lines={savedQuote.calculation.chargeLines}
+          onClose={() => setOrderCompositionOpen(false)}
+          onConfirm={() => void convertToOrder()}
+        />
+      ) : null}
     </PageLayout>
   );
 };

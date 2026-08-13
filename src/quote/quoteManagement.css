@@ -40,6 +40,17 @@
 .quote-preview-dialog .quote-management__print-document { min-height: 297mm; border-radius: 0; box-shadow: 0 1rem 3rem rgb(0 0 0 / .28); }
 .quote-preview-dialog .quote-management__print-header { display: flex; align-items: center; gap: var(--hfttr-space-4); padding-bottom: var(--hfttr-space-4); border-bottom: 2px solid #174a7e; }
 .quote-preview-dialog .quote-management__print-header img { width: 4rem; height: 4rem; object-fit: contain; }
+.quote-order-confirm-backdrop { position: fixed; z-index: 90; inset: 0; display: grid; place-items: center; padding: var(--hfttr-space-4); background: rgb(15 35 55 / .72); }
+.quote-order-confirm { width: min(34rem, 100%); max-height: 90dvh; overflow: auto; padding: var(--hfttr-space-5); border-radius: var(--app-radius-surface); background: white; box-shadow: 0 1rem 3rem rgb(0 0 0 / .3); }
+.quote-order-confirm header, .quote-order-confirm footer { display: flex; align-items: center; justify-content: space-between; gap: var(--hfttr-space-3); }
+.quote-order-confirm header h2, .quote-order-confirm header span, .quote-order-confirm > p { margin: 0; }
+.quote-order-confirm > p { margin-block: var(--hfttr-space-4); color: var(--app-color-text-muted); line-height: 1.6; }
+.quote-order-confirm ul { display: grid; gap: var(--hfttr-space-2); margin: 0 0 var(--hfttr-space-5); padding: 0; list-style: none; }
+.quote-order-confirm li { display: grid; grid-template-columns: 5rem 1fr; gap: var(--hfttr-space-3); padding: var(--hfttr-space-3); border: 1px solid var(--app-color-border); border-radius: var(--app-radius-control); }
+.quote-order-confirm li span { color: var(--app-color-text-muted); font-size: var(--hfttr-font-size-sm); font-weight: 700; }
+.quote-order-confirm li[data-kind="package"] { border-left: 4px solid var(--app-color-primary); background: var(--app-color-surface-subtle); }
+.quote-order-confirm button { min-height: var(--app-control-min-size); padding-inline: var(--hfttr-space-4); border: 1px solid var(--app-color-border); border-radius: var(--app-radius-control); background: white; font: inherit; font-weight: 700; }
+.quote-order-confirm button.is-primary { border-color: var(--app-color-primary); background: var(--app-color-primary); color: white; }
 @media (min-width: 64rem) { .quote-management__filters { grid-template-columns: minmax(0, 2fr) minmax(10rem, 1fr) minmax(9rem, 1fr) minmax(9rem, 1fr) auto; align-items: end; } }
 @media print {
   @page { size: A4; margin: 12mm; }

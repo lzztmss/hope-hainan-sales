@@ -1,6 +1,8 @@
 import { useState } from "react";
 
 import { isNonReturnablePackageSku } from "../../shared/pricing/returnPolicy";
+import { ACTIVE_CATALOG } from "../../shared/pricing/catalog";
+import type { ComponentId } from "../../shared/pricing/types";
 
 import { formatOrderMoney, formatOrderPrice } from "./formatters";
 import {
@@ -299,6 +301,23 @@ export const OrderDetailPage = ({
     ) &&
     Boolean(onOpenReturn);
   const transitions = onTransition ? availableTransitions(order, viewer) : [];
+  const packageComponentQuantities = order.lines
+    .filter((line) => line.lineType === "charge" && isNonReturnablePackageSku(line.sku))
+    .reduce((quantities, line) => {
+      const definition = ACTIVE_CATALOG.charges[line.sku as keyof typeof ACTIVE_CATALOG.charges];
+      if (!definition) return quantities;
+      for (const [componentId, quantity] of Object.entries(definition.components)) {
+        quantities[componentId as ComponentId] =
+          (quantities[componentId as ComponentId] ?? 0) + (quantity ?? 0) * line.quantity;
+      }
+      return quantities;
+    }, {} as Partial<Record<ComponentId, number>>);
+  const visibleLines = order.lines.flatMap((line) => {
+    if (line.lineType === "charge") return [line];
+    const packageQuantity = packageComponentQuantities[line.sku as ComponentId] ?? 0;
+    if (packageQuantity <= 0) return [];
+    return [{ ...line, quantity: Math.min(line.quantity, packageQuantity) }];
+  });
 
   const runAuditedAction = async (): Promise<void> => {
     if (!action) return;
@@ -383,8 +402,8 @@ export const OrderDetailPage = ({
       <section className="order-detail-section" aria-labelledby="order-lines-title">
         <h3 id="order-lines-title">商品与安装明细</h3>
         <div className="order-detail-lines">
-          {order.lines.length === 0 ? <p>暂无商品明细</p> : null}
-          {[...order.lines]
+          {visibleLines.length === 0 ? <p>暂无商品明细</p> : null}
+          {[...visibleLines]
             .sort((left, right) => Number(left.lineType === "component") - Number(right.lineType === "component"))
             .map((line) => (
             <article className="order-detail-line" data-line-type={line.lineType} key={line.id}>

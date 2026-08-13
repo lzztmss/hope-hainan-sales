@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import type { ApiClient, OrderMutationDto, QuoteDetailDto } from "../api/client";
 import { PageLayout } from "../components/layout";
 import { QuotePrintDocument } from "./QuotePrintDocument";
+import { OrderCompositionDialog } from "./OrderCompositionDialog";
 import "./quoteManagement.css";
 
 const orderKey = () => `order-create-${crypto.randomUUID()}`;
@@ -13,6 +14,7 @@ export const QuoteDetailPage = ({ client, quoteId }: { client: ApiClient; quoteI
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [orderCompositionOpen, setOrderCompositionOpen] = useState(false);
   const key = useRef<string | undefined>(undefined);
   const navigate = useNavigate();
 
@@ -47,6 +49,7 @@ export const QuoteDetailPage = ({ client, quoteId }: { client: ApiClient; quoteI
       key.current ??= orderKey();
       setOrder(await client.createOrderFromQuote(quote.id, key.current));
       setQuote({ ...quote, status: "converted" });
+      setOrderCompositionOpen(false);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "转订单失败");
     } finally {
@@ -81,7 +84,7 @@ export const QuoteDetailPage = ({ client, quoteId }: { client: ApiClient; quoteI
             <button type="button" onClick={() => setPreviewOpen(true)}>预览报价单</button>
             <button type="button" onClick={() => void print()} disabled={busy}>打印报价</button>
             {quote.status === "confirmed" ? (
-              <button className="is-primary" type="button" onClick={() => void convert()} disabled={busy}>转为订单</button>
+              <button className="is-primary" type="button" onClick={() => setOrderCompositionOpen(true)} disabled={busy}>转为订单</button>
             ) : null}
             {order ? <Link to={`/orders/${order.id}`}>查看订单 {order.orderNo}</Link> : null}
           </>}
@@ -98,6 +101,14 @@ export const QuoteDetailPage = ({ client, quoteId }: { client: ApiClient; quoteI
             }} preview actions={<><button type="button" onClick={() => setPreviewOpen(false)}>关闭预览</button><button className="is-primary" type="button" onClick={() => void print()}>打印报价</button></>} />
           </section>
         </div>
+      ) : null}
+      {quote && orderCompositionOpen ? (
+        <OrderCompositionDialog
+          busy={busy}
+          lines={quote.calculation.chargeLines}
+          onClose={() => setOrderCompositionOpen(false)}
+          onConfirm={() => void convert()}
+        />
       ) : null}
     </PageLayout>
   );
