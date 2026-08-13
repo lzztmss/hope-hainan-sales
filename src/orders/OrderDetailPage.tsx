@@ -30,6 +30,45 @@ export interface OrderDetailPageProps {
   onCompleteReturn?(input: CompleteReturnInput): Promise<void>;
 }
 
+export interface ReturnAvailability {
+  allowed: boolean;
+  reason: string | null;
+}
+
+export const describeReturnAvailability = (order: OrderDetail): ReturnAvailability => {
+  if (order.deletedAt) return { allowed: false, reason: "订单已在回收站，不能申请退单" };
+  if (!order.permissions.canRequestReturn) {
+    return { allowed: false, reason: "当前账号没有申请该订单退单的权限" };
+  }
+  if (order.status === "return_pending") {
+    return { allowed: false, reason: "已有退单正在审批，请先等待审批结果" };
+  }
+  if (order.status === "returned") {
+    return { allowed: false, reason: "该订单已完成整单退单" };
+  }
+  if (order.status === "cancelled") {
+    return { allowed: false, reason: "订单已取消，无需申请退单" };
+  }
+  if (order.status === "voided") {
+    return { allowed: false, reason: "订单已作废，不能申请退单" };
+  }
+  if (order.status === "pending" || order.status === "accepted") {
+    return { allowed: false, reason: "订单尚未生效，请使用“取消订单”" };
+  }
+  const chargeLines = order.lines.filter((line) => line.lineType === "charge");
+  const returnableLines = chargeLines.filter(
+    (line) => !isNonReturnablePackageSku(line.sku) && line.refundableQuantity > 0,
+  );
+  if (returnableLines.length > 0) return { allowed: true, reason: null };
+  if (chargeLines.some((line) => isNonReturnablePackageSku(line.sku))) {
+    return {
+      allowed: false,
+      reason: "该订单仅剩不可退的计价套餐；套餐内设备也不能单独退回",
+    };
+  }
+  return { allowed: false, reason: "该订单已没有剩余可退的独立计价商品" };
+};
+
 interface ReturnApprovalProps {
   record: ReturnRecordView;
   viewer: OrderViewer;
@@ -289,17 +328,8 @@ export const OrderDetailPage = ({
     Boolean(onDelete);
   const restoreAllowed =
     Boolean(order.deletedAt) && order.permissions.canRestore && Boolean(onRestore);
-  const returnAllowed =
-    !order.deletedAt &&
-    order.permissions.canRequestReturn &&
-    ["activated", "completed", "partially_returned"].includes(order.status) &&
-    order.lines.some(
-      (line) =>
-        line.lineType === "charge" &&
-        !isNonReturnablePackageSku(line.sku) &&
-        line.refundableQuantity > 0,
-    ) &&
-    Boolean(onOpenReturn);
+  const returnAvailability = describeReturnAvailability(order);
+  const returnAllowed = returnAvailability.allowed && Boolean(onOpenReturn);
   const transitions = onTransition ? availableTransitions(order, viewer) : [];
   const packageComponentQuantities = order.lines
     .filter((line) => line.lineType === "charge" && isNonReturnablePackageSku(line.sku))
@@ -530,10 +560,21 @@ export const OrderDetailPage = ({
             恢复订单
           </button>
         ) : null}
-        {returnAllowed ? (
-          <button className="order-warning-action" onClick={onOpenReturn} type="button">
-            申请退单
-          </button>
+        {onOpenReturn ? (
+          <div className="order-return-action-state">
+            <button
+              aria-describedby={!returnAllowed ? "order-return-unavailable-reason" : undefined}
+              className="order-warning-action"
+              disabled={!returnAllowed}
+              onClick={returnAllowed ? onOpenReturn : undefined}
+              type="button"
+            >
+              申请退单
+            </button>
+            {!returnAllowed ? (
+              <small id="order-return-unavailable-reason">{returnAvailability.reason}</small>
+            ) : null}
+          </div>
         ) : null}
       </footer>
     </section>

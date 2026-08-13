@@ -685,6 +685,35 @@
   gap: var(--hfttr-space-2);
 }
 
+.order-return-action-state {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--hfttr-space-2);
+  max-width: 100%;
+}
+
+.order-return-action-state small {
+  max-width: 24rem;
+  color: var(--app-color-text-muted);
+  line-height: 1.45;
+  text-align: right;
+}
+
+.order-return-action-state .order-warning-action:disabled {
+  cursor: not-allowed;
+}
+
+@media (max-width: 44rem) {
+  .order-return-action-state {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .order-return-action-state small { text-align: left; }
+}
+
 .return-self-review-note {
   margin: 0;
   padding: var(--hfttr-space-2) var(--hfttr-space-3);
