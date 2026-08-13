@@ -69,6 +69,15 @@ export interface EstimatedCommissionOrder {
   attributions: readonly EstimatedCommissionAttribution[];
 }
 
+export interface MissingCommissionOrder {
+  id: string;
+  orderNo: string;
+  customerNameEncrypted: string | null;
+  customerPhoneTail: string | null;
+  customerSnapshot: Record<string, unknown>;
+  activatedAt: Date;
+}
+
 export interface CommissionDashboardRepositoryFilters {
   storeId?: string;
   beneficiaryId?: string;
@@ -84,6 +93,10 @@ export interface CommissionDashboardRepository {
     scope: UserScope,
     filters: CommissionDashboardRepositoryFilters,
   ): Promise<readonly EstimatedCommissionOrder[]>;
+  listMissingAccrualOrders(
+    scope: UserScope,
+    filters: CommissionDashboardRepositoryFilters,
+  ): Promise<readonly MissingCommissionOrder[]>;
   findEffectivePolicy(at: Date): Promise<CommissionPolicyForAccrual | null>;
 }
 
@@ -130,7 +143,7 @@ export interface CommissionDashboardOrder {
   orderNo: string;
   customerMasked: string;
   activatedAt: string;
-  status: "estimated" | "accrued" | "settled" | "paid" | "reversed";
+  status: "estimated" | "accrued" | "settled" | "paid" | "reversed" | "exception";
   statusLabel: string;
   amountFen: number;
   lines: CommissionDashboardOrderLine[];
@@ -609,6 +622,28 @@ const presentEstimatedOrders = (
   return { orders: presented, totalFen, unconfiguredOrders };
 };
 
+const presentMissingAccrualOrders = (
+  orders: readonly MissingCommissionOrder[],
+  decryptPii?: (encrypted: string) => string,
+): PresentedOrder[] =>
+  orders.map((order) => ({
+    orderId: order.id,
+    orderNo: order.orderNo,
+    customerMasked: maskCustomer(
+      order.customerNameEncrypted,
+      order.customerPhoneTail,
+      order.customerSnapshot,
+      decryptPii,
+    ),
+    activatedAt: formatShanghaiDateTime(order.activatedAt),
+    status: "exception",
+    statusLabel: "提成异常 · 激活时无有效规则 · 待管理员处理",
+    amountFen: 0,
+    lines: [],
+    ledgerEntries: [],
+    sortAt: order.activatedAt,
+  }));
+
 const summarizeLedger = (
   rows: readonly DashboardLedgerRecord[],
   period: Period,
@@ -724,9 +759,10 @@ export const createCommissionDashboardService = (
     const normalized = normalizeFilters(user, filters);
     const repositoryFilters = { ...normalized.repository, orderId };
     const at = now();
-    const [ledgerRows, estimatedOrders, policy] = await Promise.all([
+    const [ledgerRows, estimatedOrders, missingAccrualOrders, policy] = await Promise.all([
       options.repository.listLedger(normalized.scope, repositoryFilters),
       options.repository.listEstimatedOrders(normalized.scope, repositoryFilters),
+      options.repository.listMissingAccrualOrders(normalized.scope, repositoryFilters),
       options.repository.findEffectivePolicy(at),
     ]);
     const scopedLedger = orderId
@@ -736,6 +772,10 @@ export const createCommissionDashboardService = (
       ? estimatedOrders.filter((order) => order.id === orderId)
       : [...estimatedOrders];
     const ledgerOrders = presentLedgerOrders(scopedLedger, options.decryptPii);
+    const exceptionalOrders = presentMissingAccrualOrders(
+      missingAccrualOrders,
+      options.decryptPii,
+    );
     const estimated = presentEstimatedOrders(
       scopedEstimated,
       policy?.rules ?? [],
@@ -750,7 +790,7 @@ export const createCommissionDashboardService = (
     return {
       normalized,
       ledgerRows: scopedLedger,
-      orders: [...estimated.orders, ...ledgerOrders],
+      orders: [...estimated.orders, ...ledgerOrders, ...exceptionalOrders],
       estimatedFen: estimated.totalFen,
       unconfiguredOrders: estimated.unconfiguredOrders + snapshotUnconfigured,
     };

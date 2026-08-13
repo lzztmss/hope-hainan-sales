@@ -7,6 +7,7 @@ import {
   inArray,
   isNull,
   lte,
+  notExists,
   or,
   type SQL,
 } from "drizzle-orm";
@@ -36,6 +37,7 @@ import type {
   DashboardLedgerRecord,
   EstimatedCommissionAttribution,
   EstimatedCommissionOrder,
+  MissingCommissionOrder,
 } from "./dashboardService.js";
 
 type QueryExecutor = AppDatabase;
@@ -340,6 +342,47 @@ export class DrizzleCommissionDashboardRepository
         ],
         attributions: attributionsByOrder.get(row.id) ?? [],
       };
+    });
+  }
+
+  async listMissingAccrualOrders(
+    scope: UserScope,
+    filters: CommissionDashboardRepositoryFilters,
+  ): Promise<readonly MissingCommissionOrder[]> {
+    const conditions: SQL[] = [
+      inArray(orders.status, ["activated", "completed", "return_pending", "returned"]),
+      isNull(orders.deletedAt),
+      notExists(
+        this.executor
+          .select({ id: orderCommissionSnapshots.id })
+          .from(orderCommissionSnapshots)
+          .where(eq(orderCommissionSnapshots.orderId, orders.id)),
+      ),
+      ...estimatedOrderScopeConditions(this.executor, scope),
+    ];
+    if (filters.storeId) conditions.push(eq(orders.storeId, filters.storeId));
+    if (filters.beneficiaryId) {
+      conditions.push(orderHasBeneficiary(this.executor, filters.beneficiaryId));
+    }
+    if (filters.orderId) conditions.push(eq(orders.id, filters.orderId));
+
+    const rows = await this.executor
+      .select({
+        id: orders.id,
+        orderNo: orders.orderNo,
+        customerNameEncrypted: customers.nameEncrypted,
+        customerPhoneTail: customers.phoneTail,
+        customerSnapshot: orders.customerSnapshot,
+        activatedAt: orders.activatedAt,
+      })
+      .from(orders)
+      .innerJoin(customers, eq(customers.id, orders.customerId))
+      .where(and(...conditions))
+      .orderBy(desc(orders.activatedAt), desc(orders.id));
+
+    return rows.map((row) => {
+      if (!row.activatedAt) throw new Error("提成异常订单缺少激活时间");
+      return { ...row, activatedAt: row.activatedAt };
     });
   }
 

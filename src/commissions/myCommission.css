@@ -129,6 +129,10 @@
   border-left-color: #c24136;
 }
 
+.commission-order-card.is-exception {
+  border-left-color: #d97706;
+}
+
 .commission-order-card > header {
   align-items: flex-start;
   display: flex;
@@ -161,6 +165,17 @@
 
 .commission-order-card.is-reversed .commission-order-card__amount strong {
   color: #b42318;
+}
+
+.commission-order-card.is-exception .commission-order-card__amount span,
+.commission-order-card.is-exception .commission-order-card__amount strong {
+  color: #9a5b08;
+}
+
+.commission-order-card__exception {
+  color: #714c0c;
+  margin: 0;
+  padding: 12px 0;
 }
 
 .commission-order-card__lines {

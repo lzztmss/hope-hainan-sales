@@ -25,7 +25,7 @@ export interface MyCommissionOrder {
   orderNo: string;
   customerMasked: string;
   activatedAt: string;
-  status: "estimated" | "accrued" | "settled" | "paid" | "reversed";
+  status: "estimated" | "accrued" | "settled" | "paid" | "reversed" | "exception";
   statusLabel: string;
   amountFen: number;
   lines: MyCommissionOrderLine[];
@@ -127,7 +127,11 @@ export const MyCommissionPage = ({ dashboard }: MyCommissionPageProps) => (
               </div>
             </header>
             <div className="commission-order-card__lines">
-              {order.lines.map((line) => (
+              {order.status === "exception" ? (
+                <p className="commission-order-card__exception">
+                  该订单未生成提成快照，当前不计入提成金额，请联系管理员核对激活时的规则版本。
+                </p>
+              ) : order.lines.map((line) => (
                 <div key={`${order.orderId}-${line.sku}`}>
                   <span>
                     {line.label} ×{line.quantity}
