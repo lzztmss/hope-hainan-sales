@@ -15,6 +15,7 @@ import type {
   OrderViewer,
   ReturnRecordView,
 } from "./types";
+import { createClientKey } from "../utils/clientKey";
 
 export type OrderApiClient = Pick<
   ApiClient,
@@ -30,12 +31,7 @@ export type OrderApiClient = Pick<
   | "transitionOrder"
 >;
 
-const operationKey = (): string => {
-  if (typeof crypto.randomUUID === "function") {
-    return `order-operation-${crypto.randomUUID()}`;
-  }
-  return `order-operation-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
-};
+const operationKey = (): string => createClientKey("order-operation");
 
 const formatDateTime = (value: string): string => {
   const date = new Date(value);

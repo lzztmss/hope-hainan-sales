@@ -3,11 +3,12 @@ import { Link, useNavigate } from "react-router-dom";
 
 import type { ApiClient, OrderMutationDto, QuoteDetailDto } from "../api/client";
 import { PageLayout } from "../components/layout";
+import { createClientKey } from "../utils/clientKey";
 import { QuotePrintDocument } from "./QuotePrintDocument";
 import { OrderCompositionDialog } from "./OrderCompositionDialog";
 import "./quoteManagement.css";
 
-const orderKey = () => `order-create-${crypto.randomUUID()}`;
+const orderKey = () => createClientKey("order-create");
 export const QuoteDetailPage = ({ client, quoteId }: { client: ApiClient; quoteId: string }) => {
   const [quote, setQuote] = useState<QuoteDetailDto | null>(null);
   const [order, setOrder] = useState<OrderMutationDto | null>(null);

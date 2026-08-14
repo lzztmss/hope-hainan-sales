@@ -22,6 +22,7 @@ import type {
   QuoteDetailDto,
 } from "../api/client";
 import { PageLayout } from "../components/layout";
+import { createClientKey } from "../utils/clientKey";
 import { QuotePrintDocument } from "./QuotePrintDocument";
 import { OrderCompositionDialog } from "./OrderCompositionDialog";
 import "./quoteWorkflow.css";
@@ -70,13 +71,10 @@ const PACKAGE_DETAIL_SKUS = new Set<ChargeSku>([
   "HOME_DUAL",
 ]);
 
-const newIdempotencyKey = (): string => {
-  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
-  return `quote-submit-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-};
+const newIdempotencyKey = (): string => createClientKey("quote-submit");
 
 const newOrderIdempotencyKey = (): string =>
-  `order-create-${newIdempotencyKey()}`;
+  createClientKey("order-create");
 
 const messageFor = (error: unknown): string =>
   error instanceof Error ? error.message : "保存失败，请重试";

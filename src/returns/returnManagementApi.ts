@@ -3,6 +3,7 @@ import {
   type ReturnRecordDto,
 } from "../api/client";
 import type { ReturnStatus } from "../orders/types";
+import { createClientKey } from "../utils/clientKey";
 
 export interface DecideManagedReturnInput {
   returnId: string;
@@ -82,12 +83,7 @@ const readReturns = (payload: unknown): readonly ReturnRecordDto[] => {
   return payload.items;
 };
 
-const defaultKeyFactory = (): string => {
-  if (typeof crypto.randomUUID === "function") {
-    return `return-complete-${crypto.randomUUID()}`;
-  }
-  return `return-complete-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
-};
+const defaultKeyFactory = (): string => createClientKey("return-complete");
 
 export const createReturnManagementApi = ({
   baseUrl = "",
