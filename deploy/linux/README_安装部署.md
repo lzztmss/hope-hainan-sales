@@ -150,6 +150,28 @@ server {
 }
 ```
 
+若服务器根路径已由其他系统占用，可改为子路径部署。部署环境填写：
+
+```dotenv
+APP_ORIGIN=https://quote.example.com
+APP_BASE_PATH=/hope/hn-fttr-v3/
+```
+
+主机 Nginx 使用带结尾斜杠的 `proxy_pass` 去除外层前缀：
+
+```nginx
+location ^~ /hope/hn-fttr-v3/ {
+    proxy_pass http://127.0.0.1:8080/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Request-ID $request_id;
+}
+```
+
+前端资源、React 页面路由和 `/api` 请求都会自动带上 `APP_BASE_PATH`；不要再把站内链接写成会跳回服务器根目录的原生绝对地址。
+
 必须传递 `Host`、`X-Real-IP`、`X-Forwarded-For`、`X-Forwarded-Proto` 和请求 ID。`X-Forwarded-Proto https` 对 Secure Cookie、审计和跳转判断很重要。证书和私钥不属于安装包，必须由公司证书系统或 ACME 单独管理。
 
 防火墙只放行 80/443；不要放行 3001 或默认内部 8080。安装后从公网验证 HTTP 自动跳 HTTPS，浏览器地址栏证书可信，且：

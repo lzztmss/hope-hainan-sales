@@ -18,6 +18,7 @@ import type {
   ReturnStatus,
   ReturnType,
 } from "../orders/types";
+import { APP_BASE_PATH } from "../appBasePath";
 
 export type ApiUserRole = "sales" | "store_manager" | "admin";
 
@@ -856,4 +857,4 @@ export const createApiClient = ({
   };
 };
 
-export const apiClient = createApiClient();
+export const apiClient = createApiClient({ baseUrl: APP_BASE_PATH });

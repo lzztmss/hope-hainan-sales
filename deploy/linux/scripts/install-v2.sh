@@ -72,6 +72,7 @@ generate_environment() {
   cat > "${ENV_FILE}" <<EOF
 APP_VERSION=${version}
 APP_ORIGIN=${APP_ORIGIN_INPUT}
+APP_BASE_PATH=/
 BIND_ADDRESS=127.0.0.1
 HTTP_PORT=8080
 SQLITE_VOLUME_NAME=hainan_fttr_heartlink_sqlite_data

@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import { flushSync } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { ACTIVE_CATALOG } from "../../shared/pricing/catalog";
 import { calculateQuote } from "../../shared/pricing/quoteEngine";
@@ -783,7 +783,7 @@ export const QuoteWorkflowPage = ({
             {createdOrder ? (
               <p role="status">
                 订单 {createdOrder.orderNo} 已创建。
-                <a href="/orders">去订单管理</a>
+                <Link to="/orders">去订单管理</Link>
               </p>
             ) : (
               <>

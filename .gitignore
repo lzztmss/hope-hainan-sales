@@ -4,6 +4,7 @@ dist-server/
 coverage/
 playwright-report/
 test-results/
+outputs/
 
 .env
 .env.*

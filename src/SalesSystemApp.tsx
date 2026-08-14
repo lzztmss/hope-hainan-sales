@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BrowserRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { type ApiClient, type ApiUserRole, apiClient } from "./api/client";
+import { APP_BASE_PATH } from "./appBasePath";
 import { CommissionRulesRoute } from "./admin/CommissionRulesRoute";
 import { UserStoreManagementRoute } from "./admin/UserStoreManagementRoute";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
@@ -324,7 +325,7 @@ export const SalesSystemRoutes = ({ client }: SalesSystemRoutesProps) => (
 
 export const SalesSystemApp = ({ client = apiClient }: SalesSystemAppProps) => (
   <AuthProvider client={client}>
-    <BrowserRouter>
+    <BrowserRouter basename={APP_BASE_PATH || undefined}>
       <SalesSystemRoutes client={client} />
     </BrowserRouter>
   </AuthProvider>

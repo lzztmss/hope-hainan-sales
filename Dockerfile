@@ -12,6 +12,8 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm fetch --frozen-lockfile
 
 FROM node-base AS build
+ARG APP_BASE_PATH=/
+ENV VITE_BASE_PATH=${APP_BASE_PATH}
 COPY . .
 RUN pnpm install --offline --frozen-lockfile
 RUN pnpm build
