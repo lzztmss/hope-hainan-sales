@@ -131,7 +131,7 @@ const PackageContentsHint = ({ definition }: { definition: CatalogCharge }) => {
         aria-label={`查看${definition.label}包含的设备`}
         type="button"
       >
-        包含设备
+        <span aria-hidden="true">i</span>
       </button>
       <div id={tooltipId} role="tooltip">
         <strong>{definition.label}包含</strong>

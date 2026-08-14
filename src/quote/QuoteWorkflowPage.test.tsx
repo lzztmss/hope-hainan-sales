@@ -31,11 +31,11 @@ describe("新建报价套餐说明与场景切换", () => {
     const standardBundle = screen.getByRole("article", {
       name: "标准居家养老套装",
     });
-    expect(
-      within(standardBundle).getByRole("button", {
-        name: "查看标准居家养老套装包含的设备",
-      }),
-    ).toBeInTheDocument();
+    const packageHintButton = within(standardBundle).getByRole("button", {
+      name: "查看标准居家养老套装包含的设备",
+    });
+    expect(packageHintButton).toBeInTheDocument();
+    expect(packageHintButton).toHaveTextContent(/^i$/);
     expect(within(standardBundle).getByRole("tooltip", { hidden: true })).toHaveTextContent(
       "迷你网关 × 1 个",
     );
