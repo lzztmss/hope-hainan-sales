@@ -213,6 +213,7 @@
 }
 
 .quote-workflow__catalog-grid article {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 5.5rem;
   gap: var(--hfttr-space-2) var(--hfttr-space-3);
@@ -221,6 +222,69 @@
   border: var(--app-border-width) solid var(--app-color-border);
   border-radius: var(--app-radius-control);
   background: var(--app-color-canvas);
+}
+
+.quote-workflow__catalog-grid article[data-has-package-details="true"] > div:nth-of-type(2) {
+  padding-inline-end: 6.5rem;
+}
+
+.quote-workflow__package-hint {
+  position: absolute;
+  z-index: 3;
+  inset-block-start: var(--hfttr-space-3);
+  inset-inline-end: var(--hfttr-space-3);
+}
+
+.quote-workflow__package-hint > button {
+  min-height: 2rem;
+  padding: 0.25rem 0.65rem;
+  border: var(--app-border-width) solid var(--app-color-primary);
+  border-radius: 999px;
+  background: var(--app-color-surface-subtle);
+  color: var(--app-color-primary-strong);
+  font-size: var(--hfttr-font-size-sm);
+  font-weight: var(--app-font-weight-bold);
+  cursor: help;
+}
+
+.quote-workflow__package-hint [role="tooltip"] {
+  position: absolute;
+  z-index: 4;
+  inset-block-start: calc(100% + var(--hfttr-space-2));
+  inset-inline-end: 0;
+  width: max-content;
+  max-width: min(22rem, 72vw);
+  padding: var(--hfttr-space-3);
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-control);
+  background: var(--app-color-primary-strong);
+  color: #fff;
+  box-shadow: var(--app-shadow-floating);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-0.25rem);
+  transition: opacity 120ms ease, transform 120ms ease, visibility 120ms ease;
+}
+
+.quote-workflow__package-hint:hover [role="tooltip"],
+.quote-workflow__package-hint:focus-within [role="tooltip"] {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.quote-workflow__package-hint [role="tooltip"] strong {
+  display: block;
+  margin-block-end: var(--hfttr-space-2);
+}
+
+.quote-workflow__package-hint [role="tooltip"] ul {
+  display: grid;
+  gap: var(--hfttr-space-1);
+  padding: 0;
+  margin: 0;
+  list-style: none;
 }
 
 .quote-workflow__catalog-grid h4,

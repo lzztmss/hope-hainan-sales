@@ -64,6 +64,12 @@ const PRODUCT_CONTROLS: readonly {
   { key: "wallButton", sku: "WALL_BUTTON" },
 ];
 
+const PACKAGE_DETAIL_SKUS = new Set<ChargeSku>([
+  "STANDARD_BUNDLE",
+  "ONE_KEY",
+  "HOME_DUAL",
+]);
+
 const newIdempotencyKey = (): string => {
   if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
   return `quote-submit-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -105,6 +111,40 @@ const CatalogPrice = ({
             ? "一次性收取，不计入心连心月增费"
             : "按所选数量逐项计价"}
       </small>
+    </div>
+  );
+};
+
+const PackageContentsHint = ({ definition }: { definition: CatalogCharge }) => {
+  if (!PACKAGE_DETAIL_SKUS.has(definition.sku)) return null;
+  const tooltipId = `package-contents-${definition.sku.toLowerCase()}`;
+  const contents = Object.entries(definition.components).flatMap(
+    ([componentId, quantity]) => {
+      if (!quantity) return [];
+      const component = ACTIVE_CATALOG.components[componentId as keyof typeof ACTIVE_CATALOG.components];
+      return [{ component, quantity }];
+    },
+  );
+
+  return (
+    <div className="quote-workflow__package-hint">
+      <button
+        aria-describedby={tooltipId}
+        aria-label={`查看${definition.label}包含的设备`}
+        type="button"
+      >
+        包含设备
+      </button>
+      <div id={tooltipId} role="tooltip">
+        <strong>{definition.label}包含</strong>
+        <ul>
+          {contents.map(({ component, quantity }) => (
+            <li key={component.componentId}>
+              {component.label} × {quantity} {component.unit}
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 };
@@ -220,18 +260,17 @@ const maskPhone = (value: string): string => {
 const quantityOf = (selection: QuoteSelection, key: QuantityKey): number =>
   selection[key] ?? 0;
 
-const initialSelection = (): QuoteSelection => ({ watch: 1 });
+const initialSelection = (): QuoteSelection => ({});
 
 const scenarioSelection = (
   scenario: Scenario,
   roomType: RoomType,
   elderCount: 1 | 2 | 3 | 4,
-  current: QuoteSelection,
 ): QuoteSelection => {
   if (scenario === "one_key") return { oneKey: 1 };
   if (scenario === "home_dual") return { homeDual: 1 };
   if (scenario === "room") return buildRoomPreset(roomType, elderCount);
-  return current;
+  return {};
 };
 
 const buildPricing = (
@@ -325,10 +364,14 @@ export const QuoteWorkflowPage = ({
 
   const chooseScenario = (nextScenario: Scenario) => {
     setScenario(nextScenario);
-    setSelectionNotice(nextScenario === "room" ? "已按当前户型和长者人数重新生成推荐配置。" : null);
-    setSelection((current) =>
-      scenarioSelection(nextScenario, roomType, elderCount, current),
+    setSelectionNotice(
+      nextScenario === "room"
+        ? "已按当前户型和长者人数重新生成推荐配置。"
+        : nextScenario === "custom"
+          ? "已切换为自选产品并清空原商品数量。"
+          : null,
     );
+    setSelection(scenarioSelection(nextScenario, roomType, elderCount));
   };
 
   const changeRoom = (nextRoom: RoomType) => {
@@ -602,6 +645,11 @@ export const QuoteWorkflowPage = ({
                 checked={scenario === value}
                 disabled={locked}
                 onChange={() => chooseScenario(value)}
+                onClick={() => {
+                  if (value === "custom" && scenario === "custom") {
+                    chooseScenario("custom");
+                  }
+                }}
               />
               {label}
             </label>
@@ -626,8 +674,14 @@ export const QuoteWorkflowPage = ({
           <div className="quote-workflow__catalog-grid">
             {PRODUCT_CONTROLS.map(({ key, sku }) => {
               const definition = ACTIVE_CATALOG.charges[sku];
+              const hasPackageDetails = PACKAGE_DETAIL_SKUS.has(sku);
               return (
-                <article aria-label={definition.label} key={key}>
+                <article
+                  aria-label={definition.label}
+                  data-has-package-details={hasPackageDetails}
+                  key={key}
+                >
+                  <PackageContentsHint definition={definition} />
                   <div>
                     <h4>{definition.label}</h4>
                     <CatalogPrice definition={definition} mode={mode} />
