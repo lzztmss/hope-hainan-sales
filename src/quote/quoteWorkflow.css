@@ -225,30 +225,30 @@
 }
 
 .quote-workflow__catalog-grid article[data-has-package-details="true"] > div:nth-of-type(2) {
-  padding-inline-end: 3rem;
+  padding-inline-end: 2.25rem;
 }
 
 .quote-workflow__package-hint {
   position: absolute;
   z-index: 3;
-  inset-block-start: var(--hfttr-space-3);
-  inset-inline-end: var(--hfttr-space-3);
+  inset-block-start: var(--hfttr-space-2);
+  inset-inline-end: var(--hfttr-space-2);
 }
 
 .quote-workflow__package-hint > button {
   display: grid;
   place-items: center;
   box-sizing: border-box;
-  width: 2.25rem;
-  height: 2.25rem;
-  min-height: 2.25rem;
+  width: 1.65rem;
+  height: 1.65rem;
+  min-height: 1.65rem;
   padding: 0;
   border: var(--app-border-width) solid var(--app-color-primary);
   border-radius: 50%;
   background: var(--app-color-surface-subtle);
   color: var(--app-color-primary-strong);
   font-family: Georgia, serif;
-  font-size: 1rem;
+  font-size: 0.8rem;
   font-weight: var(--app-font-weight-bold);
   font-style: italic;
   line-height: 1;
