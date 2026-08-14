@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { describeReturnAvailability } from "./OrderDetailPage";
-import type { OrderDetail } from "./types";
+import { availableTransitions, describeReturnAvailability } from "./OrderDetailPage";
+import type { OrderDetail, OrderViewer } from "./types";
 
 const order = (overrides: Partial<OrderDetail> = {}): OrderDetail => ({
   id: "order-1",
@@ -59,5 +59,32 @@ describe("订单退单入口说明", () => {
   it("退单审批中时提示等待审批", () => {
     const result = describeReturnAvailability(order({ status: "return_pending" }));
     expect(result.reason).toContain("正在审批");
+  });
+});
+
+describe("订单状态操作按钮", () => {
+  const viewer = (role: OrderViewer["role"]): OrderViewer => ({
+    id: `${role}-1`,
+    displayName: role,
+    role,
+    storeId: "store-1",
+  });
+
+  it("已受理订单只向经理和管理员展示激活", () => {
+    const accepted = order({ status: "accepted" });
+    expect(availableTransitions(accepted, viewer("sales")).map((item) => item.command))
+      .not.toContain("ACTIVATE");
+    expect(availableTransitions(accepted, viewer("store_manager")).map((item) => item.command))
+      .toContain("ACTIVATE");
+    expect(availableTransitions(accepted, viewer("admin")).map((item) => item.command))
+      .toContain("ACTIVATE");
+  });
+
+  it("已激活订单只向销售员展示完成", () => {
+    const activated = order({ status: "activated" });
+    expect(availableTransitions(activated, viewer("sales")).map((item) => item.command))
+      .toEqual(["COMPLETE"]);
+    expect(availableTransitions(activated, viewer("store_manager"))).toEqual([]);
+    expect(availableTransitions(activated, viewer("admin"))).toEqual([]);
   });
 });

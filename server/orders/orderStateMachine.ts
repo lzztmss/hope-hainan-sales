@@ -25,6 +25,7 @@ type TransitionKey = `${OrderStatus}->${OrderStatus}`;
 
 const ALL_ROLES: readonly UserRole[] = ["sales", "store_manager", "admin"];
 const MANAGEMENT_ROLES: readonly UserRole[] = ["store_manager", "admin"];
+const SALES_ROLES: readonly UserRole[] = ["sales"];
 
 const TRANSITIONS: Readonly<Partial<Record<TransitionKey, readonly UserRole[]>>> =
   Object.freeze({
@@ -34,7 +35,7 @@ const TRANSITIONS: Readonly<Partial<Record<TransitionKey, readonly UserRole[]>>>
     "accepted->activated": MANAGEMENT_ROLES,
     "accepted->cancelled": ALL_ROLES,
     "accepted->voided": ["admin"],
-    "activated->completed": MANAGEMENT_ROLES,
+    "activated->completed": SALES_ROLES,
     "activated->return_pending": ALL_ROLES,
     "completed->return_pending": ALL_ROLES,
     "partially_returned->return_pending": ALL_ROLES,

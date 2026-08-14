@@ -261,7 +261,7 @@ const ReturnCompletion = ({
   );
 };
 
-const availableTransitions = (
+export const availableTransitions = (
   order: OrderDetail,
   viewer: OrderViewer,
 ): Array<{ command: OrderTransitionCommand; label: string; tone: string }> => {
@@ -291,7 +291,7 @@ const availableTransitions = (
   }
   if (
     order.status === "activated" &&
-    (viewer.role === "store_manager" || viewer.role === "admin")
+    viewer.role === "sales"
   ) {
     return [
       { command: "COMPLETE", label: "完成订单", tone: "order-primary-action" },
