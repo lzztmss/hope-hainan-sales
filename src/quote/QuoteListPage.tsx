@@ -116,7 +116,7 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
       eyebrow="销售报价"
       title={viewer.role === "admin" ? "全部报价" : viewer.role === "store_manager" ? "本厅报价" : "我的报价"}
       description={viewer.role === "admin" ? "查询全部营业厅报价，可按营业厅和销售员筛选。" : viewer.role === "store_manager" ? "仅展示本营业厅报价，可按本厅销售员筛选。" : "查询已保存报价，未转订单的报价可以继续修改、打印或转为订单。"}
-      actions={<Link className="quote-management__primary-link" to="/quotes/new">新建报价</Link>}
+      actions={viewer.role === "sales" ? <Link className="quote-management__primary-link" to="/quotes/new">新建报价</Link> : null}
     >
       <form className="quote-management__filters" onSubmit={submit}>
         <div className="quote-management__filter-row is-primary">
