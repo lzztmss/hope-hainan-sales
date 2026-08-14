@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type {
   ApiClient,
   MyCommissionDashboardResponse,
 } from "../api/client";
 import { PageLayout } from "../components/layout";
+import { usePageAutoRefresh } from "../hooks/usePageAutoRefresh";
 import { MyCommissionPage } from "./MyCommissionPage";
 
 export type MyCommissionRouteClient = Pick<
@@ -40,22 +41,29 @@ export const MyCommissionRoute = ({
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
+  const load = useCallback(async (background = false) => {
+    if (!background) {
+      setDashboard(null);
+      setError(null);
+    }
+    try {
+      const nextDashboard = await client.getMyCommissionDashboard({ month, limit: 50 });
+      setDashboard(nextDashboard);
+      setError(null);
+    } catch (loadError) {
+      if (!background) setError(errorMessage(loadError));
+    }
+  }, [client, month]);
+
   useEffect(() => {
-    let active = true;
-    setDashboard(null);
-    setError(null);
-    void client
-      .getMyCommissionDashboard({ month, limit: 50 })
-      .then((nextDashboard) => {
-        if (active) setDashboard(nextDashboard);
-      })
-      .catch((loadError: unknown) => {
-        if (active) setError(errorMessage(loadError));
-      });
-    return () => {
-      active = false;
-    };
-  }, [attempt, client, month]);
+    void load();
+  }, [attempt, load]);
+
+  usePageAutoRefresh({
+    enabled: Boolean(dashboard),
+    intervalMs: 60_000,
+    onRefresh: () => load(true),
+  });
 
   if (error) {
     return (

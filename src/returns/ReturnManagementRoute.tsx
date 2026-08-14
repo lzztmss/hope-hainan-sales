@@ -6,6 +6,7 @@ import type {
   ReturnRecordDto,
 } from "../api/client";
 import type { ReturnStatus } from "../orders/types";
+import { usePageAutoRefresh } from "../hooks/usePageAutoRefresh";
 import { ReturnManagementPage } from "./ReturnManagementPage";
 import {
   returnManagementApi,
@@ -35,16 +36,21 @@ export const ReturnManagementRoute = ({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadVersion, setReloadVersion] = useState(0);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
+  const load = useCallback(async (background = false) => {
+    if (!background) {
+      setLoading(true);
+      setLoadError(null);
+    }
     try {
       setItems(await api.listReturns({ status: status || undefined, storeId: storeId || undefined, sellerId: sellerId || undefined }));
+      setLoadError(null);
     } catch (error) {
-      setItems([]);
-      setLoadError(errorMessage(error));
+      if (!background) {
+        setItems([]);
+        setLoadError(errorMessage(error));
+      }
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   }, [api, sellerId, status, storeId]);
 
@@ -55,6 +61,12 @@ export const ReturnManagementRoute = ({
   useEffect(() => {
     void load();
   }, [load, reloadVersion]);
+
+  usePageAutoRefresh({
+    enabled: !loading,
+    intervalMs: 15_000,
+    onRefresh: () => load(true),
+  });
 
   const replaceRecord = (next: ReturnRecordDto) => {
     setItems((current) =>

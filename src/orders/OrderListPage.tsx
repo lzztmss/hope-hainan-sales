@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 import { formatOrderMoney, formatOrderPrice } from "./formatters";
+import { usePageAutoRefresh } from "../hooks/usePageAutoRefresh";
 import { OrderDetailPage } from "./OrderDetailPage";
 import { ReturnDialog } from "./ReturnDialog";
 import {
@@ -95,23 +96,34 @@ export const OrderListPage = ({
   const [returnOpen, setReturnOpen] = useState(false);
   const openedInitialOrderId = useRef<string | null>(null);
 
-  const loadOrders = useCallback(async (): Promise<void> => {
-    setLoading(true);
-    setListError(null);
+  const loadOrders = useCallback(async (background = false): Promise<void> => {
+    if (!background) {
+      setLoading(true);
+      setListError(null);
+    }
     try {
       const result = await adapter.listOrders(appliedFilters);
       setItems(scopeOrders(result.items, viewer));
+      setListError(null);
     } catch (error) {
-      setItems([]);
-      setListError(error instanceof Error ? error.message : "订单加载失败，请重试");
+      if (!background) {
+        setItems([]);
+        setListError(error instanceof Error ? error.message : "订单加载失败，请重试");
+      }
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   }, [adapter, appliedFilters, viewer]);
 
   useEffect(() => {
     void loadOrders();
   }, [loadOrders]);
+
+  usePageAutoRefresh({
+    enabled: !loading,
+    intervalMs: 15_000,
+    onRefresh: () => loadOrders(true),
+  });
 
   const openDetail = async (orderId: string): Promise<void> => {
     setDetailLoading(true);

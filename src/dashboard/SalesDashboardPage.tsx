@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { SalesReportFilters, SalesReportResponse } from "../../shared/reports/types";
 import { PageLayout } from "../components/layout";
+import { usePageAutoRefresh } from "../hooks/usePageAutoRefresh";
 import { ReportFilters } from "../reports/ReportFilters";
 import { ReportSummary } from "../reports/ReportSummary";
 import { reportsApi } from "../reports/reportApi";
@@ -22,23 +23,40 @@ export const SalesDashboardPage = ({
   const [report, setReport] = useState(initialReport);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const defaults = defaultShanghaiReportFilters();
-  const initialFilters: SalesReportFilters = {
+  const defaults = useMemo(() => defaultShanghaiReportFilters(), []);
+  const initialFilters: SalesReportFilters = useMemo(() => ({
     from: report?.period.from ?? defaults.from,
     to: report?.period.to ?? defaults.to,
     groupBy: "none",
-  };
-  const load = async (filters: SalesReportFilters) => {
-    setBusy(true);
-    setError(null);
+  }), [defaults.from, defaults.to, report?.period.from, report?.period.to]);
+  const appliedFilters = useRef(initialFilters);
+  const initialLoadStarted = useRef(false);
+  const load = useCallback(async (filters: SalesReportFilters, background = false) => {
+    if (!background) {
+      setBusy(true);
+      setError(null);
+    }
     try {
       setReport(await onLoad({ ...filters, groupBy: "none" }));
+      setError(null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "销售报表加载失败");
+      if (!background) setError(reason instanceof Error ? reason.message : "销售报表加载失败");
     } finally {
-      setBusy(false);
+      if (!background) setBusy(false);
     }
-  };
+  }, [onLoad]);
+
+  useEffect(() => {
+    if (initialReport || initialLoadStarted.current) return;
+    initialLoadStarted.current = true;
+    void load(appliedFilters.current);
+  }, [initialReport, load]);
+
+  usePageAutoRefresh({
+    enabled: Boolean(report) && !busy,
+    intervalMs: 60_000,
+    onRefresh: () => load(appliedFilters.current, true),
+  });
 
   return (
     <PageLayout
@@ -49,7 +67,10 @@ export const SalesDashboardPage = ({
       <ReportFilters
         busy={busy}
         initialValue={initialFilters}
-        onApply={(filters) => void load(filters)}
+        onApply={(filters) => {
+          appliedFilters.current = filters;
+          void load(filters);
+        }}
         onExport={(filters) => void onExport({ ...filters, groupBy: "none" })}
       />
       {error ? <div className="report-error" role="alert">{error}</div> : null}

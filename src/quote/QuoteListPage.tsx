@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import type { ApiClient, AuthenticatedUser, OrderFilterOptionsApiResponse, QuoteDetailDto, QuoteStatus } from "../api/client";
 import { PageLayout } from "../components/layout";
+import { usePageAutoRefresh } from "../hooks/usePageAutoRefresh";
 import "./quoteManagement.css";
 
 const STATUS_LABELS: Record<QuoteStatus, string> = {
@@ -15,6 +16,15 @@ const STATUS_LABELS: Record<QuoteStatus, string> = {
 
 const money = (fen: number) =>
   `¥${(fen / 100).toLocaleString("zh-CN", { minimumFractionDigits: 2 })}`;
+
+interface AppliedQuoteFilters {
+  dateFrom: string;
+  dateTo: string;
+  query: string;
+  sellerId: string;
+  status: QuoteStatus | "";
+  storeId: string;
+}
 
 export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: AuthenticatedUser }) => {
   const [searchParams] = useSearchParams();
@@ -29,36 +39,57 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
   const [options, setOptions] = useState<OrderFilterOptionsApiResponse>({ stores: [], sellers: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const appliedFilters = useRef<AppliedQuoteFilters>({
+    dateFrom: "",
+    dateTo: "",
+    query: initialQuery,
+    sellerId: "",
+    status: "",
+    storeId: "",
+  });
 
-  const load = useCallback(async (nextQuery: string, nextStatus: QuoteStatus | "", nextFrom = "", nextTo = "", nextStoreId = "", nextSellerId = "") => {
-    setLoading(true);
-    setError(null);
+  const load = useCallback(async (filters: AppliedQuoteFilters, background = false) => {
+    if (!background) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const result = await client.listQuotes({
-        query: nextQuery.trim() || undefined,
-        status: nextStatus || undefined,
-        storeId: nextStoreId || undefined,
-        sellerId: nextSellerId || undefined,
-        dateFrom: nextFrom || undefined,
-        dateTo: nextTo || undefined,
+        query: filters.query.trim() || undefined,
+        status: filters.status || undefined,
+        storeId: filters.storeId || undefined,
+        sellerId: filters.sellerId || undefined,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
       });
       setItems(result.items);
+      setError(null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "报价读取失败");
+      if (!background) setError(reason instanceof Error ? reason.message : "报价读取失败");
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   }, [client]);
 
-  useEffect(() => { void load(initialQuery, ""); }, [initialQuery, load]);
+  useEffect(() => {
+    appliedFilters.current = { ...appliedFilters.current, query: initialQuery };
+    void load(appliedFilters.current);
+  }, [initialQuery, load]);
   useEffect(() => {
     if (viewer.role === "sales") return;
     void client.listOrderFilterOptions().then(setOptions).catch(() => setOptions({ stores: [], sellers: [] }));
   }, [client, viewer.role]);
 
+  usePageAutoRefresh({
+    enabled: !loading,
+    intervalMs: 15_000,
+    onRefresh: () => load(appliedFilters.current, true),
+  });
+
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    void load(query, status, dateFrom, dateTo, storeId, sellerId);
+    appliedFilters.current = { dateFrom, dateTo, query, sellerId, status, storeId };
+    void load(appliedFilters.current);
   };
 
   return (

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { SalesReportFilters, SalesReportResponse } from "../../shared/reports/types";
 import { PageLayout } from "../components/layout";
+import { usePageAutoRefresh } from "../hooks/usePageAutoRefresh";
 import { ReportFilters } from "./ReportFilters";
 import { formatReportFen, formatReportRate, ReportSummary } from "./ReportSummary";
 import { reportsApi } from "./reportApi";
@@ -36,20 +37,28 @@ export const TeamReportPage = ({
     to: report?.period.to ?? defaults.to,
     groupBy: report?.rows[0]?.sellerId ? "seller" : "store",
   }), [defaults.from, defaults.to, report?.period.from, report?.period.to, report?.rows]);
-  const load = async (filters: SalesReportFilters) => {
-    setBusy(true);
-    setError(null);
+  const appliedFilters = useRef(initialFilters);
+  const initialLoadStarted = useRef(false);
+  const load = useCallback(async (filters: SalesReportFilters, background = false) => {
+    if (!background) {
+      setBusy(true);
+      setError(null);
+    }
     try {
       setReport(await onLoad(filters));
+      setError(null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "团队报表加载失败");
+      if (!background) setError(reason instanceof Error ? reason.message : "团队报表加载失败");
     } finally {
-      setBusy(false);
+      if (!background) setBusy(false);
     }
-  };
+  }, [onLoad]);
 
   useEffect(() => {
-    if (!initialReport) void load(initialFilters);
+    if (!initialReport && !initialLoadStarted.current) {
+      initialLoadStarted.current = true;
+      void load(appliedFilters.current);
+    }
     if (providedStores || providedSellers) return;
     void fetch("/api/order-filter-options", { credentials: "include" })
       .then(async (response) => {
@@ -58,7 +67,13 @@ export const TeamReportPage = ({
       })
       .then(setOptions)
       .catch(() => setOptions({ stores: [], sellers: [] }));
-  }, []);
+  }, [initialReport, load, providedSellers, providedStores]);
+
+  usePageAutoRefresh({
+    enabled: Boolean(report) && !busy,
+    intervalMs: 60_000,
+    onRefresh: () => load(appliedFilters.current, true),
+  });
 
   return (
     <PageLayout
@@ -70,7 +85,10 @@ export const TeamReportPage = ({
         allowTeamFilters
         busy={busy}
         initialValue={initialFilters}
-        onApply={(filters) => void load(filters)}
+        onApply={(filters) => {
+          appliedFilters.current = filters;
+          void load(filters);
+        }}
         onExport={(filters) => void onExport(filters)}
         sellers={options.sellers}
         stores={options.stores}
