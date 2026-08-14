@@ -132,7 +132,7 @@
   border: var(--app-border-width) solid var(--app-color-border);
   border-radius: var(--app-radius-surface) var(--app-radius-surface) 0 0;
   background: var(--app-color-surface);
-  box-shadow: var(--app-shadow-floating);
+  box-shadow: none;
 }
 
 .order-filter-panel[data-open="true"] {
@@ -188,7 +188,18 @@
 }
 
 .order-filter-fields input:not([type="checkbox"]),
-.order-filter-fields select,
+.order-filter-fields select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: var(--app-control-min-size);
+  min-height: var(--app-control-min-size);
+  padding: 0 var(--hfttr-space-3);
+  background: var(--app-color-surface);
+  color: var(--app-color-text);
+  line-height: 1.2;
+}
+
 .return-reason-field textarea,
 .return-approval textarea,
 .order-audit-action textarea {
@@ -199,11 +210,13 @@
 }
 
 .order-recycle-filter {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: var(--hfttr-space-2);
+  height: var(--app-control-min-size);
   min-height: var(--app-control-min-size);
-  padding: var(--hfttr-space-2) var(--hfttr-space-3);
+  padding: 0 var(--hfttr-space-3);
   border: var(--app-border-width) solid var(--app-color-border);
   border-radius: var(--app-radius-control);
   color: var(--app-color-text);
@@ -221,6 +234,14 @@
 
 .order-filter-panel > footer {
   justify-content: flex-end;
+}
+
+.order-filter-panel > footer button {
+  box-sizing: border-box;
+  min-width: 6rem;
+  height: var(--app-control-min-size);
+  min-height: var(--app-control-min-size);
+  padding-block: 0;
 }
 
 .order-page .order-primary-action,

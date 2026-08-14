@@ -1,8 +1,6 @@
 .customer-list__filters {
   display: grid;
-  grid-template-columns: minmax(18rem, 1fr) auto;
-  gap: 1rem;
-  align-items: end;
+  gap: var(--hfttr-space-4);
   padding: 1.25rem;
   margin-bottom: 1.25rem;
   border: 1px solid #dce5ef;
@@ -10,10 +8,13 @@
   background: #fff;
 }
 
+.customer-list__filter-row { display: grid; gap: var(--hfttr-space-3) var(--hfttr-space-4); min-width: 0; }
 .customer-list__filters label { display: grid; gap: .45rem; }
 .customer-list__filters span { color: #42556b; font-weight: 700; }
-.customer-list__filters input, .customer-list__filters select { min-height: 2.75rem; padding: 0 .85rem; border: 1px solid #cbd8e6; border-radius: .65rem; background: #fff; font: inherit; }
-.customer-list__filters button { min-height: 2.75rem; padding: 0 1.4rem; border: 0; border-radius: .65rem; background: #174c82; color: #fff; font-weight: 700; }
+.customer-list__filters input, .customer-list__filters select, .customer-list__filters button { box-sizing: border-box; width: 100%; min-width: 0; height: var(--app-control-min-size); min-height: var(--app-control-min-size); padding: 0 .85rem; border: 1px solid #cbd8e6; border-radius: .65rem; background: #fff; font: inherit; line-height: 1.2; }
+.customer-list__filters button { border-color: #174c82; background: #174c82; color: #fff; font-weight: 700; }
+.customer-list__filters button.is-secondary { border-color: #cbd8e6; background: #fff; color: #174c82; }
+.customer-list__filter-actions { display: grid; grid-template-columns: repeat(2, minmax(5rem, 1fr)); gap: var(--hfttr-space-3); align-self: end; }
 .customer-list__error { color: #b42318; }
 .customer-list__empty { padding: 2rem; text-align: center; color: #617187; background: #fff; border-radius: 1rem; }
 .customer-list__grid { display: grid; gap: 1rem; }
@@ -28,7 +29,14 @@
 .customer-list__grid dd { margin: 0; color: #24384d; font-weight: 650; }
 .customer-list__grid a { color: #174c82; font-weight: 700; }
 
+@media (min-width: 42rem) {
+  .customer-list__filter-row.is-secondary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 64rem) {
+  .customer-list__filter-row.is-primary { grid-template-columns: minmax(18rem, 32rem) 1fr; }
+  .customer-list__filter-row.is-secondary { grid-template-columns: minmax(12rem, 18rem) minmax(12rem, 18rem) minmax(2rem, 1fr) auto; }
+  .customer-list__filter-actions { grid-column: 4; min-width: 12rem; }
+}
 @media (max-width: 800px) {
-  .customer-list__filters { grid-template-columns: 1fr; }
   .customer-list__grid dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

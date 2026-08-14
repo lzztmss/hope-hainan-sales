@@ -5,8 +5,8 @@
   border-radius: var(--app-radius-surface);
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(3, minmax(150px, 1fr)) auto;
-  padding: 16px;
+  grid-template-columns: repeat(3, minmax(10rem, 1fr));
+  padding: var(--hfttr-space-5);
 }
 
 .report-filters label { display: grid; gap: 6px; }
@@ -14,15 +14,18 @@
 .report-filters input,
 .report-filters select,
 .report-filters button {
+  box-sizing: border-box;
+  height: var(--app-control-min-size);
+  min-height: var(--app-control-min-size);
   border: 1px solid var(--app-color-border);
   border-radius: var(--app-radius-control);
   font: inherit;
-  min-height: 44px;
-  padding: 9px 12px;
+  padding: 0 var(--hfttr-space-3);
+  line-height: 1.2;
 }
 .report-filters input,
-.report-filters select { background: white; color: var(--app-color-text); width: 100%; }
-.report-filters__actions { display: flex; gap: 8px; }
+.report-filters select { box-sizing: border-box; width: 100%; min-width: 0; height: var(--app-control-min-size); min-height: var(--app-control-min-size); padding: 0 var(--hfttr-space-3); background: white; color: var(--app-color-text); line-height: 1.2; }
+.report-filters__actions { display: grid; grid-template-columns: repeat(2, minmax(6rem, 1fr)); gap: var(--hfttr-space-3); align-self: end; }
 .report-filters button { background: var(--app-color-primary); color: white; cursor: pointer; font-weight: 700; }
 .report-filters button + button { background: white; color: var(--app-color-primary); }
 .report-filters button:disabled { cursor: wait; opacity: .6; }
@@ -74,7 +77,6 @@
 @media (max-width: 800px) {
   .report-filters { grid-template-columns: 1fr 1fr; }
   .report-filters__actions { grid-column: 1 / -1; }
-  .report-filters__actions button { flex: 1; }
   .report-commission-panel > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .report-commission-panel article + article { border-left: 0; }
   .team-report-rows { grid-template-columns: 1fr; }
