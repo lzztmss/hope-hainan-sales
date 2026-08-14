@@ -32,7 +32,7 @@ const order = (overrides: Partial<OrderDetail> = {}): OrderDetail => ({
 });
 
 describe("订单退单入口说明", () => {
-  it("仅有不可退套餐时说明原因而不是静默隐藏", () => {
+  it("仅有套餐时仍允许申请整单退单", () => {
     const result = describeReturnAvailability(order({
       lines: [{
         id: "line-package", lineType: "charge", sku: "HOME_DUAL",
@@ -41,8 +41,7 @@ describe("订单退单入口说明", () => {
         oneTimeSubtotalFen: 0, monthlySubtotalFen: 3000, locations: [],
       }],
     }));
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toContain("不可退的计价套餐");
+    expect(result).toEqual({ allowed: true, reason: null });
   });
 
   it("存在剩余独立计价商品时允许申请", () => {

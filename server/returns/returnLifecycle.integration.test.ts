@@ -161,6 +161,45 @@ const createFixture = async (initialStatus: "activated" | "completed") => {
 };
 
 describe("退单状态与提成冲销一致性", () => {
+  it("整单退单可同时退回完整套餐和自购商品", async () => {
+    const { client, order, seller } = await createFixture("completed");
+    await client.db.insert(orderLines).values({
+      orderId: order.id,
+      lineType: "charge",
+      sku: "HOME_DUAL",
+      label: "心连心·居家双护",
+      unit: "套",
+      quantity: 1,
+      oneTimeUnitFen: 89900,
+      oneTimeSubtotalFen: 89900,
+      monthlyUnitFen: 0,
+      monthlySubtotalFen: 0,
+      locations: [],
+    });
+    const service = createReturnService({
+      repository: new DrizzleReturnRepository(client),
+      commissionReversal: {
+        validateReversalForCompletedReturn: async () => undefined,
+        reverseForCompletedReturn: async () => undefined,
+      },
+      numberSuffix: () => "PACKAGE",
+    });
+
+    const requested = await service.requestReturn(
+      seller,
+      order.id,
+      { type: "full", reason: "客户申请整单退回", items: [] },
+      "return-request-package-full-001",
+    );
+
+    expect(requested.items.map((item) => item.sku).sort()).toEqual([
+      "GATEWAY",
+      "HOME_DUAL",
+    ]);
+    expect(requested.maxRefundFen).toBe(129800);
+    await client.close();
+  });
+
   it("管理员可审批自己提交的退单并保留审计", async () => {
     const { client, order, admin } = await createFixture("completed");
     const repository = new DrizzleReturnRepository(client);

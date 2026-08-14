@@ -205,24 +205,12 @@ const buildItems = (
   order: ReturnOrderRecord,
   input: RequestReturnInput,
 ): ReturnItemRecord[] => {
-  if (
-    input.type === "full" &&
-    order.lines.some(
-      (line) =>
-        line.lineType === "charge" &&
-        isNonReturnablePackageSku(line.sku) &&
-        line.quantity - line.returnedQuantity > 0,
-    )
-  ) {
-    throw new Error("订单含不可退套餐，不能整单退单；仅可选择其他可退单品");
-  }
   const selections =
     input.type === "full"
       ? order.lines
           .filter(
             (line) =>
               line.lineType === "charge" &&
-              !isNonReturnablePackageSku(line.sku) &&
               line.quantity - line.returnedQuantity > 0,
           )
           .map((line) => ({
@@ -241,8 +229,8 @@ const buildItems = (
     if (line.lineType !== "charge") {
       throw new Error("套装内部物理设备不能单独退");
     }
-    if (isNonReturnablePackageSku(line.sku)) {
-      throw new Error(`${line.label}属于套餐，当前不支持整套或拆分退单`);
+    if (input.type === "partial" && isNonReturnablePackageSku(line.sku)) {
+      throw new Error(`${line.label}属于套餐，只能随整单一起退回，不能单独或拆分退单`);
     }
     const remaining = line.quantity - line.returnedQuantity;
     if (

@@ -39,13 +39,7 @@ export const ReturnDialog = ({
   open,
   order,
 }: ReturnDialogProps) => {
-  const hasPackage = order.lines.some(
-    (line) =>
-      line.lineType === "charge" &&
-      isNonReturnablePackageSku(line.sku) &&
-      line.refundableQuantity > 0,
-  );
-  const [type, setType] = useState<ReturnType>(hasPackage ? "partial" : "full");
+  const [type, setType] = useState<ReturnType>("full");
   const [partial, setPartial] = useState(() => buildPartialState(order));
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -53,12 +47,12 @@ export const ReturnDialog = ({
 
   useEffect(() => {
     if (!open) return;
-    setType(hasPackage ? "partial" : "full");
+    setType("full");
     setPartial(buildPartialState(order));
     setReason("");
     setError(null);
     setSubmitting(false);
-  }, [hasPackage, open, order.id, order.version]);
+  }, [open, order.id, order.version]);
 
   const returnableLines = useMemo(
     () =>
@@ -67,6 +61,13 @@ export const ReturnDialog = ({
           line.lineType === "charge" &&
           !isNonReturnablePackageSku(line.sku) &&
           line.refundableQuantity > 0,
+      ),
+    [order.lines],
+  );
+  const fullReturnLines = useMemo(
+    () =>
+      order.lines.filter(
+        (line) => line.lineType === "charge" && line.refundableQuantity > 0,
       ),
     [order.lines],
   );
@@ -79,10 +80,11 @@ export const ReturnDialog = ({
       isNonReturnablePackageSku(line.sku) &&
       line.refundableQuantity > 0,
   );
+  const displayedLines = type === "full" ? fullReturnLines : returnableLines;
 
   const selectedItems = useMemo(() => {
     if (type === "full") {
-      return returnableLines.map((line) => ({
+      return fullReturnLines.map((line) => ({
         orderLineId: line.id,
         quantity: line.refundableQuantity,
       }));
@@ -92,10 +94,10 @@ export const ReturnDialog = ({
       if (!state?.selected) return [];
       return [{ orderLineId: line.id, quantity: Number(state.quantity) }];
     });
-  }, [partial, returnableLines, type]);
+  }, [fullReturnLines, partial, returnableLines, type]);
 
   const refundFen = selectedItems.reduce((total, item) => {
-    const line = returnableLines.find((candidate) => candidate.id === item.orderLineId);
+    const line = order.lines.find((candidate) => candidate.id === item.orderLineId);
     return total + (line?.refundableUnitFen ?? 0) * item.quantity;
   }, 0);
 
@@ -113,7 +115,8 @@ export const ReturnDialog = ({
       return;
     }
     for (const item of selectedItems) {
-      const line = returnableLines.find(
+      const eligibleLines = type === "full" ? fullReturnLines : returnableLines;
+      const line = eligibleLines.find(
         (candidate) => candidate.id === item.orderLineId,
       );
       if (
@@ -175,7 +178,6 @@ export const ReturnDialog = ({
               <input
                 aria-label="整单退单"
                 checked={type === "full"}
-                disabled={hasPackage}
                 name="return-type"
                 onChange={() => {
                   setType("full");
@@ -185,7 +187,7 @@ export const ReturnDialog = ({
               />
               <span>
                 <strong>整单退单</strong>
-                <small>{hasPackage ? "订单含不可退套餐，不能整单退单" : "退回所有剩余可退计价商品"}</small>
+                <small>套餐与自购商品一起整单退回</small>
               </span>
             </label>
             <label>
@@ -206,9 +208,10 @@ export const ReturnDialog = ({
             </label>
           </fieldset>
 
-          <section className="return-line-list" aria-label="可退计价商品">
-            {returnableLines.map((line) => {
+          <section className="return-line-list" aria-label={type === "full" ? "整单退回商品" : "可退计价商品"}>
+            {displayedLines.map((line) => {
               const state = partial[line.id];
+              const packageLine = isNonReturnablePackageSku(line.sku);
               return (
                 <div className="return-line" key={line.id}>
                   {type === "partial" ? (
@@ -230,7 +233,10 @@ export const ReturnDialog = ({
                     />
                   ) : null}
                   <div>
-                    <strong>{line.label}</strong>
+                    <strong>
+                      {line.label}
+                      {packageLine ? "（套餐整套退回）" : ""}
+                    </strong>
                     <span>
                       剩余可退 {line.refundableQuantity} {line.unit}·
                       {formatOrderMoney(line.refundableUnitFen)}/{line.unit}
@@ -269,9 +275,9 @@ export const ReturnDialog = ({
 
           {packageLines.length > 0 ? (
             <section className="return-package-note" aria-label="不可退套餐">
-              <strong>以下套餐不可申请退单</strong>
+              <strong>{type === "full" ? "以下套餐随整单一并退回" : "以下套餐仅支持整单退回"}</strong>
               <span>{packageLines.map((line) => line.label).join("、")}</span>
-              <small>套餐及套餐内设备按完整方案交付，当前不支持整套或拆分退回。</small>
+              <small>套餐及套餐内设备按完整方案交付，不支持部分退套餐或拆退套餐内设备。</small>
             </section>
           ) : null}
 

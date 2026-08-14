@@ -56,15 +56,8 @@ export const describeReturnAvailability = (order: OrderDetail): ReturnAvailabili
     return { allowed: false, reason: "订单尚未生效，请使用“取消订单”" };
   }
   const chargeLines = order.lines.filter((line) => line.lineType === "charge");
-  const returnableLines = chargeLines.filter(
-    (line) => !isNonReturnablePackageSku(line.sku) && line.refundableQuantity > 0,
-  );
-  if (returnableLines.length > 0) return { allowed: true, reason: null };
-  if (chargeLines.some((line) => isNonReturnablePackageSku(line.sku))) {
-    return {
-      allowed: false,
-      reason: "该订单仅剩不可退的计价套餐；套餐内设备也不能单独退回",
-    };
+  if (chargeLines.some((line) => line.refundableQuantity > 0)) {
+    return { allowed: true, reason: null };
   }
   return { allowed: false, reason: "该订单已没有剩余可退的独立计价商品" };
 };
@@ -442,7 +435,7 @@ export const OrderDetailPage = ({
                   {line.lineType === "component"
                     ? "套餐内设备"
                     : isNonReturnablePackageSku(line.sku)
-                      ? "计价套餐 · 不可退"
+                      ? "计价套餐 · 仅可整单退"
                       : "计价商品"}
                 </span>
                 <strong>{line.label}×{line.quantity}{line.unit}</strong>
