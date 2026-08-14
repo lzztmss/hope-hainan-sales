@@ -92,6 +92,25 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
     void load(appliedFilters.current);
   };
 
+  const reset = () => {
+    const cleared: AppliedQuoteFilters = {
+      dateFrom: "",
+      dateTo: "",
+      query: "",
+      sellerId: "",
+      status: "",
+      storeId: "",
+    };
+    setQuery("");
+    setStatus("");
+    setDateFrom("");
+    setDateTo("");
+    setStoreId("");
+    setSellerId("");
+    appliedFilters.current = cleared;
+    void load(cleared);
+  };
+
   return (
     <PageLayout
       eyebrow="销售报价"
@@ -100,35 +119,42 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
       actions={<Link className="quote-management__primary-link" to="/quotes/new">新建报价</Link>}
     >
       <form className="quote-management__filters" onSubmit={submit}>
-        <label>
-          <span>搜索报价</span>
-          <input
-            type="search"
-            placeholder="报价单号、客户姓名或手机号"
-            value={query}
-            onChange={(event) => setQuery(event.currentTarget.value)}
-          />
-        </label>
-        {viewer.role === "admin" ? <label><span>营业厅</span><select value={storeId} onChange={(event) => { setStoreId(event.currentTarget.value); setSellerId(""); }}><option value="">全部营业厅</option>{options.stores.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
-        {viewer.role !== "sales" ? <label><span>销售员</span><select value={sellerId} onChange={(event) => setSellerId(event.currentTarget.value)}><option value="">全部可见销售员</option>{options.sellers.filter((option) => !storeId || option.storeId === storeId).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
-        <label>
-          <span>报价状态</span>
-          <select value={status} onChange={(event) => setStatus(event.currentTarget.value as QuoteStatus | "")}>
-            <option value="">全部状态</option>
-            {Object.entries(STATUS_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>开始日期</span>
-          <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.currentTarget.value)} />
-        </label>
-        <label>
-          <span>结束日期</span>
-          <input type="date" value={dateTo} onChange={(event) => setDateTo(event.currentTarget.value)} />
-        </label>
-        <button type="submit" disabled={loading}>查询</button>
+        <div className="quote-management__filter-row is-primary">
+          <label className="is-search">
+            <span>搜索报价</span>
+            <input
+              type="search"
+              placeholder="报价单号、客户姓名或手机号"
+              value={query}
+              onChange={(event) => setQuery(event.currentTarget.value)}
+            />
+          </label>
+          <label>
+            <span>报价状态</span>
+            <select value={status} onChange={(event) => setStatus(event.currentTarget.value as QuoteStatus | "")}>
+              <option value="">全部状态</option>
+              {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>开始日期</span>
+            <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.currentTarget.value)} />
+          </label>
+          <label>
+            <span>结束日期</span>
+            <input type="date" value={dateTo} onChange={(event) => setDateTo(event.currentTarget.value)} />
+          </label>
+        </div>
+        <div className="quote-management__filter-row is-secondary">
+          {viewer.role === "admin" ? <label><span>营业厅</span><select value={storeId} onChange={(event) => { setStoreId(event.currentTarget.value); setSellerId(""); }}><option value="">全部营业厅</option>{options.stores.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
+          {viewer.role !== "sales" ? <label><span>销售员</span><select value={sellerId} onChange={(event) => setSellerId(event.currentTarget.value)}><option value="">全部可见销售员</option>{options.sellers.filter((option) => !storeId || option.storeId === storeId).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
+          <div className="quote-management__filter-actions">
+            <button className="is-secondary" disabled={loading} onClick={reset} type="button">重置</button>
+            <button type="submit" disabled={loading}>查询</button>
+          </div>
+        </div>
       </form>
 
       {error ? <p className="quote-management__error" role="alert">{error}</p> : null}
