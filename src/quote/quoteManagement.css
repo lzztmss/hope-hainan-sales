@@ -14,9 +14,9 @@
 }
 .quote-management__primary-link { background: var(--app-color-primary); color: white; }
 .quote-management__filters { display: grid; gap: var(--hfttr-space-4); padding: var(--hfttr-space-5); border: 1px solid var(--app-color-border); border-radius: var(--app-radius-surface); background: white; }
-.quote-management__filter-row { display: grid; gap: var(--hfttr-space-3); min-width: 0; }
+.quote-management__filter-row { display: grid; gap: var(--hfttr-space-3) var(--hfttr-space-4); min-width: 0; }
 .quote-management__filters label { display: grid; gap: var(--hfttr-space-2); font-weight: 700; }
-.quote-management__filters input, .quote-management__filters select, .quote-management__filters button, .quote-management__actions button { width: 100%; min-width: 0; min-height: var(--app-control-min-size); padding: var(--hfttr-space-2) var(--hfttr-space-3); border: 1px solid var(--app-color-border); border-radius: var(--app-radius-control); background: white; font: inherit; }
+.quote-management__filters input, .quote-management__filters select, .quote-management__filters button, .quote-management__actions button { box-sizing: border-box; width: 100%; min-width: 0; height: var(--app-control-min-size); min-height: var(--app-control-min-size); padding: 0 var(--hfttr-space-3); border: 1px solid var(--app-color-border); border-radius: var(--app-radius-control); background: white; font: inherit; line-height: 1.2; }
 .quote-management__filters button, .quote-management__actions .is-primary { border-color: var(--app-color-primary); background: var(--app-color-primary); color: white; font-weight: 700; }
 .quote-management__filters button.is-secondary { border-color: var(--app-color-border); background: white; color: var(--app-color-primary-strong); }
 .quote-management__filter-actions { display: grid; grid-template-columns: repeat(2, minmax(5rem, 1fr)); gap: var(--hfttr-space-3); align-self: end; }
@@ -60,6 +60,6 @@
 }
 @media (min-width: 64rem) {
   .quote-management__filter-row.is-primary { grid-template-columns: minmax(16rem, 2fr) repeat(3, minmax(9rem, 1fr)); }
-  .quote-management__filter-row.is-secondary { grid-template-columns: repeat(2, minmax(13rem, 1fr)) auto; }
-  .quote-management__filter-actions { grid-column: -2 / -1; min-width: 12rem; }
+  .quote-management__filter-row.is-secondary { grid-template-columns: minmax(12rem, 18rem) minmax(12rem, 18rem) minmax(2rem, 1fr) auto; }
+  .quote-management__filter-actions { grid-column: 4; min-width: 12rem; }
 }
