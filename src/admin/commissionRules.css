@@ -65,7 +65,16 @@
 }
 
 .commission-version-selector {
-  padding: 16px 20px;
+  padding: 20px 24px;
+}
+
+.commission-version-selector select {
+  box-sizing: border-box;
+  width: 100%;
+  height: 52px;
+  min-height: 52px;
+  padding: 0 14px;
+  line-height: 1.2;
 }
 
 .commission-policy-reason {
