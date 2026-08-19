@@ -29,6 +29,7 @@ import {
   orders,
   quoteLines,
   quotes,
+  returns,
   stores,
   users,
 } from "../db/schema.js";
@@ -132,7 +133,7 @@ export class DrizzleOrderRepository implements OrderRepository {
   }
 
   private async hydrate(row: OrderRow): Promise<OrderRecord> {
-    const [lineRows, attributionRows] = await Promise.all([
+    const [lineRows, attributionRows, returnRows] = await Promise.all([
       this.executor
         .select()
         .from(orderLines)
@@ -143,6 +144,11 @@ export class DrizzleOrderRepository implements OrderRepository {
         .from(orderAttributions)
         .where(eq(orderAttributions.orderId, row.id))
         .orderBy(orderAttributions.createdAt, orderAttributions.id),
+      this.executor
+        .select({ returnNo: returns.returnNo })
+        .from(returns)
+        .where(eq(returns.orderId, row.id))
+        .orderBy(returns.requestedAt, returns.id),
     ]);
     return {
       ...baseOrder(row),
@@ -170,6 +176,7 @@ export class DrizzleOrderRepository implements OrderRepository {
           beneficiarySnapshot: entry.beneficiarySnapshot,
         }),
       ),
+      returnNos: returnRows.map((entry) => entry.returnNo),
     };
   }
 

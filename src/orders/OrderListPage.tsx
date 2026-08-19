@@ -261,7 +261,7 @@ export const OrderListPage = ({
             <span>搜索订单</span>
             <input
               onChange={(event) => setFilter("search", event.currentTarget.value)}
-              placeholder="订单号、客户或手机号"
+              placeholder="订单号、退单号、客户或手机号"
               type="search"
               value={draftFilters.search}
             />

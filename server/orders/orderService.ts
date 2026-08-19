@@ -118,6 +118,7 @@ export interface OrderRecord extends OrderWriteRecord {
   updatedAt: Date;
   lines: OrderLineRecord[];
   attributions: OrderAttributionRecord[];
+  returnNos?: string[];
 }
 
 export interface OrderListFilters {
@@ -324,10 +325,14 @@ export const createOrderService = (options: OrderServiceOptions) => {
   const matchesPresentedOrder = (
     order: ReturnType<typeof presentOrder>,
     query: string,
+    returnNos: readonly string[] = [],
   ): boolean => {
     const phoneQuery = query.replace(/\D/g, "");
     return (
       order.orderNo.toLocaleLowerCase("zh-CN").includes(query) ||
+      returnNos.some((returnNo) =>
+        returnNo.toLocaleLowerCase("zh-CN").includes(query),
+      ) ||
       Boolean(order.customer.name?.toLocaleLowerCase("zh-CN").includes(query)) ||
       (phoneQuery.length > 0 &&
         Boolean(order.customer.phoneMasked?.replace(/\D/g, "").endsWith(phoneQuery)))
@@ -710,7 +715,9 @@ export const createOrderService = (options: OrderServiceOptions) => {
       const presented = result.items.map((order) => presentOrder(order, options.decryptPii));
       return {
         items: query
-          ? presented.filter((order) => matchesPresentedOrder(order, query))
+          ? presented.filter((order, index) =>
+              matchesPresentedOrder(order, query, result.items[index]?.returnNos),
+            )
           : presented,
         nextCursor: result.nextCursor,
       };
@@ -732,7 +739,9 @@ export const createOrderService = (options: OrderServiceOptions) => {
       const presented = result.items.map((order) => presentOrder(order, options.decryptPii));
       return {
         items: query
-          ? presented.filter((order) => matchesPresentedOrder(order, query))
+          ? presented.filter((order, index) =>
+              matchesPresentedOrder(order, query, result.items[index]?.returnNos),
+            )
           : presented,
         nextCursor: result.nextCursor,
       };

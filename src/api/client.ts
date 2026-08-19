@@ -708,6 +708,7 @@ export const createApiClient = ({
     },
     async listOrders(query) {
       const parameters = new URLSearchParams();
+      if (query.query) parameters.set("query", query.query);
       if (query.orderNo) parameters.set("orderNo", query.orderNo);
       if (query.customerPhoneTail) {
         parameters.set("customerPhoneTail", query.customerPhoneTail);
