@@ -5,7 +5,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   UserStoreManagementRoute,
 } from "./UserStoreManagementRoute";
-import type { UserStoreManagementApi } from "./UserStoreManagementPage";
+import {
+  createUserStoreManagementApi,
+  type UserStoreManagementApi,
+} from "./UserStoreManagementPage";
 
 const api = (): UserStoreManagementApi => ({
   listStores: vi.fn().mockResolvedValue([]),
@@ -18,6 +21,51 @@ const api = (): UserStoreManagementApi => ({
 });
 
 describe("营业厅与账号路由", () => {
+  it("子路径部署时账号修改与重置请求使用应用基础路径", async () => {
+    const administrator = {
+      id: "admin-1",
+      workNo: "ADMIN001",
+      displayName: "管理员",
+      phoneMasked: null,
+      role: "admin" as const,
+      personnelType: "admin" as const,
+      storeId: null,
+      storeName: null,
+      active: true,
+      mustChangePassword: false,
+      lastLoginAt: null,
+      createdAt: "2026-08-13T00:00:00.000Z",
+      updatedAt: "2026-08-13T00:00:00.000Z",
+    };
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ user: administrator }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const managementApi = createUserStoreManagementApi(
+      fetcher,
+      "/hope/hn-fttr-v3",
+    );
+
+    await managementApi.updateUser("user/1", { active: false, reason: "停用测试" });
+    await managementApi.resetPassword("user/1", {
+      initialPassword: "NewPass88",
+      reason: "重置测试",
+    });
+
+    expect(fetcher).toHaveBeenNthCalledWith(
+      1,
+      "/hope/hn-fttr-v3/api/admin/users/user%2F1",
+      expect.objectContaining({ method: "PATCH" }),
+    );
+    expect(fetcher).toHaveBeenNthCalledWith(
+      2,
+      "/hope/hn-fttr-v3/api/admin/users/user%2F1/reset-password",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
   it("父级重新渲染时不会重复加载数据", async () => {
     const managementApi = api();
     const view = render(<UserStoreManagementRoute api={managementApi} />);

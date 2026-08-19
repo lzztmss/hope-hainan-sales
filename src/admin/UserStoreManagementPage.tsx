@@ -1,9 +1,12 @@
 import {
+  useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
 } from "react";
 
+import { APP_BASE_PATH } from "../appBasePath";
 import "./userStoreManagement.css";
 
 export type ManagedUserRole = "sales" | "store_manager" | "admin";
@@ -142,11 +145,12 @@ const apiRequest = async <T,>(
 
 export const createUserStoreManagementApi = (
   fetcher: FetchLike = fetch,
+  baseUrl = APP_BASE_PATH,
 ): UserStoreManagementApi => ({
   async listStores() {
     const result = await apiRequest<{ stores: ManagedStoreView[] }>(
       fetcher,
-      "/api/admin/stores",
+      `${baseUrl}/api/admin/stores`,
       { method: "GET" },
     );
     return result.stores;
@@ -154,7 +158,7 @@ export const createUserStoreManagementApi = (
   async createStore(input) {
     const result = await apiRequest<{ store: ManagedStoreView }>(
       fetcher,
-      "/api/admin/stores",
+      `${baseUrl}/api/admin/stores`,
       { method: "POST", body: JSON.stringify(input) },
     );
     return result.store;
@@ -162,7 +166,7 @@ export const createUserStoreManagementApi = (
   async updateStore(id, input) {
     const result = await apiRequest<{ store: ManagedStoreView }>(
       fetcher,
-      `/api/admin/stores/${encodeURIComponent(id)}`,
+      `${baseUrl}/api/admin/stores/${encodeURIComponent(id)}`,
       { method: "PATCH", body: JSON.stringify(input) },
     );
     return result.store;
@@ -176,7 +180,7 @@ export const createUserStoreManagementApi = (
     const suffix = query.size > 0 ? `?${query.toString()}` : "";
     const result = await apiRequest<{ users: ManagedUserView[] }>(
       fetcher,
-      `/api/admin/users${suffix}`,
+      `${baseUrl}/api/admin/users${suffix}`,
       { method: "GET" },
     );
     return result.users;
@@ -184,7 +188,7 @@ export const createUserStoreManagementApi = (
   async createUser(input) {
     const result = await apiRequest<{ user: ManagedUserView }>(
       fetcher,
-      "/api/admin/users",
+      `${baseUrl}/api/admin/users`,
       { method: "POST", body: JSON.stringify(input) },
     );
     return result.user;
@@ -192,7 +196,7 @@ export const createUserStoreManagementApi = (
   async updateUser(id, input) {
     const result = await apiRequest<{ user: ManagedUserView }>(
       fetcher,
-      `/api/admin/users/${encodeURIComponent(id)}`,
+      `${baseUrl}/api/admin/users/${encodeURIComponent(id)}`,
       { method: "PATCH", body: JSON.stringify(input) },
     );
     return result.user;
@@ -200,7 +204,7 @@ export const createUserStoreManagementApi = (
   async resetPassword(id, input) {
     const result = await apiRequest<{ user: ManagedUserView }>(
       fetcher,
-      `/api/admin/users/${encodeURIComponent(id)}/reset-password`,
+      `${baseUrl}/api/admin/users/${encodeURIComponent(id)}/reset-password`,
       { method: "POST", body: JSON.stringify(input) },
     );
     return result.user;
@@ -290,6 +294,21 @@ export const UserStoreManagementPage = ({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [passwordInvalid, setPasswordInvalid] = useState(false);
+  const actionPanelRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!managerStoreId && !statusAction && !editDraft && !resetDraft) return;
+    const frame = window.requestAnimationFrame(() => {
+      actionPanelRef.current?.scrollIntoView?.({
+        behavior: "smooth",
+        block: "center",
+      });
+      actionPanelRef.current
+        ?.querySelector<HTMLElement>("input, select")
+        ?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [editDraft, managerStoreId, resetDraft, statusAction]);
 
   const activeStores = useMemo(
     () => stores.filter((store) => store.active),
@@ -404,6 +423,7 @@ export const UserStoreManagementPage = ({
     });
     setResetDraft(null);
     setStatusAction(null);
+    setManagerStoreId(null);
     setError(null);
   };
 
@@ -533,6 +553,9 @@ export const UserStoreManagementPage = ({
         setManagerStoreId(store.id);
         setManagerUserId(store.managerUserId ?? "");
         setManagerReason("");
+        setStatusAction(null);
+        setEditDraft(null);
+        setResetDraft(null);
       }}
     >
       指定经理
@@ -552,6 +575,7 @@ export const UserStoreManagementPage = ({
         });
         setEditDraft(null);
         setResetDraft(null);
+        setManagerStoreId(null);
       }}
     >
       {store.active ? "停用" : "启用"}
@@ -582,6 +606,7 @@ export const UserStoreManagementPage = ({
           });
           setEditDraft(null);
           setStatusAction(null);
+          setManagerStoreId(null);
           setError(null);
         }}
       >
@@ -602,6 +627,7 @@ export const UserStoreManagementPage = ({
           });
           setEditDraft(null);
           setResetDraft(null);
+          setManagerStoreId(null);
         }}
       >
         {managedUser.active ? "停用" : "启用"}
@@ -667,7 +693,7 @@ export const UserStoreManagementPage = ({
       </section>
 
       {managerStoreId ? (
-        <section className="management-action-panel" aria-labelledby="manager-action-title">
+        <section ref={actionPanelRef} className="management-action-panel" aria-labelledby="manager-action-title">
           <h2 id="manager-action-title">指定营业厅主经理</h2>
           <form onSubmit={(event) => void saveStoreManager(event)}>
             <label>主经理<select value={managerUserId} onChange={(event) => setManagerUserId(event.currentTarget.value)}><option value="">暂不指定</option>{users.filter((user) => user.storeId === managerStoreId && user.role === "store_manager" && user.active).map((user) => <option key={user.id} value={user.id}>{user.displayName}（{user.workNo}）</option>)}</select></label>
@@ -678,7 +704,7 @@ export const UserStoreManagementPage = ({
       ) : null}
 
       {statusAction ? (
-        <section className="management-action-panel" aria-labelledby="status-action-title">
+        <section ref={actionPanelRef} className="management-action-panel" aria-labelledby="status-action-title">
           <h2 id="status-action-title">{statusAction.nextActive ? "启用" : "停用"}{statusAction.kind === "store" ? "营业厅" : "账号"}</h2>
           <p>{statusAction.name} · 所有启停操作都会写入审计记录。</p>
           <form onSubmit={(event) => void runStatusAction(event)}>
@@ -731,7 +757,7 @@ export const UserStoreManagementPage = ({
       </section>
 
       {editDraft ? (
-        <section className="management-action-panel" aria-labelledby="edit-account-title">
+        <section ref={actionPanelRef} className="management-action-panel" aria-labelledby="edit-account-title">
           <h2 id="edit-account-title">编辑账号</h2><p>留空手机号不会改动原绑定；历史订单仍使用原销售快照。</p>
           <form className="management-form" onSubmit={(event) => void saveEdit(event)}><fieldset><legend>账号资料</legend>
             <label>编辑工号<input required value={editDraft.workNo} onChange={(event) => setEditDraft({ ...editDraft, workNo: event.currentTarget.value.toUpperCase() })} /></label>
@@ -747,7 +773,7 @@ export const UserStoreManagementPage = ({
       ) : null}
 
       {resetDraft ? (
-        <section className="management-action-panel" aria-labelledby="reset-password-title">
+        <section ref={actionPanelRef} className="management-action-panel" aria-labelledby="reset-password-title">
           <h2 id="reset-password-title">{resetDraft.userId === currentUserId ? "修改本人密码" : `重置${resetDraft.displayName}的临时密码`}</h2><p>{resetDraft.userId === currentUserId ? "保存后当前会话会立即失效，请使用新密码重新登录；无需再次修改。" : "请将临时密码通过电话、当面或内部通讯单独告知本人。该账号所有会话会立即失效，登录后须设置只有本人知道的新密码。"}</p>
           <form onSubmit={(event) => void resetPassword(event)}><label>{resetDraft.userId === currentUserId ? "新密码" : "新临时密码"}（8 至 128 位）<input aria-label={resetDraft.userId === currentUserId ? "新密码（8 至 128 位）" : "新临时密码（8 至 128 位）"} type="password" required minLength={8} maxLength={128} value={resetDraft.initialPassword} onChange={(event) => setResetDraft({ ...resetDraft, initialPassword: event.currentTarget.value })} /></label><label>重置密码原因（至少 2 个字符）<input required minLength={2} value={resetDraft.reason} onChange={(event) => setResetDraft({ ...resetDraft, reason: event.currentTarget.value })} /></label><div className="management-form-actions"><button type="button" onClick={() => setResetDraft(null)}>取消</button><button type="submit" className="management-primary" disabled={busy}>确认{resetDraft.userId === currentUserId ? "修改" : "重置"}密码</button></div></form>
         </section>

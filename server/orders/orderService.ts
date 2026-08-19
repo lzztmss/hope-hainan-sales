@@ -532,7 +532,8 @@ export const createOrderService = (options: OrderServiceOptions) => {
       } catch (error) {
         if (isUniqueViolation(error)) {
           const winner =
-            await options.repository.findByIdempotencyKey(idempotencyKey);
+            (await options.repository.findByIdempotencyKey(idempotencyKey)) ??
+            (await options.repository.findByQuoteId(quoteId));
           if (winner) return requireVisibleExistingOrder(user, winner);
         }
         throw error;
