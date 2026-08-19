@@ -15,6 +15,13 @@
       "when": 1786534823223,
       "tag": "0001_giant_jane_foster",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787120570000,
+      "tag": "0002_monthly_return_refund_cap",
+      "breakpoints": true
     }
   ]
 }

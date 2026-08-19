@@ -78,4 +78,33 @@ describe("整单退单商品明细", () => {
     expect(within(list).getByText("人体传感器")).toBeInTheDocument();
     expect(screen.getByText("客户最高可退 ¥1,198.00")).toBeInTheDocument();
   });
+
+  it("月付商品展示一个计费月的现金退款上限", () => {
+    render(
+      <ReturnDialog
+        open
+        order={{
+          ...order,
+          paymentMode: "contract_36",
+          oneTimeFen: 0,
+          monthlyTotalFen: 19_800,
+          lines: [{
+            ...order.lines[1]!,
+            label: "睡眠监测床垫",
+            refundableUnitFen: 4_000,
+            monthlyUnitFen: 4_000,
+            oneTimeSubtotalFen: 0,
+            monthlySubtotalFen: 4_000,
+          }],
+        }}
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("客户最高可退 ¥40.00")).toBeInTheDocument();
+    expect(
+      screen.getByText(/月付商品按本计费月已收月费计算退款上限/),
+    ).toBeInTheDocument();
+  });
 });

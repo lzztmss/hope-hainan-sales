@@ -2,6 +2,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 
 import type { AppDatabase, DbClient, DbTransaction } from "../db/client.js";
 import type { UserScope } from "../auth/authorization.js";
+import { refundableUnitFenFor } from "../../shared/pricing/returnPolicy.js";
 import {
   auditLogs,
   orderLines,
@@ -133,6 +134,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
         sellerId: orders.sellerId,
         storeId: orders.storeId,
         status: orders.status,
+        paymentMode: orders.paymentMode,
         refundedFen: orders.refundedFen,
       })
       .from(orders)
@@ -178,7 +180,11 @@ export class DrizzleReturnRepository implements ReturnRepository {
         label: line.label,
         quantity: line.quantity,
         returnedQuantity: returnedByLine.get(line.id) ?? 0,
-        refundableUnitFen: line.oneTimeUnitFen,
+        refundableUnitFen: refundableUnitFenFor({
+          paymentMode: order.paymentMode,
+          oneTimeUnitFen: line.oneTimeUnitFen,
+          monthlyUnitFen: line.monthlyUnitFen,
+        }),
       })),
     };
   }

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 
 import type { AuthenticatedUser } from "../auth/authorization.js";
 import { createDatabaseClient } from "../db/client.js";
@@ -347,6 +348,56 @@ describe("退单状态与提成冲销一致性", () => {
     expect(finished?.refundedFen).toBe(99800);
     expect(finished?.lines.every((line) => line.returnedQuantity === line.quantity))
       .toBe(true);
+    await client.close();
+  });
+
+  it("36 个月月付商品按本计费月月费计算退款上限", async () => {
+    const { client, order, seller } = await createFixture("completed");
+    await client.db
+      .update(orders)
+      .set({
+        paymentMode: "contract_36",
+        heartMonthlyFen: 4_000,
+        monthlyTotalFen: 4_000,
+        contract36Fen: 144_000,
+      })
+      .where(eq(orders.id, order.id));
+    await client.db
+      .update(orderLines)
+      .set({
+        sku: "MATTRESS",
+        label: "睡眠监测床垫",
+        oneTimeUnitFen: 0,
+        oneTimeSubtotalFen: 0,
+        monthlyUnitFen: 4_000,
+        monthlySubtotalFen: 4_000,
+      })
+      .where(eq(orderLines.orderId, order.id));
+    const repository = new DrizzleReturnRepository(client);
+    const service = createReturnService({
+      repository,
+      commissionReversal: {
+        validateReversalForCompletedReturn: async () => undefined,
+        reverseForCompletedReturn: async () => undefined,
+      },
+      numberSuffix: () => "MONTHLY",
+    });
+    const line = (await repository.findOrderForReturn(order.id))?.lines[0];
+    expect(line?.refundableUnitFen).toBe(4_000);
+
+    const requested = await service.requestReturn(
+      seller,
+      order.id,
+      {
+        type: "partial",
+        reason: "退回当月已收费的床垫",
+        items: [{ orderLineId: line!.id, quantity: 1 }],
+      },
+      "return-request-monthly-fee-001",
+    );
+
+    expect(requested.maxRefundFen).toBe(4_000);
+    expect(requested.items[0]?.maxRefundFen).toBe(4_000);
     await client.close();
   });
 

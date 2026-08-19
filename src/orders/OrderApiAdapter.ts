@@ -16,6 +16,8 @@ import type {
   ReturnRecordView,
 } from "./types";
 import { createClientKey } from "../utils/clientKey";
+import { refundableUnitFenFor } from "../../shared/pricing/returnPolicy";
+import type { PaymentMode } from "../../shared/pricing/types";
 
 export type OrderApiClient = Pick<
   ApiClient,
@@ -200,6 +202,7 @@ const mapLine = (
   index: number,
   returned: ReadonlyMap<string, number>,
   wholeOrderReturned: boolean,
+  paymentMode: PaymentMode,
 ): OrderLineView => {
   const persistedId = line.id?.trim() || null;
   const alreadyReturned = persistedId ? returned.get(persistedId) ?? 0 : 0;
@@ -218,7 +221,14 @@ const mapLine = (
       line.lineType === "charge" && persistedId
         ? Math.max(0, line.quantity - returnedQuantity)
         : 0,
-    refundableUnitFen: line.lineType === "charge" ? line.oneTimeUnitFen : 0,
+    refundableUnitFen:
+      line.lineType === "charge"
+        ? refundableUnitFenFor({
+            paymentMode,
+            oneTimeUnitFen: line.oneTimeUnitFen,
+            monthlyUnitFen: line.monthlyUnitFen,
+          })
+        : 0,
     monthlyUnitFen: line.monthlyUnitFen,
     oneTimeSubtotalFen: line.oneTimeSubtotalFen,
     monthlySubtotalFen: line.monthlySubtotalFen,
@@ -239,7 +249,13 @@ const mapDetail = (
     heartMonthlyFen: order.heartMonthlyFen,
     contract36Fen: order.contract36Fen,
     lines: order.lines.map((line, index) =>
-      mapLine(line, index, returned, order.status === "returned"),
+      mapLine(
+        line,
+        index,
+        returned,
+        order.status === "returned",
+        order.paymentMode,
+      ),
     ),
     timeline: timelineFor(order),
     returns: returns.map((record) => mapReturn(record, viewer)),

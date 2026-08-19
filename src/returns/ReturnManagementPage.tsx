@@ -397,7 +397,7 @@ export const ReturnManagementPage = ({
                 <td><strong>{record.returnNo}</strong><Link className="returns-order-link" to={`/orders/${record.orderId}`}>原订单 {record.orderNo}</Link><small>{record.returnType === "full" ? "整单退单" : "部分退单"}</small></td>
                 <td><strong>申请人 ID：{record.requestedBy}</strong><span>{formatDateTime(record.requestedAt)}</span></td>
                 <td><p>{record.reason}</p><ReturnItems record={record} /></td>
-                <td><strong>最高可退 {formatMoney(record.maxRefundFen)}</strong>{record.maxRefundFen === 0 ? <small>月付订单暂无实收月费数据，当前仅按一次性实收金额核算</small> : null}{record.status === "completed" ? <span>实际已退 {formatMoney(record.refundFen)}</span> : null}</td>
+                <td><strong>最高可退 {formatMoney(record.maxRefundFen)}</strong><small>按申请时订单计价及本计费月收费快照核算</small>{record.status === "completed" ? <span>实际已退 {formatMoney(record.refundFen)}</span> : null}</td>
                 <td><ReturnStatusBadge status={record.status} /></td>
                 <td>{actionFor(record)}</td>
               </tr>
@@ -414,7 +414,7 @@ export const ReturnManagementPage = ({
               <div className="returns-mobile-meta"><Link className="returns-order-link" to={`/orders/${record.orderId}`}>原订单 {record.orderNo}</Link><span>申请人 ID：{record.requestedBy}</span><span>{formatDateTime(record.requestedAt)}</span></div>
               <p>{record.reason}</p>
               <ReturnItems record={record} />
-              <div className="returns-mobile-amount"><strong>最高可退 {formatMoney(record.maxRefundFen)}</strong>{record.maxRefundFen === 0 ? <small>暂无实收月费数据，仅按一次性实收核算</small> : null}{record.status === "completed" ? <span>实际已退 {formatMoney(record.refundFen)}</span> : null}</div>
+              <div className="returns-mobile-amount"><strong>最高可退 {formatMoney(record.maxRefundFen)}</strong><small>按申请时订单计价及本计费月收费快照核算</small>{record.status === "completed" ? <span>实际已退 {formatMoney(record.refundFen)}</span> : null}</div>
               <footer>{actionFor(record)}</footer>
             </article>
           </li>
