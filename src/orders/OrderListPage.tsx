@@ -341,7 +341,7 @@ export const OrderListPage = ({
           >
             重置
           </button>
-          <button className="order-primary-action" type="submit">应用筛选</button>
+          <button className="order-primary-action" type="submit">查询</button>
         </footer>
       </form>
 
