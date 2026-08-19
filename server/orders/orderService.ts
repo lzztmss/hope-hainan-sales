@@ -430,6 +430,9 @@ export const createOrderService = (options: OrderServiceOptions) => {
       attributions: OrderAttributionInput[] | undefined,
       idempotencyKey: string,
     ): Promise<OrderRecord> {
+      if (user.role !== "sales") {
+        throw new OrderServiceError("仅销售员可以将报价转为订单", 403);
+      }
       validateIdempotencyKey(idempotencyKey);
       const userScope = scopeForUser(user);
       const existing =

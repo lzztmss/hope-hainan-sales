@@ -19,6 +19,23 @@ const seller: AuthenticatedUser = {
   mustChangePassword: false,
 };
 
+const nonSalesUsers: AuthenticatedUser[] = [
+  {
+    id: "manager-1",
+    displayName: "测试厅经理",
+    role: "store_manager",
+    storeId: "store-1",
+    mustChangePassword: false,
+  },
+  {
+    id: "admin-1",
+    displayName: "测试管理员",
+    role: "admin",
+    storeId: null,
+    mustChangePassword: false,
+  },
+];
+
 const pricing = (watch: number): QuoteInput => ({
   mode: "contract_36",
   fttrPlan: 159,
@@ -121,6 +138,24 @@ const setup = () => {
 };
 
 describe("报价保存后编辑主链路", () => {
+  it.each(nonSalesUsers)("拒绝 $role 直接调用后端创建报价", async (user) => {
+    const { repository, service } = setup();
+
+    await expect(
+      service.confirmQuote(user, draft(1), `quote-key-${user.role}-123456`),
+    ).rejects.toThrow("仅销售员可以创建报价单");
+    expect(repository.quotes.size).toBe(0);
+  });
+
+  it.each(nonSalesUsers)("拒绝 $role 修改销售员报价", async (user) => {
+    const { service } = setup();
+    const created = await service.confirmQuote(seller, draft(1), "quote-key-123456");
+
+    await expect(service.updateQuote(user, created.id, draft(2), 1)).rejects.toThrow(
+      "仅销售员可以修改报价单",
+    );
+  });
+
   it("重新核价、保留报价单号并递增版本", async () => {
     const { repository, service } = setup();
     const created = await service.confirmQuote(seller, draft(1), "quote-key-123456");

@@ -2,7 +2,10 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import type { AuthService } from "../auth/authService.js";
-import type { AuthenticatedUser } from "../auth/authorization.js";
+import {
+  AuthorizationError,
+  type AuthenticatedUser,
+} from "../auth/authorization.js";
 import type { QuoteService } from "../quotes/quoteService.js";
 import { SESSION_COOKIE_NAME } from "./auth.js";
 import { sendValidationError } from "./validationError.js";
@@ -119,6 +122,9 @@ const resolveUser = async (
 
 const sendServiceError = (reply: FastifyReply, error: unknown) => {
   const message = error instanceof Error ? error.message : "操作失败";
+  if (error instanceof AuthorizationError) {
+    return reply.status(error.statusCode).send({ error: message });
+  }
   const statusCode = message.includes("不存在") ? 404 : 400;
   return reply.status(statusCode).send({ error: message });
 };

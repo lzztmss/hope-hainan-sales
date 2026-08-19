@@ -7,6 +7,7 @@ import type {
   RoomType,
 } from "../../shared/pricing/types.js";
 import {
+  AuthorizationError,
   canAccessOwnedRecord,
   scopeForUser,
   type AuthenticatedUser,
@@ -174,6 +175,15 @@ const optionalEncrypted = (
 const validateIdempotencyKey = (value: string): void => {
   if (!/^[A-Za-z0-9_-]{12,128}$/.test(value)) {
     throw new Error("幂等键格式不正确");
+  }
+};
+
+const requireSalesQuoteOperator = (
+  user: AuthenticatedUser,
+  action: "创建报价单" | "修改报价单",
+): void => {
+  if (user.role !== "sales") {
+    throw new AuthorizationError(`仅销售员可以${action}`);
   }
 };
 
@@ -378,6 +388,7 @@ export const createQuoteService = (options: QuoteServiceOptions) => {
       draft: QuoteDraft,
       idempotencyKey: string,
     ): Promise<ConfirmedQuote> {
+      requireSalesQuoteOperator(user, "创建报价单");
       validateIdempotencyKey(idempotencyKey);
       if (!user.storeId) throw new Error("用户未绑定营业厅");
       const storeId = user.storeId;
@@ -456,6 +467,7 @@ export const createQuoteService = (options: QuoteServiceOptions) => {
       draft: QuoteDraft,
       expectedVersion: number,
     ): Promise<QuotePresentation> {
+      requireSalesQuoteOperator(user, "修改报价单");
       if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
         throw new Error("报价版本不正确");
       }

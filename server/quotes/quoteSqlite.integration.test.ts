@@ -108,6 +108,35 @@ describe("SQLite 报价持久化主链路", () => {
       now: () => new Date("2026-08-12T10:00:00.000Z"),
       randomSuffix: () => "ORD123",
     });
+    const nonSalesUsers: AuthenticatedUser[] = [
+      {
+        id: "manager-test",
+        displayName: "测试厅经理",
+        role: "store_manager",
+        storeId,
+        mustChangePassword: false,
+      },
+      {
+        id: "admin-test",
+        displayName: "测试管理员",
+        role: "admin",
+        storeId: null,
+        mustChangePassword: false,
+      },
+    ];
+    for (const user of nonSalesUsers) {
+      await expect(
+        orderService.createOrderFromQuote(
+          user,
+          created.id,
+          undefined,
+          `sqlite-order-${user.role}-123456`,
+        ),
+      ).rejects.toMatchObject({
+        message: "仅销售员可以将报价转为订单",
+        statusCode: 403,
+      });
+    }
     const order = await orderService.createOrderFromQuote(
       seller,
       created.id,
