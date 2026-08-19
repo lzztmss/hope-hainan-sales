@@ -295,9 +295,18 @@ export const UserStoreManagementPage = ({
   const [error, setError] = useState<string | null>(null);
   const [passwordInvalid, setPasswordInvalid] = useState(false);
   const actionPanelRef = useRef<HTMLElement | null>(null);
+  const actionPanelKey = managerStoreId
+    ? `manager:${managerStoreId}`
+    : statusAction
+      ? `status:${statusAction.kind}:${statusAction.id}`
+      : editDraft
+        ? `edit:${editDraft.userId}`
+        : resetDraft
+          ? `reset:${resetDraft.userId}`
+          : null;
 
   useEffect(() => {
-    if (!managerStoreId && !statusAction && !editDraft && !resetDraft) return;
+    if (!actionPanelKey) return;
     const frame = window.requestAnimationFrame(() => {
       actionPanelRef.current?.scrollIntoView?.({
         behavior: "smooth",
@@ -308,7 +317,7 @@ export const UserStoreManagementPage = ({
         ?.focus({ preventScroll: true });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [editDraft, managerStoreId, resetDraft, statusAction]);
+  }, [actionPanelKey]);
 
   const activeStores = useMemo(
     () => stores.filter((store) => store.active),

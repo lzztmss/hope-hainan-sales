@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { SalesReportFilters, SalesReportResponse } from "../../shared/reports/types";
+import { APP_BASE_PATH } from "../appBasePath";
 import { PageLayout } from "../components/layout";
 import { usePageAutoRefresh } from "../hooks/usePageAutoRefresh";
 import { ReportFilters } from "./ReportFilters";
@@ -60,7 +61,7 @@ export const TeamReportPage = ({
       void load(appliedFilters.current);
     }
     if (providedStores || providedSellers) return;
-    void fetch("/api/order-filter-options", { credentials: "include" })
+    void fetch(`${APP_BASE_PATH}/api/order-filter-options`, { credentials: "include" })
       .then(async (response) => {
         if (!response.ok) throw new Error("筛选项加载失败");
         return response.json() as Promise<typeof options>;

@@ -1,4 +1,5 @@
 import type { SalesReportFilters, SalesReportResponse } from "../../shared/reports/types";
+import { APP_BASE_PATH } from "../appBasePath";
 
 export interface ReportsApi {
   getSalesReport(filters: SalesReportFilters): Promise<SalesReportResponse>;
@@ -15,7 +16,7 @@ const queryString = (filters: SalesReportFilters): string => {
 
 export const createReportsApi = (
   fetcher: typeof fetch = fetch,
-  baseUrl = "",
+  baseUrl = APP_BASE_PATH,
 ): ReportsApi => ({
   async getSalesReport(filters) {
     const response = await fetcher(`${baseUrl}/api/reports/sales?${queryString(filters)}`, {
