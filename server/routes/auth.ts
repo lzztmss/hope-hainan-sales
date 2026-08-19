@@ -95,11 +95,7 @@ export const registerAuthRoutes = async (
 
     const limiterKey = `${request.ip}:${parsed.data.identifier.trim().toUpperCase()}`;
     const attemptAt = Date.now();
-    if (limiter.isLimited(limiterKey, attemptAt)) {
-      return reply
-        .status(429)
-        .send({ error: "尝试次数过多，请稍后再试" });
-    }
+    const limited = limiter.isLimited(limiterKey, attemptAt);
 
     try {
       const result = await options.authService.login(
@@ -117,6 +113,11 @@ export const registerAuthRoutes = async (
       });
       return { user: result.user };
     } catch {
+      if (limited) {
+        return reply
+          .status(429)
+          .send({ error: "尝试次数过多，请稍后再试；正确密码仍可正常登录" });
+      }
       limiter.recordFailure(limiterKey, attemptAt);
       return reply.status(401).send({ error: AUTHENTICATION_FAILED_MESSAGE });
     }
