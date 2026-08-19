@@ -486,6 +486,23 @@ export const OrderDetailPage = ({
                   </span>
                 </header>
                 <p>{record.reason}</p>
+                <div className="order-return-items">
+                  <span>
+                    {record.status === "completed"
+                      ? "已退回商品"
+                      : record.status === "rejected"
+                        ? "申请退回商品（已驳回）"
+                        : "申请退回商品"}
+                  </span>
+                  <ul>
+                    {record.items.map((item) => (
+                      <li key={item.orderLineId}>
+                        <strong>{item.label} × {item.quantity}</strong>
+                        <small>可退上限 {formatOrderMoney(item.refundFen)}</small>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
                 <strong>
                   {record.status === "completed"
                     ? `实际退款 ${formatOrderMoney(record.refundFen)}`

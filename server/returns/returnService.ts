@@ -58,6 +58,7 @@ export type ReturnRequestStatus =
 export interface ReturnRequestRecord {
   id: string;
   returnNo: string;
+  orderNo: string;
   idempotencyKey: string;
   completionIdempotencyKey: string | null;
   orderId: string;

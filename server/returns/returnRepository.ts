@@ -44,11 +44,13 @@ const mapItem = (row: ReturnItemRow): ReturnItemRecord => ({
 const mapRequest = (
   row: ReturnRow,
   itemRows: readonly ReturnItemRow[],
+  orderNo: string,
 ): ReturnRequestRecord => {
   const items = itemRows.map(mapItem);
   return {
     id: row.id,
     returnNo: row.returnNo,
+    orderNo,
     idempotencyKey: row.idempotencyKey,
     completionIdempotencyKey: row.completionIdempotencyKey,
     orderId: row.orderId,
@@ -85,11 +87,20 @@ export class DrizzleReturnRepository implements ReturnRepository {
   }
 
   private async loadRequest(row: ReturnRow): Promise<ReturnRequestRecord> {
-    const items = await this.executor
-      .select()
-      .from(returnItems)
-      .where(eq(returnItems.returnId, row.id));
-    return mapRequest(row, items);
+    const [items, orderRows] = await Promise.all([
+      this.executor
+        .select()
+        .from(returnItems)
+        .where(eq(returnItems.returnId, row.id)),
+      this.executor
+        .select({ orderNo: orders.orderNo })
+        .from(orders)
+        .where(eq(orders.id, row.orderId))
+        .limit(1),
+    ]);
+    const orderNo = orderRows[0]?.orderNo;
+    if (!orderNo) throw new Error("退单关联订单不存在");
+    return mapRequest(row, items, orderNo);
   }
 
   async findByRequestIdempotencyKey(
@@ -187,7 +198,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
       })
       .returning();
     if (!created) throw new Error("退单创建失败");
-    const itemRows = await this.executor
+    await this.executor
       .insert(returnItems)
       .values(
         input.items.map((item) => ({
@@ -215,7 +226,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
           inArray(orders.status, ["activated", "completed", "partially_returned"]),
         ),
       );
-    return mapRequest(created, itemRows);
+    return this.loadRequest(created);
   }
 
   async findRequestById(id: string): Promise<ReturnRequestRecord | null> {

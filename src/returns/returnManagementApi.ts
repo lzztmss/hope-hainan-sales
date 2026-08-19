@@ -53,6 +53,7 @@ const isReturnRecord = (value: unknown): value is ReturnRecordDto => {
   return (
     typeof value.id === "string" &&
     typeof value.returnNo === "string" &&
+    typeof value.orderNo === "string" &&
     typeof value.orderId === "string" &&
     typeof value.requestedBy === "string" &&
     typeof value.reason === "string" &&

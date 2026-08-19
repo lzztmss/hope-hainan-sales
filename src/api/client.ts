@@ -298,6 +298,7 @@ export interface ReturnItemDto {
 export interface ReturnRecordDto {
   id: string;
   returnNo: string;
+  orderNo: string;
   orderId: string;
   returnType: ReturnType;
   status: ReturnStatus;
@@ -547,7 +548,9 @@ const readReturnRecord = (payload: unknown): ReturnRecordDto => {
     !("id" in payload) ||
     typeof payload.id !== "string" ||
     !("returnNo" in payload) ||
-    typeof payload.returnNo !== "string"
+    typeof payload.returnNo !== "string" ||
+    !("orderNo" in payload) ||
+    typeof payload.orderNo !== "string"
   ) {
     throw new ApiError("服务响应格式异常，请稍后重试", 500);
   }

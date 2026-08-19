@@ -192,6 +192,7 @@ describe("退单状态与提成冲销一致性", () => {
       "return-request-package-full-001",
     );
 
+    expect(requested.orderNo).toBe("XLXDD-TEST-RETURN");
     expect(requested.items.map((item) => item.sku).sort()).toEqual([
       "GATEWAY",
       "HOME_DUAL",
