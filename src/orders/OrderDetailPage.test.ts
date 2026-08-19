@@ -132,8 +132,8 @@ describe("订单状态操作按钮", () => {
   });
 });
 
-describe("月付退单后的下期月费", () => {
-  it("本期保留原月费，并从下期扣除已完成退单商品的月增费", () => {
+describe("月付退单后的调整月费", () => {
+  it("保留原订单月费，并计算扣除已完成退单商品后的月费", () => {
     const current = order({
       monthlyTotalFen: 19_800,
       lines: [{
@@ -149,7 +149,7 @@ describe("月付退单后的下期月费", () => {
     expect(monthlyAmountAfterCompletedReturns(current)).toBe(17_800);
   });
 
-  it("整单退回后下期月费为零", () => {
+  it("整单退回后扣除已退商品的月费为零", () => {
     expect(monthlyAmountAfterCompletedReturns(order({ status: "returned" }))).toBe(0);
   });
 });

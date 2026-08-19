@@ -104,7 +104,7 @@ describe("整单退单商品明细", () => {
 
     expect(screen.getByText("客户最高可退 ¥40.00")).toBeInTheDocument();
     expect(
-      screen.getByText(/月付商品按本计费月已收月费计算退款上限/),
+      screen.getByText(/月付商品按一个月的商品月费计算退款上限/),
     ).toBeInTheDocument();
   });
 });

@@ -291,7 +291,7 @@ export const ReturnDialog = ({
             <strong>客户最高可退 {formatOrderMoney(refundFen)}</strong>
             <small>这是客户退款上限，不是销售提成；提成将在退单完成后按所退商品原提成自动扣回。</small>
             {order.paymentMode === "contract_36" ? (
-              <small>月付商品按本计费月已收月费计算退款上限；退单完成后，从下一计费月起停止收取所退商品月费。</small>
+              <small>月付商品按一个月的商品月费计算退款上限；退单完成后，订单月费将扣除已退商品的月增费。</small>
             ) : null}
           </div>
 

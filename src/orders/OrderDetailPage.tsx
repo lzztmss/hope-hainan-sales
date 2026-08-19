@@ -426,12 +426,12 @@ export const OrderDetailPage = ({
           </strong>
         </div>
         <div>
-          <span>{order.paymentMode === "contract_36" ? (hasMonthlyAdjustment ? "本期原每月合计" : "每月合计") : "设备合计"}</span>
+          <span>{order.paymentMode === "contract_36" ? (hasMonthlyAdjustment ? "原订单月费" : "每月合计") : "设备合计"}</span>
           <strong>{formatOrderPrice(order.oneTimeFen, order.monthlyTotalFen)}</strong>
         </div>
         {hasMonthlyAdjustment ? (
           <div className="is-adjusted-monthly">
-            <span>退单完成后下月起</span>
+            <span>扣除已退商品后月费</span>
             <strong>{formatOrderMoney(nextMonthlyFen)}/月</strong>
           </div>
         ) : null}
@@ -445,7 +445,7 @@ export const OrderDetailPage = ({
 
       {hasMonthlyAdjustment ? (
         <p className="order-billing-adjustment-note">
-          本计费月仍按原月费 {formatOrderMoney(order.monthlyTotalFen)} 计费；已完成退单商品的月增费从下一计费月停止，不追溯修改本月账单。
+          原订单月费为 {formatOrderMoney(order.monthlyTotalFen)}/月；扣除已完成退单商品后，月费为 {formatOrderMoney(nextMonthlyFen)}/月。
         </p>
       ) : null}
 
@@ -455,7 +455,7 @@ export const OrderDetailPage = ({
         <div><dt>服务地址</dt><dd>{order.customerAddress}</dd></div>
         <div><dt>FTTR 档位</dt><dd>{order.fttrLabel}</dd></div>
         <div><dt>{hasMonthlyAdjustment ? "原心连心月增费" : "心连心月增费"}</dt><dd>{formatOrderMoney(order.heartMonthlyFen)}/月</dd></div>
-        {hasMonthlyAdjustment ? <div><dt>下月起心连心月增费</dt><dd>{formatOrderMoney(nextHeartMonthlyFen)}/月</dd></div> : null}
+        {hasMonthlyAdjustment ? <div><dt>扣除已退商品后心连心月增费</dt><dd>{formatOrderMoney(nextHeartMonthlyFen)}/月</dd></div> : null}
         <div><dt>原合同 36 个月名义合计</dt><dd>{formatOrderMoney(order.contract36Fen)}</dd></div>
       </dl>
 
