@@ -74,6 +74,35 @@ describe("订单退单入口说明", () => {
     expect(result.reason).toContain("正在审批");
     expect(result.reason).not.toContain("没有申请");
   });
+
+  it("全部计价商品退完后提示已完成整单退单", () => {
+    const result = describeReturnAvailability(order({
+      status: "returned",
+      permissions: {
+        canDelete: false,
+        canRestore: false,
+        canRequestReturn: false,
+      },
+    }));
+    expect(result).toEqual({
+      allowed: false,
+      reason: "该订单已完成整单退单",
+    });
+  });
+
+  it("部分退单完成后仍有剩余商品时允许再次申请", () => {
+    const result = describeReturnAvailability(order({
+      status: "partially_returned",
+      lines: [{
+        id: "line-watch", lineType: "charge", sku: "WATCH",
+        label: "AI 健康智能手表", unit: "块", quantity: 2,
+        returnedQuantity: 1, monthlyUnitFen: 2000,
+        refundableQuantity: 1, refundableUnitFen: 59900,
+        oneTimeSubtotalFen: 119800, monthlySubtotalFen: 4000, locations: [],
+      }],
+    }));
+    expect(result).toEqual({ allowed: true, reason: null });
+  });
 });
 
 describe("订单状态操作按钮", () => {

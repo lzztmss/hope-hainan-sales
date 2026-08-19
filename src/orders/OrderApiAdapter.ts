@@ -66,14 +66,18 @@ const permissionsFor = (
 ): OrderPermissions => {
   const reversibleStatus = order.status === "pending" || order.status === "accepted";
   const reviewer = viewer.role === "store_manager" || viewer.role === "admin";
+  const canAccessOrder =
+    viewer.role === "admin" ||
+    (viewer.role === "store_manager" && viewer.storeId === order.storeId) ||
+    (viewer.role === "sales" &&
+      viewer.storeId === order.storeId &&
+      viewer.id === order.sellerId);
   return {
     canDelete: order.deletedAt === null && reversibleStatus,
     canRestore: order.deletedAt !== null && reviewer && reversibleStatus,
-    canRequestReturn:
-      order.deletedAt === null &&
-      (order.status === "activated" ||
-        order.status === "completed" ||
-        order.status === "partially_returned"),
+    // 权限只描述账号是否可操作该归属订单；审批中、已退完等业务状态
+    // 由 OrderDetailPage 单独解释，避免把状态限制误报成“没有权限”。
+    canRequestReturn: canAccessOrder,
   };
 };
 

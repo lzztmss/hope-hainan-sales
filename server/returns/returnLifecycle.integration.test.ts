@@ -259,6 +259,97 @@ describe("退单状态与提成冲销一致性", () => {
     await client.close();
   });
 
+  it("部分退单完成后可继续退剩余商品并重新计算金额", async () => {
+    const { client, order, seller, admin } = await createFixture("completed");
+    await client.db.insert(orderLines).values({
+      orderId: order.id,
+      lineType: "charge",
+      sku: "WATCH",
+      label: "AI 健康智能手表",
+      unit: "块",
+      quantity: 1,
+      oneTimeUnitFen: 59900,
+      oneTimeSubtotalFen: 59900,
+      monthlyUnitFen: 0,
+      monthlySubtotalFen: 0,
+      locations: [],
+    });
+    const repository = new DrizzleReturnRepository(client);
+    let suffix = 0;
+    const service = createReturnService({
+      repository,
+      commissionReversal: {
+        validateReversalForCompletedReturn: async () => undefined,
+        reverseForCompletedReturn: async () => undefined,
+      },
+      numberSuffix: () => `SEQ${++suffix}`,
+    });
+    const initial = await repository.findOrderForReturn(order.id);
+    const gateway = initial?.lines.find((line) => line.sku === "GATEWAY");
+    const watch = initial?.lines.find((line) => line.sku === "WATCH");
+    expect(gateway).toBeDefined();
+    expect(watch).toBeDefined();
+
+    const first = await service.requestReturn(
+      seller,
+      order.id,
+      {
+        type: "partial",
+        reason: "先退回迷你网关",
+        items: [{ orderLineId: gateway!.id, quantity: 1 }],
+      },
+      "return-request-sequence-first-001",
+    );
+    expect(first.maxRefundFen).toBe(39900);
+    await expect(
+      service.requestReturn(
+        seller,
+        order.id,
+        {
+          type: "partial",
+          reason: "审批中再次申请",
+          items: [{ orderLineId: watch!.id, quantity: 1 }],
+        },
+        "return-request-sequence-block-001",
+      ),
+    ).rejects.toThrow("当前订单状态不可退单");
+    await service.decideReturn(admin, first.id, "approved", "同意第一笔退单");
+    await service.completeReturn(
+      admin,
+      first.id,
+      39900,
+      "return-complete-sequence-first-001",
+    );
+    expect((await repository.findOrderForReturn(order.id))?.status).toBe(
+      "partially_returned",
+    );
+
+    const second = await service.requestReturn(
+      seller,
+      order.id,
+      {
+        type: "partial",
+        reason: "继续退回剩余手表",
+        items: [{ orderLineId: watch!.id, quantity: 1 }],
+      },
+      "return-request-sequence-second-001",
+    );
+    expect(second.maxRefundFen).toBe(59900);
+    await service.decideReturn(admin, second.id, "approved", "同意第二笔退单");
+    await service.completeReturn(
+      admin,
+      second.id,
+      59900,
+      "return-complete-sequence-second-001",
+    );
+    const finished = await repository.findOrderForReturn(order.id);
+    expect(finished?.status).toBe("returned");
+    expect(finished?.refundedFen).toBe(99800);
+    expect(finished?.lines.every((line) => line.returnedQuantity === line.quantity))
+      .toBe(true);
+    await client.close();
+  });
+
   it("冲销预检失败不会提前完成退单，重试后完整收口", async () => {
     const { client, order, seller, admin } = await createFixture("activated");
     const repository = new DrizzleReturnRepository(client);
