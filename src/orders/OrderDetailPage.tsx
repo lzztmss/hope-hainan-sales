@@ -48,9 +48,6 @@ export const monthlyAmountAfterCompletedReturns = (order: OrderDetail): number =
 
 export const describeReturnAvailability = (order: OrderDetail): ReturnAvailability => {
   if (order.deletedAt) return { allowed: false, reason: "订单已在回收站，不能申请退单" };
-  if (!order.permissions.canRequestReturn) {
-    return { allowed: false, reason: "当前账号没有申请该订单退单的权限" };
-  }
   if (order.status === "return_pending") {
     return { allowed: false, reason: "已有退单正在审批，请先等待审批结果" };
   }
@@ -65,6 +62,9 @@ export const describeReturnAvailability = (order: OrderDetail): ReturnAvailabili
   }
   if (order.status === "pending" || order.status === "accepted") {
     return { allowed: false, reason: "订单尚未生效，请使用“取消订单”" };
+  }
+  if (!order.permissions.canRequestReturn) {
+    return { allowed: false, reason: "当前账号没有申请该订单退单的权限" };
   }
   const chargeLines = order.lines.filter((line) => line.lineType === "charge");
   if (chargeLines.some((line) => line.refundableQuantity > 0)) {

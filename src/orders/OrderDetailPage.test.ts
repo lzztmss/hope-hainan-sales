@@ -63,8 +63,16 @@ describe("订单退单入口说明", () => {
   });
 
   it("退单审批中时提示等待审批", () => {
-    const result = describeReturnAvailability(order({ status: "return_pending" }));
+    const result = describeReturnAvailability(order({
+      status: "return_pending",
+      permissions: {
+        canDelete: false,
+        canRestore: false,
+        canRequestReturn: false,
+      },
+    }));
     expect(result.reason).toContain("正在审批");
+    expect(result.reason).not.toContain("没有申请");
   });
 });
 
