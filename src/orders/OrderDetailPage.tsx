@@ -35,6 +35,17 @@ export interface ReturnAvailability {
   reason: string | null;
 }
 
+export const monthlyAmountAfterCompletedReturns = (order: OrderDetail): number => {
+  if (order.status === "returned") return 0;
+  const stoppedMonthlyFen = order.lines
+    .filter((line) => line.lineType === "charge")
+    .reduce(
+      (sum, line) => sum + line.monthlyUnitFen * line.returnedQuantity,
+      0,
+    );
+  return Math.max(0, order.monthlyTotalFen - stoppedMonthlyFen);
+};
+
 export const describeReturnAvailability = (order: OrderDetail): ReturnAvailability => {
   if (order.deletedAt) return { allowed: false, reason: "订单已在回收站，不能申请退单" };
   if (!order.permissions.canRequestReturn) {
@@ -341,6 +352,19 @@ export const OrderDetailPage = ({
     if (packageQuantity <= 0) return [];
     return [{ ...line, quantity: Math.min(line.quantity, packageQuantity) }];
   });
+  const nextMonthlyFen = monthlyAmountAfterCompletedReturns(order);
+  const hasMonthlyAdjustment =
+    order.paymentMode === "contract_36" && nextMonthlyFen < order.monthlyTotalFen;
+  const stoppedHeartMonthlyFen = order.lines
+    .filter((line) => line.lineType === "charge")
+    .reduce(
+      (sum, line) => sum + line.monthlyUnitFen * line.returnedQuantity,
+      0,
+    );
+  const nextHeartMonthlyFen =
+    order.status === "returned"
+      ? 0
+      : Math.max(0, order.heartMonthlyFen - stoppedHeartMonthlyFen);
 
   const runAuditedAction = async (): Promise<void> => {
     if (!action) return;
@@ -402,9 +426,15 @@ export const OrderDetailPage = ({
           </strong>
         </div>
         <div>
-          <span>{order.paymentMode === "contract_36" ? "每月合计" : "设备合计"}</span>
+          <span>{order.paymentMode === "contract_36" ? (hasMonthlyAdjustment ? "本期原每月合计" : "每月合计") : "设备合计"}</span>
           <strong>{formatOrderPrice(order.oneTimeFen, order.monthlyTotalFen)}</strong>
         </div>
+        {hasMonthlyAdjustment ? (
+          <div className="is-adjusted-monthly">
+            <span>退单完成后下月起</span>
+            <strong>{formatOrderMoney(nextMonthlyFen)}/月</strong>
+          </div>
+        ) : null}
         {order.refundedFen > 0 ? (
           <div>
             <span>已退款</span>
@@ -413,13 +443,20 @@ export const OrderDetailPage = ({
         ) : null}
       </section>
 
+      {hasMonthlyAdjustment ? (
+        <p className="order-billing-adjustment-note">
+          本计费月仍按原月费 {formatOrderMoney(order.monthlyTotalFen)} 计费；已完成退单商品的月增费从下一计费月停止，不追溯修改本月账单。
+        </p>
+      ) : null}
+
       <dl className="order-detail-facts">
         <div><dt>营业厅</dt><dd>{order.storeName}</dd></div>
         <div><dt>销售员</dt><dd>{order.sellerName}</dd></div>
         <div><dt>服务地址</dt><dd>{order.customerAddress}</dd></div>
         <div><dt>FTTR 档位</dt><dd>{order.fttrLabel}</dd></div>
-        <div><dt>心连心月增费</dt><dd>{formatOrderMoney(order.heartMonthlyFen)}/月</dd></div>
-        <div><dt>36 个月名义合计</dt><dd>{formatOrderMoney(order.contract36Fen)}</dd></div>
+        <div><dt>{hasMonthlyAdjustment ? "原心连心月增费" : "心连心月增费"}</dt><dd>{formatOrderMoney(order.heartMonthlyFen)}/月</dd></div>
+        {hasMonthlyAdjustment ? <div><dt>下月起心连心月增费</dt><dd>{formatOrderMoney(nextHeartMonthlyFen)}/月</dd></div> : null}
+        <div><dt>原合同 36 个月名义合计</dt><dd>{formatOrderMoney(order.contract36Fen)}</dd></div>
       </dl>
 
       <section className="order-detail-section" aria-labelledby="order-lines-title">
@@ -429,16 +466,31 @@ export const OrderDetailPage = ({
           {[...visibleLines]
             .sort((left, right) => Number(left.lineType === "component") - Number(right.lineType === "component"))
             .map((line) => (
-            <article className="order-detail-line" data-line-type={line.lineType} key={line.id}>
+            <article
+              className="order-detail-line"
+              data-line-type={line.lineType}
+              data-returned={line.returnedQuantity > 0 ? "true" : "false"}
+              key={line.id}
+            >
               <div>
                 <span>
-                  {line.lineType === "component"
+                  {line.returnedQuantity > 0
+                    ? line.returnedQuantity >= line.quantity ? "已退商品" : "部分已退"
+                    : line.lineType === "component"
                     ? "套餐内设备"
                     : isNonReturnablePackageSku(line.sku)
                       ? "计价套餐 · 仅可整单退"
                       : "计价商品"}
                 </span>
                 <strong>{line.label}×{line.quantity}{line.unit}</strong>
+                {line.returnedQuantity > 0 ? (
+                  <small className="order-line-returned">
+                    已退 {line.returnedQuantity}{line.unit}
+                    {line.returnedQuantity < line.quantity
+                      ? ` · 剩余 ${line.quantity - line.returnedQuantity}${line.unit}`
+                      : " · 已全部退回"}
+                  </small>
+                ) : null}
               </div>
               <div>
                 <span>

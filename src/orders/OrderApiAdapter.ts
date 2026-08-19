@@ -195,9 +195,13 @@ const mapLine = (
   line: OrderLineDto,
   index: number,
   returned: ReadonlyMap<string, number>,
+  wholeOrderReturned: boolean,
 ): OrderLineView => {
   const persistedId = line.id?.trim() || null;
   const alreadyReturned = persistedId ? returned.get(persistedId) ?? 0 : 0;
+  const returnedQuantity = wholeOrderReturned
+    ? line.quantity
+    : Math.min(line.quantity, alreadyReturned);
   return {
     id: persistedId ?? `missing-order-line-id-${index + 1}`,
     lineType: line.lineType,
@@ -205,11 +209,13 @@ const mapLine = (
     label: line.label,
     unit: line.unit,
     quantity: line.quantity,
+    returnedQuantity,
     refundableQuantity:
       line.lineType === "charge" && persistedId
-        ? Math.max(0, line.quantity - alreadyReturned)
+        ? Math.max(0, line.quantity - returnedQuantity)
         : 0,
     refundableUnitFen: line.lineType === "charge" ? line.oneTimeUnitFen : 0,
+    monthlyUnitFen: line.monthlyUnitFen,
     oneTimeSubtotalFen: line.oneTimeSubtotalFen,
     monthlySubtotalFen: line.monthlySubtotalFen,
     locations: [...line.locations],
@@ -228,7 +234,9 @@ const mapDetail = (
     fttrLabel: fttrLabel(order),
     heartMonthlyFen: order.heartMonthlyFen,
     contract36Fen: order.contract36Fen,
-    lines: order.lines.map((line, index) => mapLine(line, index, returned)),
+    lines: order.lines.map((line, index) =>
+      mapLine(line, index, returned, order.status === "returned"),
+    ),
     timeline: timelineFor(order),
     returns: returns.map((record) => mapReturn(record, viewer)),
   };

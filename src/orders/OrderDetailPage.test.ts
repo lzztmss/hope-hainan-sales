@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { availableTransitions, describeReturnAvailability } from "./OrderDetailPage";
+import {
+  availableTransitions,
+  describeReturnAvailability,
+  monthlyAmountAfterCompletedReturns,
+} from "./OrderDetailPage";
 import type { OrderDetail, OrderViewer } from "./types";
 
 const order = (overrides: Partial<OrderDetail> = {}): OrderDetail => ({
@@ -37,6 +41,7 @@ describe("订单退单入口说明", () => {
       lines: [{
         id: "line-package", lineType: "charge", sku: "HOME_DUAL",
         label: "心连心·居家双护", unit: "套", quantity: 1,
+        returnedQuantity: 0, monthlyUnitFen: 3000,
         refundableQuantity: 1, refundableUnitFen: 0,
         oneTimeSubtotalFen: 0, monthlySubtotalFen: 3000, locations: [],
       }],
@@ -49,6 +54,7 @@ describe("订单退单入口说明", () => {
       lines: [{
         id: "line-watch", lineType: "charge", sku: "WATCH",
         label: "AI 健康智能手表", unit: "块", quantity: 1,
+        returnedQuantity: 0, monthlyUnitFen: 2000,
         refundableQuantity: 1, refundableUnitFen: 2000,
         oneTimeSubtotalFen: 0, monthlySubtotalFen: 2000, locations: [],
       }],
@@ -86,5 +92,27 @@ describe("订单状态操作按钮", () => {
       .toEqual(["COMPLETE"]);
     expect(availableTransitions(activated, viewer("store_manager"))).toEqual([]);
     expect(availableTransitions(activated, viewer("admin"))).toEqual([]);
+  });
+});
+
+describe("月付退单后的下期月费", () => {
+  it("本期保留原月费，并从下期扣除已完成退单商品的月增费", () => {
+    const current = order({
+      monthlyTotalFen: 19_800,
+      lines: [{
+        id: "line-watch", lineType: "charge", sku: "WATCH",
+        label: "AI 健康智能手表", unit: "块", quantity: 1,
+        returnedQuantity: 1, refundableQuantity: 0, refundableUnitFen: 0,
+        monthlyUnitFen: 2_000, oneTimeSubtotalFen: 0,
+        monthlySubtotalFen: 2_000, locations: [],
+      }],
+    });
+
+    expect(current.monthlyTotalFen).toBe(19_800);
+    expect(monthlyAmountAfterCompletedReturns(current)).toBe(17_800);
+  });
+
+  it("整单退回后下期月费为零", () => {
+    expect(monthlyAmountAfterCompletedReturns(order({ status: "returned" }))).toBe(0);
   });
 });

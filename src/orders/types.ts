@@ -55,8 +55,10 @@ export interface OrderLineView {
   label: string;
   unit: string;
   quantity: number;
+  returnedQuantity: number;
   refundableQuantity: number;
   refundableUnitFen: number;
+  monthlyUnitFen: number;
   oneTimeSubtotalFen: number;
   monthlySubtotalFen: number;
   locations: string[];
