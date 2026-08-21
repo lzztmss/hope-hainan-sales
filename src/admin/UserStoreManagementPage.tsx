@@ -7,6 +7,7 @@ import {
 } from "react";
 
 import { APP_BASE_PATH } from "../appBasePath";
+import { Pagination, usePagination } from "../components/Pagination";
 import "./userStoreManagement.css";
 
 export type ManagedUserRole = "sales" | "store_manager" | "admin";
@@ -337,6 +338,11 @@ export const UserStoreManagementPage = ({
         .includes(term),
     );
   }, [search, users]);
+  const userPagination = usePagination(filteredUsers);
+
+  useEffect(() => {
+    userPagination.resetPage();
+  }, [search, userPagination.resetPage]);
 
   const begin = (): void => {
     setBusy(true);
@@ -748,7 +754,7 @@ export const UserStoreManagementPage = ({
         <label className="management-search">搜索账号<input type="search" placeholder="工号、姓名、营业厅或手机号后四位" value={search} onChange={(event) => setSearch(event.currentTarget.value)} /></label>
 
         <div className="management-mobile-list" aria-label="账号移动列表">
-          {filteredUsers.map((managedUser) => (
+          {userPagination.visibleItems.map((managedUser) => (
             <article className="management-mobile-card" data-testid={`managed-user-mobile-${managedUser.id}`} key={managedUser.id}>
               <header><div><span>{managedUser.workNo}</span><h3>{managedUser.displayName}</h3></div>{statusBadge(managedUser.active)}</header>
               <div className="management-tags"><span>{roleLabels[managedUser.role]}</span><span>{personnelLabels[managedUser.personnelType]}</span>{managedUser.mustChangePassword ? <span className="is-warning">待改初始密码</span> : null}</div>
@@ -760,9 +766,14 @@ export const UserStoreManagementPage = ({
 
         <div className="management-desktop-table">
           <table aria-label="账号桌面列表"><thead><tr><th>工号 / 姓名</th><th>角色</th><th>营业厅</th><th>手机号</th><th>状态</th><th>操作</th></tr></thead>
-            <tbody>{filteredUsers.map((managedUser) => <tr key={managedUser.id}><td><strong>{managedUser.workNo}</strong><span>{managedUser.displayName}</span></td><td>{roleLabels[managedUser.role]}<small>{personnelLabels[managedUser.personnelType]}</small></td><td>{managedUser.storeName ?? "公司管理员"}</td><td>{managedUser.phoneMasked ?? "未绑定"}</td><td>{statusBadge(managedUser.active)}{managedUser.mustChangePassword ? <small>待改密码</small> : null}</td><td>{userActions(managedUser)}</td></tr>)}</tbody>
+            <tbody>{userPagination.visibleItems.map((managedUser) => <tr key={managedUser.id}><td><strong>{managedUser.workNo}</strong><span>{managedUser.displayName}</span></td><td>{roleLabels[managedUser.role]}<small>{personnelLabels[managedUser.personnelType]}</small></td><td>{managedUser.storeName ?? "公司管理员"}</td><td>{managedUser.phoneMasked ?? "未绑定"}</td><td>{statusBadge(managedUser.active)}{managedUser.mustChangePassword ? <small>待改密码</small> : null}</td><td>{userActions(managedUser)}</td></tr>)}</tbody>
           </table>
         </div>
+        <Pagination
+          onPageChange={userPagination.setPage}
+          page={userPagination.page}
+          totalItems={filteredUsers.length}
+        />
       </section>
 
       {editDraft ? (

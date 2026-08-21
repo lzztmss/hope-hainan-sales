@@ -1,3 +1,4 @@
+import { Pagination, usePagination } from "../components/Pagination";
 import { formatFen } from "../../shared/money";
 import "./myCommission.css";
 
@@ -63,8 +64,11 @@ const summaryDefinitions: ReadonlyArray<{
   { key: "netLifetimeFen", label: "累计净提成", tone: "primary" },
 ];
 
-export const MyCommissionPage = ({ dashboard }: MyCommissionPageProps) => (
-  <section className="my-commission-page" aria-labelledby="my-commission-title">
+export const MyCommissionPage = ({ dashboard }: MyCommissionPageProps) => {
+  const pagination = usePagination(dashboard.orders);
+
+  return (
+    <section className="my-commission-page" aria-labelledby="my-commission-title">
     <header className="my-commission-page__header">
       <div>
         <p>销售激励</p>
@@ -112,7 +116,7 @@ export const MyCommissionPage = ({ dashboard }: MyCommissionPageProps) => (
       <div className="commission-order-list">
         {dashboard.orders.length === 0 ? (
           <p className="commission-order-empty">本期暂无提成订单</p>
-        ) : dashboard.orders.map((order) => (
+        ) : pagination.visibleItems.map((order) => (
           <article
             className={`commission-order-card is-${order.status}`}
             data-testid={`commission-order-${order.orderId}`}
@@ -149,6 +153,12 @@ export const MyCommissionPage = ({ dashboard }: MyCommissionPageProps) => (
           </article>
         ))}
       </div>
+      <Pagination
+        onPageChange={pagination.setPage}
+        page={pagination.page}
+        totalItems={dashboard.orders.length}
+      />
     </section>
-  </section>
-);
+    </section>
+  );
+};

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { Link, useSearchParams } from "react-router-dom";
 
 import type { ApiClient, AuthenticatedUser, OrderFilterOptionsApiResponse, QuoteDetailDto, QuoteStatus } from "../api/client";
+import { Pagination, usePagination } from "../components/Pagination";
 import { PageLayout } from "../components/layout";
 import { usePageAutoRefresh } from "../hooks/usePageAutoRefresh";
 import "./quoteManagement.css";
@@ -39,6 +40,7 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
   const [options, setOptions] = useState<OrderFilterOptionsApiResponse>({ stores: [], sellers: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const pagination = usePagination(items);
   const appliedFilters = useRef<AppliedQuoteFilters>({
     dateFrom: "",
     dateTo: "",
@@ -61,15 +63,17 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
         sellerId: filters.sellerId || undefined,
         dateFrom: filters.dateFrom || undefined,
         dateTo: filters.dateTo || undefined,
+        limit: 100,
       });
       setItems(result.items);
+      if (!background) pagination.resetPage();
       setError(null);
     } catch (reason) {
       if (!background) setError(reason instanceof Error ? reason.message : "报价读取失败");
     } finally {
       if (!background) setLoading(false);
     }
-  }, [client]);
+  }, [client, pagination.resetPage]);
 
   useEffect(() => {
     appliedFilters.current = { ...appliedFilters.current, query: initialQuery };
@@ -163,7 +167,7 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
         <div className="quote-management__empty">没有找到符合条件的报价。</div>
       ) : null}
       <div className="quote-management__list">
-        {items.map((quote) => (
+        {pagination.visibleItems.map((quote) => (
           <article key={quote.id}>
             <header>
               <div>
@@ -183,6 +187,11 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
           </article>
         ))}
       </div>
+      <Pagination
+        onPageChange={pagination.setPage}
+        page={pagination.page}
+        totalItems={items.length}
+      />
     </PageLayout>
   );
 };

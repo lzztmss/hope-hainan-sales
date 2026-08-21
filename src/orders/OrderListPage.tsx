@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 
 import { formatOrderMoney, formatOrderPrice } from "./formatters";
 import { usePageAutoRefresh } from "../hooks/usePageAutoRefresh";
+import { Pagination, usePagination } from "../components/Pagination";
 import { OrderDetailPage } from "./OrderDetailPage";
 import { ReturnDialog } from "./ReturnDialog";
 import {
@@ -94,6 +95,7 @@ export const OrderListPage = ({
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [returnOpen, setReturnOpen] = useState(false);
+  const pagination = usePagination(items);
   const openedInitialOrderId = useRef<string | null>(null);
 
   const loadOrders = useCallback(async (background = false): Promise<void> => {
@@ -173,6 +175,7 @@ export const OrderListPage = ({
     const seller = availableSellers.find((option) => option.label === next.sellerQuery);
     if (store) next.storeQuery = store.id;
     if (seller) next.sellerQuery = seller.id;
+    pagination.resetPage();
     setAppliedFilters(next);
     setFilterOpen(false);
   };
@@ -335,6 +338,7 @@ export const OrderListPage = ({
           <button
             onClick={() => {
               setDraftFilters(EMPTY_FILTERS);
+              pagination.resetPage();
               setAppliedFilters(EMPTY_FILTERS);
             }}
             type="button"
@@ -375,7 +379,7 @@ export const OrderListPage = ({
             </tr>
           </thead>
           <tbody>
-            {items.map((order) => (
+            {pagination.visibleItems.map((order) => (
               <tr key={order.id}>
                 <td>
                   <strong>{order.customerMasked}</strong>
@@ -402,7 +406,7 @@ export const OrderListPage = ({
       </div>
 
       <ul aria-label="移动端订单列表" className="order-mobile-list">
-        {items.map((order) => (
+        {pagination.visibleItems.map((order) => (
           <li key={order.id}>
             <button
               aria-label={`查看订单 ${order.orderNo}`}
@@ -426,6 +430,11 @@ export const OrderListPage = ({
           </li>
         ))}
       </ul>
+      <Pagination
+        onPageChange={pagination.setPage}
+        page={pagination.page}
+        totalItems={items.length}
+      />
 
       {detail ? (
         <div className="order-modal-backdrop">

@@ -47,7 +47,7 @@ export const MyCommissionRoute = ({
       setError(null);
     }
     try {
-      const nextDashboard = await client.getMyCommissionDashboard({ month, limit: 50 });
+      const nextDashboard = await client.getMyCommissionDashboard({ month, limit: 100 });
       setDashboard(nextDashboard);
       setError(null);
     } catch (loadError) {

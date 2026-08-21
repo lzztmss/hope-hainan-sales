@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
 import type { ApiClient, AuthenticatedUser, CustomerListItemDto, OrderFilterOptionsApiResponse } from "../api/client";
+import { Pagination, usePagination } from "../components/Pagination";
 import { PageLayout } from "../components/layout";
 import "./customers.css";
 
@@ -19,6 +20,7 @@ export const CustomerListPage = ({ client, viewer }: { client: ApiClient; viewer
   const [options, setOptions] = useState<OrderFilterOptionsApiResponse>({ stores: [], sellers: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const pagination = usePagination(items);
 
   const load = useCallback(async (nextQuery = "", nextStoreId = "", nextSellerId = "") => {
     setLoading(true);
@@ -40,6 +42,7 @@ export const CustomerListPage = ({ client, viewer }: { client: ApiClient; viewer
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    pagination.resetPage();
     void load(query, storeId, sellerId);
   };
 
@@ -47,6 +50,7 @@ export const CustomerListPage = ({ client, viewer }: { client: ApiClient; viewer
     setQuery("");
     setStoreId("");
     setSellerId("");
+    pagination.resetPage();
     void load();
   };
 
@@ -84,7 +88,7 @@ export const CustomerListPage = ({ client, viewer }: { client: ApiClient; viewer
         <div className="customer-list__empty">没有找到符合条件的客户。</div>
       ) : null}
       <div className="customer-list__grid">
-        {items.map((customer) => (
+        {pagination.visibleItems.map((customer) => (
           <article key={customer.id}>
             <header>
               <div>
@@ -103,6 +107,11 @@ export const CustomerListPage = ({ client, viewer }: { client: ApiClient; viewer
           </article>
         ))}
       </div>
+      <Pagination
+        onPageChange={pagination.setPage}
+        page={pagination.page}
+        totalItems={items.length}
+      />
     </PageLayout>
   );
 };

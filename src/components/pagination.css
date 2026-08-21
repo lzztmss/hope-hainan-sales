@@ -1,0 +1,65 @@
+.app-pagination {
+  align-items: center;
+  background: var(--app-color-surface, #fff);
+  border: 1px solid var(--app-color-border, #d9e2ec);
+  border-radius: var(--app-radius-surface, 14px);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-top: 16px;
+  padding: 12px 16px;
+}
+
+.app-pagination__summary {
+  color: var(--app-color-text-muted, #62748a);
+  font-size: 13px;
+}
+
+.app-pagination__controls,
+.app-pagination__page-slot {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.app-pagination button {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--app-color-border, #d9e2ec);
+  border-radius: 8px;
+  color: var(--app-color-text, #1d2b3a);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0 11px;
+}
+
+.app-pagination button.is-current {
+  background: var(--app-color-primary, #1478bd);
+  border-color: var(--app-color-primary, #1478bd);
+  color: #fff;
+}
+
+.app-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+@media (max-width: 640px) {
+  .app-pagination {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .app-pagination__controls {
+    justify-content: space-between;
+    overflow-x: auto;
+  }
+
+  .app-pagination__summary { text-align: center; }
+}
