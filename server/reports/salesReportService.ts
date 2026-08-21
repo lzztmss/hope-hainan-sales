@@ -169,6 +169,7 @@ export const createSalesReportService = (options: {
   const getReport = async (
     user: AuthenticatedUser,
     filters: SalesReportFilters = {},
+    paginated = true,
   ): Promise<SalesReportResponse> => {
     const generatedAt = now();
     const period = parseReportPeriod(filters.from, filters.to, generatedAt);
@@ -176,7 +177,12 @@ export const createSalesReportService = (options: {
     const facts = await options.repository.loadFacts(scope, period);
     const requestedGroup = filters.groupBy ?? (user.role === "admin" ? "store" : user.role === "store_manager" ? "seller" : "none");
     const groupBy = user.role === "sales" ? "none" : requestedGroup;
-    const rows = groupBy === "none" ? [] : groupFacts(facts, groupBy);
+    const allRows = groupBy === "none" ? [] : groupFacts(facts, groupBy);
+    const page = filters.page ?? 1;
+    const pageSize = filters.pageSize ?? 20;
+    const rows = paginated
+      ? allRows.slice((page - 1) * pageSize, page * pageSize)
+      : allRows;
     return {
       generatedAt: generatedAt.toISOString(),
       period: { from: period.from, to: period.to, timeZone: "Asia/Shanghai" },
@@ -191,6 +197,9 @@ export const createSalesReportService = (options: {
       },
       totals: metricsForFacts(facts),
       rows,
+      total: allRows.length,
+      page,
+      pageSize,
     };
   };
 
@@ -201,7 +210,7 @@ export const createSalesReportService = (options: {
       filters: SalesReportFilters,
       sourceIp?: string,
     ): Promise<{ csv: string; fileName: string }> {
-      const report = await getReport(user, filters);
+      const report = await getReport(user, filters, false);
       const scope = normalizeScope(user, filters);
       const normalizedFilters = {
         from: report.period.from,

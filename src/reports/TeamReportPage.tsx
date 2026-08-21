@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SalesReportFilters, SalesReportResponse } from "../../shared/reports/types";
 import { APP_BASE_PATH } from "../appBasePath";
 import { PageLayout } from "../components/layout";
-import { Pagination, usePagination } from "../components/Pagination";
+import { LIST_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { usePageAutoRefresh } from "../hooks/usePageAutoRefresh";
 import { ReportFilters } from "./ReportFilters";
 import { formatReportFen, formatReportRate, ReportSummary } from "./ReportSummary";
@@ -33,8 +33,7 @@ export const TeamReportPage = ({
     stores: providedStores ?? [],
     sellers: providedSellers ?? [],
   });
-  const reportRows = report?.rows ?? [];
-  const pagination = usePagination(reportRows);
+  const [page, setPage] = useState(1);
   const defaults = useMemo(() => defaultShanghaiReportFilters(), []);
   const initialFilters: SalesReportFilters = useMemo(() => ({
     from: report?.period.from ?? defaults.from,
@@ -43,21 +42,22 @@ export const TeamReportPage = ({
   }), [defaults.from, defaults.to, report?.period.from, report?.period.to, report?.rows]);
   const appliedFilters = useRef(initialFilters);
   const initialLoadStarted = useRef(false);
-  const load = useCallback(async (filters: SalesReportFilters, background = false) => {
+  const load = useCallback(async (filters: SalesReportFilters, requestedPage = 1, background = false) => {
     if (!background) {
       setBusy(true);
       setError(null);
     }
     try {
-      setReport(await onLoad(filters));
-      if (!background) pagination.resetPage();
+      const next = await onLoad({ ...filters, page: requestedPage, pageSize: LIST_PAGE_SIZE });
+      setReport(next);
+      setPage(next.page ?? requestedPage);
       setError(null);
     } catch (reason) {
       if (!background) setError(reason instanceof Error ? reason.message : "团队报表加载失败");
     } finally {
       if (!background) setBusy(false);
     }
-  }, [onLoad, pagination.resetPage]);
+  }, [onLoad]);
 
   useEffect(() => {
     if (!initialReport && !initialLoadStarted.current) {
@@ -77,7 +77,7 @@ export const TeamReportPage = ({
   usePageAutoRefresh({
     enabled: Boolean(report) && !busy,
     intervalMs: 60_000,
-    onRefresh: () => load(appliedFilters.current, true),
+    onRefresh: () => load(appliedFilters.current, page, true),
   });
 
   return (
@@ -92,7 +92,7 @@ export const TeamReportPage = ({
         initialValue={initialFilters}
         onApply={(filters) => {
           appliedFilters.current = filters;
-          void load(filters);
+          void load(filters, 1);
         }}
         onExport={(filters) => void onExport(filters)}
         sellers={options.sellers}
@@ -103,7 +103,7 @@ export const TeamReportPage = ({
         <>
           <ReportSummary metrics={report.totals} />
           <section className="team-report-rows" aria-label="团队明细">
-            {pagination.visibleItems.map((row) => (
+            {report.rows.map((row) => (
               <article aria-label={`${row.label}销售数据`} key={row.key}>
                 <header><h2>{row.label}</h2><span>{row.storeName}</span></header>
                 <dl>
@@ -121,9 +121,9 @@ export const TeamReportPage = ({
             {report.rows.length === 0 ? <div className="report-empty">当前筛选范围暂无团队明细</div> : null}
           </section>
           <Pagination
-            onPageChange={pagination.setPage}
-            page={pagination.page}
-            totalItems={report.rows.length}
+            onPageChange={(nextPage) => void load(appliedFilters.current, nextPage)}
+            page={page}
+            totalItems={report.total ?? report.rows.length}
           />
         </>
       ) : <div className="report-empty">请选择日期并查询报表</div>}

@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 
 import type { ApiClient, AuthenticatedUser, CustomerListItemDto, OrderFilterOptionsApiResponse } from "../api/client";
-import { Pagination, usePagination } from "../components/Pagination";
+import { LIST_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { PageLayout } from "../components/layout";
 import "./customers.css";
 
@@ -14,19 +14,24 @@ const ROOM_LABELS: Record<string, string> = {
 
 export const CustomerListPage = ({ client, viewer }: { client: ApiClient; viewer: AuthenticatedUser }) => {
   const [items, setItems] = useState<readonly CustomerListItemDto[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [query, setQuery] = useState("");
   const [storeId, setStoreId] = useState("");
   const [sellerId, setSellerId] = useState("");
   const [options, setOptions] = useState<OrderFilterOptionsApiResponse>({ stores: [], sellers: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const pagination = usePagination(items);
+  const appliedFilters = useRef({ query: "", storeId: "", sellerId: "" });
 
-  const load = useCallback(async (nextQuery = "", nextStoreId = "", nextSellerId = "") => {
+  const load = useCallback(async (nextQuery = "", nextStoreId = "", nextSellerId = "", requestedPage = 1) => {
     setLoading(true);
     setError(null);
     try {
-      setItems((await client.listCustomers({ query: nextQuery, storeId: nextStoreId || undefined, sellerId: nextSellerId || undefined })).items);
+      const result = await client.listCustomers({ query: nextQuery, storeId: nextStoreId || undefined, sellerId: nextSellerId || undefined, page: requestedPage, pageSize: LIST_PAGE_SIZE });
+      setItems(result.items);
+      setTotal(result.total);
+      setPage(result.page);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "客户读取失败");
     } finally {
@@ -42,7 +47,7 @@ export const CustomerListPage = ({ client, viewer }: { client: ApiClient; viewer
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    pagination.resetPage();
+    appliedFilters.current = { query, storeId, sellerId };
     void load(query, storeId, sellerId);
   };
 
@@ -50,7 +55,7 @@ export const CustomerListPage = ({ client, viewer }: { client: ApiClient; viewer
     setQuery("");
     setStoreId("");
     setSellerId("");
-    pagination.resetPage();
+    appliedFilters.current = { query: "", storeId: "", sellerId: "" };
     void load();
   };
 
@@ -88,7 +93,7 @@ export const CustomerListPage = ({ client, viewer }: { client: ApiClient; viewer
         <div className="customer-list__empty">没有找到符合条件的客户。</div>
       ) : null}
       <div className="customer-list__grid">
-        {pagination.visibleItems.map((customer) => (
+        {items.map((customer) => (
           <article key={customer.id}>
             <header>
               <div>
@@ -108,9 +113,12 @@ export const CustomerListPage = ({ client, viewer }: { client: ApiClient; viewer
         ))}
       </div>
       <Pagination
-        onPageChange={pagination.setPage}
-        page={pagination.page}
-        totalItems={items.length}
+        onPageChange={(nextPage) => {
+          const filters = appliedFilters.current;
+          void load(filters.query, filters.storeId, filters.sellerId, nextPage);
+        }}
+        page={page}
+        totalItems={total}
       />
     </PageLayout>
   );

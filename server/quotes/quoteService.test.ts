@@ -80,7 +80,10 @@ class MemoryQuoteRepository implements QuoteRepository {
   }
 
   async list(_scope: UserScope, filters: QuoteListFilters) {
-    return { items: [...this.quotes.values()].slice(0, filters.limit) };
+    const items = [...this.quotes.values()];
+    if (filters.query) return { items, total: items.length };
+    const start = (filters.page - 1) * filters.pageSize;
+    return { items: items.slice(start, start + filters.pageSize), total: items.length };
   }
 
   async updateQuote(id: string, expectedVersion: number, input: QuoteWriteRecord) {
@@ -192,9 +195,36 @@ describe("报价保存后编辑主链路", () => {
     const { service } = setup();
     await service.confirmQuote(seller, draft(1), "quote-key-123456");
 
-    const byName = await service.listQuotes(seller, { query: "张先生", limit: 50 });
-    const byPhone = await service.listQuotes(seller, { query: "8000", limit: 50 });
+    const byName = await service.listQuotes(seller, { query: "张先生", page: 1, pageSize: 20 });
+    const byPhone = await service.listQuotes(seller, { query: "8000", page: 1, pageSize: 20 });
     expect(byName.items).toHaveLength(1);
     expect(byPhone.items).toHaveLength(1);
+  });
+
+  it("服务端按每页 20 条返回并保留真实总数", async () => {
+    const { repository, service } = setup();
+    const created = await service.confirmQuote(seller, draft(1), "quote-key-123456");
+    for (let index = 2; index <= 45; index += 1) {
+      repository.quotes.set(`quote-${index}`, {
+        ...created,
+        id: `quote-${index}`,
+        quoteNo: `XLX-PAGE-${String(index).padStart(3, "0")}`,
+        idempotencyKey: `quote-page-key-${String(index).padStart(6, "0")}`,
+      });
+    }
+
+    const secondPage = await service.listQuotes(seller, { page: 2, pageSize: 20 });
+    const thirdPage = await service.listQuotes(seller, { page: 3, pageSize: 20 });
+    const searchedThirdPage = await service.listQuotes(seller, {
+      query: "张先生",
+      page: 3,
+      pageSize: 20,
+    });
+
+    expect(secondPage).toMatchObject({ total: 45, page: 2, pageSize: 20 });
+    expect(secondPage.items).toHaveLength(20);
+    expect(thirdPage.items).toHaveLength(5);
+    expect(searchedThirdPage).toMatchObject({ total: 45, page: 3, pageSize: 20 });
+    expect(searchedThirdPage.items).toHaveLength(5);
   });
 });

@@ -20,6 +20,8 @@ const filtersSchema = z.object({
   storeId: z.string().uuid().optional(),
   sellerId: z.string().uuid().optional(),
   groupBy: z.enum(["none", "store", "seller"]).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 
 const resolveUser = async (
@@ -64,6 +66,8 @@ const parseFilters = (value: unknown): SalesReportFilters | null => {
         storeId: parsed.data.storeId,
         sellerId: parsed.data.sellerId,
         groupBy: parsed.data.groupBy,
+        page: parsed.data.page,
+        pageSize: parsed.data.pageSize,
       }
     : null;
 };

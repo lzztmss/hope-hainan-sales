@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, isNull, sql, type SQL } from "drizzle-orm";
 
 import type { UserScope } from "../auth/authorization.js";
 import type { DbClient } from "../db/client.js";
@@ -20,13 +20,18 @@ export class DrizzleCustomerRepository implements CustomerRepository {
   async list(
     scope: UserScope,
     filters: { storeId?: string; ownerUserId?: string },
-    limit: number,
-  ): Promise<readonly CustomerListRecord[]> {
+    paging: { page: number; pageSize: number; unpaged?: boolean },
+  ): Promise<{ items: readonly CustomerListRecord[]; total: number }> {
     const scoped = scopeCondition(scope);
     const ownershipFilters = [scoped];
     if (filters.storeId) ownershipFilters.push(eq(customers.storeId, filters.storeId));
     if (filters.ownerUserId) ownershipFilters.push(eq(customers.ownerUserId, filters.ownerUserId));
-    const rows = await this.client.db
+    const where = and(isNull(customers.deletedAt), ...ownershipFilters);
+    const [totalRow] = await this.client.db
+      .select({ value: count() })
+      .from(customers)
+      .where(where);
+    let query = this.client.db
       .select({
         id: customers.id,
         storeId: customers.storeId,
@@ -47,15 +52,18 @@ export class DrizzleCustomerRepository implements CustomerRepository {
       .innerJoin(users, eq(users.id, customers.ownerUserId))
       .leftJoin(quotes, and(eq(quotes.customerId, customers.id), isNull(quotes.deletedAt)))
       .leftJoin(orders, and(eq(orders.customerId, customers.id), isNull(orders.deletedAt)))
-      .where(and(isNull(customers.deletedAt), ...ownershipFilters))
+      .where(where)
       .groupBy(customers.id, stores.name, users.displayName)
-      .orderBy(desc(customers.updatedAt), desc(customers.id))
-      .limit(limit);
-    return rows.map((row) => ({
+      .orderBy(desc(customers.updatedAt), desc(customers.id));
+    if (!paging.unpaged) {
+      query = query.limit(paging.pageSize).offset((paging.page - 1) * paging.pageSize) as typeof query;
+    }
+    const rows = await query;
+    return { items: rows.map((row) => ({
       ...row,
       quoteCount: Number(row.quoteCount),
       orderCount: Number(row.orderCount),
       lastQuoteAt: row.lastQuoteAt ? new Date(row.lastQuoteAt) : null,
-    }));
+    })), total: Number(totalRow?.value ?? 0) };
   }
 }

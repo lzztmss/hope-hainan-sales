@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 
 import { formatOrderMoney, formatOrderPrice } from "./formatters";
 import { usePageAutoRefresh } from "../hooks/usePageAutoRefresh";
-import { Pagination, usePagination } from "../components/Pagination";
+import { LIST_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { OrderDetailPage } from "./OrderDetailPage";
 import { ReturnDialog } from "./ReturnDialog";
 import {
@@ -89,23 +89,26 @@ export const OrderListPage = ({
   const [appliedFilters, setAppliedFilters] = useState<OrderListFilters>(EMPTY_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
   const [items, setItems] = useState<OrderSummary[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [detail, setDetail] = useState<OrderDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [returnOpen, setReturnOpen] = useState(false);
-  const pagination = usePagination(items);
   const openedInitialOrderId = useRef<string | null>(null);
 
-  const loadOrders = useCallback(async (background = false): Promise<void> => {
+  const loadOrders = useCallback(async (background = false, requestedPage = 1): Promise<void> => {
     if (!background) {
       setLoading(true);
       setListError(null);
     }
     try {
-      const result = await adapter.listOrders(appliedFilters);
+      const result = await adapter.listOrders(appliedFilters, requestedPage, LIST_PAGE_SIZE);
       setItems(scopeOrders(result.items, viewer));
+      setTotal(result.total);
+      setPage(requestedPage);
       setListError(null);
     } catch (error) {
       if (!background) {
@@ -124,7 +127,7 @@ export const OrderListPage = ({
   usePageAutoRefresh({
     enabled: !loading,
     intervalMs: 15_000,
-    onRefresh: () => loadOrders(true),
+    onRefresh: () => loadOrders(true, page),
   });
 
   const openDetail = async (orderId: string): Promise<void> => {
@@ -164,9 +167,9 @@ export const OrderListPage = ({
   };
 
   const pageDescription = useMemo(() => {
-    if (appliedFilters.recycleBin) return `回收站内共 ${items.length} 笔订单`;
-    return `共 ${items.length} 笔可见订单`;
-  }, [appliedFilters.recycleBin, items.length]);
+    if (appliedFilters.recycleBin) return `回收站内共 ${total} 笔订单`;
+    return `共 ${total} 笔可见订单`;
+  }, [appliedFilters.recycleBin, total]);
 
   const submitFiltersWithResolvedOwnership = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -175,7 +178,7 @@ export const OrderListPage = ({
     const seller = availableSellers.find((option) => option.label === next.sellerQuery);
     if (store) next.storeQuery = store.id;
     if (seller) next.sellerQuery = seller.id;
-    pagination.resetPage();
+    setPage(1);
     setAppliedFilters(next);
     setFilterOpen(false);
   };
@@ -338,7 +341,7 @@ export const OrderListPage = ({
           <button
             onClick={() => {
               setDraftFilters(EMPTY_FILTERS);
-              pagination.resetPage();
+              setPage(1);
               setAppliedFilters(EMPTY_FILTERS);
             }}
             type="button"
@@ -379,7 +382,7 @@ export const OrderListPage = ({
             </tr>
           </thead>
           <tbody>
-            {pagination.visibleItems.map((order) => (
+            {items.map((order) => (
               <tr key={order.id}>
                 <td>
                   <strong>{order.customerMasked}</strong>
@@ -406,7 +409,7 @@ export const OrderListPage = ({
       </div>
 
       <ul aria-label="移动端订单列表" className="order-mobile-list">
-        {pagination.visibleItems.map((order) => (
+        {items.map((order) => (
           <li key={order.id}>
             <button
               aria-label={`查看订单 ${order.orderNo}`}
@@ -431,9 +434,9 @@ export const OrderListPage = ({
         ))}
       </ul>
       <Pagination
-        onPageChange={pagination.setPage}
-        page={pagination.page}
-        totalItems={items.length}
+        onPageChange={(nextPage) => void loadOrders(false, nextPage)}
+        page={page}
+        totalItems={total}
       />
 
       {detail ? (

@@ -4,8 +4,6 @@ import {
   count,
   desc,
   eq,
-  like,
-  or,
   type SQL,
 } from "drizzle-orm";
 
@@ -198,27 +196,37 @@ export class DrizzleAdminRepository implements AdminRepository {
 
   async listUsers(
     filters: AdminUserFilters,
-  ): Promise<readonly AdminUserRecord[]> {
+  ): Promise<{ items: readonly AdminUserRecord[]; total: number; activeTotal: number; mustChangePasswordTotal: number }> {
     const conditions: SQL[] = [];
     if (filters.storeId) conditions.push(eq(users.storeId, filters.storeId));
     if (filters.role) conditions.push(eq(users.role, filters.role));
     if (filters.active !== undefined) {
       conditions.push(eq(users.active, filters.active));
     }
-    if (filters.query) {
-      conditions.push(
-        or(
-          like(users.workNo, `%${filters.query}%`),
-          like(users.displayName, `%${filters.query}%`),
-        )!,
-      );
-    }
-    return this.executor
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    const [[totalRow], [activeRow], [mustChangeRow]] = await Promise.all([
+      this.executor.select({ value: count() }).from(users).where(where),
+      this.executor.select({ value: count() }).from(users).where(eq(users.active, true)),
+      this.executor.select({ value: count() }).from(users).where(eq(users.mustChangePassword, true)),
+    ]);
+    let query = this.executor
       .select(userSelection)
       .from(users)
       .leftJoin(stores, eq(stores.id, users.storeId))
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .where(where)
       .orderBy(desc(users.active), asc(users.workNo));
+    if (!filters.query) {
+      query = query
+        .limit(filters.pageSize ?? 20)
+        .offset(((filters.page ?? 1) - 1) * (filters.pageSize ?? 20)) as typeof query;
+    }
+    const items = await query;
+    return {
+      items,
+      total: Number(totalRow?.value ?? 0),
+      activeTotal: Number(activeRow?.value ?? 0),
+      mustChangePasswordTotal: Number(mustChangeRow?.value ?? 0),
+    };
   }
 
   private async loadUser(id: string): Promise<AdminUserRecord | null> {

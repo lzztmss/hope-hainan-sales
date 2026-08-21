@@ -7,7 +7,7 @@ describe("API client order filters", () => {
     let requestedUrl = "";
     const fetcher: typeof fetch = async (input) => {
       requestedUrl = String(input);
-      return new Response(JSON.stringify({ items: [], nextCursor: null }), {
+      return new Response(JSON.stringify({ items: [], nextCursor: null, total: 45, page: 2, pageSize: 20 }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
@@ -16,11 +16,12 @@ describe("API client order filters", () => {
 
     await client.listOrders({
       query: "XLX-RT-20260818-89E127",
-      limit: 100,
+      page: 2,
+      limit: 20,
     });
 
     expect(requestedUrl).toBe(
-      "/api/orders?query=XLX-RT-20260818-89E127&limit=100",
+      "/api/orders?query=XLX-RT-20260818-89E127&page=2&limit=20",
     );
   });
 });

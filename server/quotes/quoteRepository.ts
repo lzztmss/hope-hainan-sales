@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNotNull, isNull, lt, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNotNull, isNull, lt, sql, type SQL } from "drizzle-orm";
 
 import type { QuoteCalculation } from "../../shared/pricing/types.js";
 import type {
@@ -208,13 +208,23 @@ export class DrizzleQuoteRepository implements QuoteRepository {
     conditions.push(filters.deletedOnly ? isNotNull(quotes.deletedAt) : isNull(quotes.deletedAt));
     if (filters.dateFrom) conditions.push(gte(quotes.confirmedAt, filters.dateFrom));
     if (filters.dateTo) conditions.push(lt(quotes.confirmedAt, filters.dateTo));
-    const rows = await this.executor
+    const where = and(...conditions);
+    const [totalRow] = await this.executor
+      .select({ value: count() })
+      .from(quotes)
+      .where(where);
+    let query = this.executor
       .select()
       .from(quotes)
-      .where(and(...conditions))
-      .orderBy(desc(quotes.updatedAt), desc(quotes.id))
-      .limit(filters.query ? 500 : filters.limit);
-    return { items: rows.map(mapQuote) };
+      .where(where)
+      .orderBy(desc(quotes.updatedAt), desc(quotes.id));
+    if (!filters.query) {
+      query = query
+        .limit(filters.pageSize)
+        .offset((filters.page - 1) * filters.pageSize) as typeof query;
+    }
+    const rows = await query;
+    return { items: rows.map(mapQuote), total: Number(totalRow?.value ?? 0) };
   }
 
   async updateQuote(

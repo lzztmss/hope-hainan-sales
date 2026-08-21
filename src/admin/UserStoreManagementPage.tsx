@@ -7,7 +7,7 @@ import {
 } from "react";
 
 import { APP_BASE_PATH } from "../appBasePath";
-import { Pagination, usePagination } from "../components/Pagination";
+import { Pagination } from "../components/Pagination";
 import "./userStoreManagement.css";
 
 export type ManagedUserRole = "sales" | "store_manager" | "admin";
@@ -86,6 +86,13 @@ export interface UserStoreManagementPageProps {
   currentUserId?: string;
   stores: readonly ManagedStoreView[];
   users: readonly ManagedUserView[];
+  managerCandidates?: readonly ManagedUserView[];
+  userPage?: number;
+  userTotal?: number;
+  activeUserTotal?: number;
+  mustChangePasswordTotal?: number;
+  onUserPageChange?(page: number): void;
+  onUserQueryChange?(query: string): void;
   onCreateStore?(input: CreateManagedStoreInput): Promise<void>;
   onUpdateStore?(id: string, input: UpdateManagedStoreInput): Promise<void>;
   onCreateUser?(input: CreateManagedUserInput): Promise<void>;
@@ -98,6 +105,17 @@ export interface ManagedUserFilters {
   role?: ManagedUserRole;
   active?: boolean;
   query?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ManagedUserPage {
+  users: ManagedUserView[];
+  total: number;
+  activeTotal: number;
+  mustChangePasswordTotal: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface UserStoreManagementApi {
@@ -107,7 +125,7 @@ export interface UserStoreManagementApi {
     id: string,
     input: UpdateManagedStoreInput,
   ): Promise<ManagedStoreView>;
-  listUsers(filters?: ManagedUserFilters): Promise<ManagedUserView[]>;
+  listUsers(filters?: ManagedUserFilters): Promise<ManagedUserPage>;
   createUser(input: CreateManagedUserInput): Promise<ManagedUserView>;
   updateUser(
     id: string,
@@ -178,13 +196,14 @@ export const createUserStoreManagementApi = (
     if (filters.role) query.set("role", filters.role);
     if (filters.active !== undefined) query.set("active", String(filters.active));
     if (filters.query) query.set("query", filters.query);
+    query.set("page", String(filters.page ?? 1));
+    query.set("pageSize", String(filters.pageSize ?? 20));
     const suffix = query.size > 0 ? `?${query.toString()}` : "";
-    const result = await apiRequest<{ users: ManagedUserView[] }>(
+    return apiRequest<ManagedUserPage>(
       fetcher,
       `${baseUrl}/api/admin/users${suffix}`,
       { method: "GET" },
     );
-    return result.users;
   },
   async createUser(input) {
     const result = await apiRequest<{ user: ManagedUserView }>(
@@ -274,6 +293,13 @@ export const UserStoreManagementPage = ({
   currentUserId,
   stores,
   users,
+  managerCandidates = users,
+  userPage = 1,
+  userTotal = users.length,
+  activeUserTotal = users.filter((user) => user.active).length,
+  mustChangePasswordTotal = users.filter((user) => user.mustChangePassword).length,
+  onUserPageChange,
+  onUserQueryChange,
   onCreateStore,
   onUpdateStore,
   onCreateUser,
@@ -291,6 +317,7 @@ export const UserStoreManagementPage = ({
   const [managerUserId, setManagerUserId] = useState("");
   const [managerReason, setManagerReason] = useState("");
   const [search, setSearch] = useState("");
+  const lastReportedSearch = useRef("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -324,25 +351,15 @@ export const UserStoreManagementPage = ({
     () => stores.filter((store) => store.active),
     [stores],
   );
-  const activeUsers = useMemo(
-    () => users.filter((user) => user.active).length,
-    [users],
-  );
-  const filteredUsers = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return users;
-    return users.filter((user) =>
-      [user.workNo, user.displayName, user.storeName ?? "", user.phoneMasked ?? ""]
-        .join(" ")
-        .toLowerCase()
-        .includes(term),
-    );
-  }, [search, users]);
-  const userPagination = usePagination(filteredUsers);
-
   useEffect(() => {
-    userPagination.resetPage();
-  }, [search, userPagination.resetPage]);
+    const normalized = search.trim();
+    if (normalized === lastReportedSearch.current) return;
+    const timer = window.setTimeout(() => {
+      lastReportedSearch.current = normalized;
+      onUserQueryChange?.(normalized);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [onUserQueryChange, search]);
 
   const begin = (): void => {
     setBusy(true);
@@ -662,8 +679,8 @@ export const UserStoreManagementPage = ({
 
       <section className="management-summary" aria-label="管理汇总">
         <article><span>启用营业厅</span><strong>{activeStores.length}</strong></article>
-        <article><span>启用账号</span><strong>{activeUsers}</strong></article>
-        <article><span>首次登录待改密</span><strong>{users.filter((user) => user.mustChangePassword).length}</strong></article>
+        <article><span>启用账号</span><strong>{activeUserTotal}</strong></article>
+        <article><span>首次登录待改密</span><strong>{mustChangePasswordTotal}</strong></article>
       </section>
 
       <div className="management-live" aria-live="polite">
@@ -711,7 +728,7 @@ export const UserStoreManagementPage = ({
         <section ref={actionPanelRef} className="management-action-panel" aria-labelledby="manager-action-title">
           <h2 id="manager-action-title">指定营业厅主经理</h2>
           <form onSubmit={(event) => void saveStoreManager(event)}>
-            <label>主经理<select value={managerUserId} onChange={(event) => setManagerUserId(event.currentTarget.value)}><option value="">暂不指定</option>{users.filter((user) => user.storeId === managerStoreId && user.role === "store_manager" && user.active).map((user) => <option key={user.id} value={user.id}>{user.displayName}（{user.workNo}）</option>)}</select></label>
+              <label>主经理<select value={managerUserId} onChange={(event) => setManagerUserId(event.currentTarget.value)}><option value="">暂不指定</option>{managerCandidates.filter((user) => user.storeId === managerStoreId && user.role === "store_manager" && user.active).map((user) => <option key={user.id} value={user.id}>{user.displayName}（{user.workNo}）</option>)}</select></label>
             <label>变更原因（至少 2 个字符）<input required minLength={2} value={managerReason} onChange={(event) => setManagerReason(event.currentTarget.value)} /></label>
             <div className="management-form-actions"><button type="button" onClick={() => setManagerStoreId(null)}>取消</button><button className="management-primary" disabled={busy} type="submit">确认指定</button></div>
           </form>
@@ -754,7 +771,7 @@ export const UserStoreManagementPage = ({
         <label className="management-search">搜索账号<input type="search" placeholder="工号、姓名、营业厅或手机号后四位" value={search} onChange={(event) => setSearch(event.currentTarget.value)} /></label>
 
         <div className="management-mobile-list" aria-label="账号移动列表">
-          {userPagination.visibleItems.map((managedUser) => (
+          {users.map((managedUser) => (
             <article className="management-mobile-card" data-testid={`managed-user-mobile-${managedUser.id}`} key={managedUser.id}>
               <header><div><span>{managedUser.workNo}</span><h3>{managedUser.displayName}</h3></div>{statusBadge(managedUser.active)}</header>
               <div className="management-tags"><span>{roleLabels[managedUser.role]}</span><span>{personnelLabels[managedUser.personnelType]}</span>{managedUser.mustChangePassword ? <span className="is-warning">待改初始密码</span> : null}</div>
@@ -766,13 +783,13 @@ export const UserStoreManagementPage = ({
 
         <div className="management-desktop-table">
           <table aria-label="账号桌面列表"><thead><tr><th>工号 / 姓名</th><th>角色</th><th>营业厅</th><th>手机号</th><th>状态</th><th>操作</th></tr></thead>
-            <tbody>{userPagination.visibleItems.map((managedUser) => <tr key={managedUser.id}><td><strong>{managedUser.workNo}</strong><span>{managedUser.displayName}</span></td><td>{roleLabels[managedUser.role]}<small>{personnelLabels[managedUser.personnelType]}</small></td><td>{managedUser.storeName ?? "公司管理员"}</td><td>{managedUser.phoneMasked ?? "未绑定"}</td><td>{statusBadge(managedUser.active)}{managedUser.mustChangePassword ? <small>待改密码</small> : null}</td><td>{userActions(managedUser)}</td></tr>)}</tbody>
+            <tbody>{users.map((managedUser) => <tr key={managedUser.id}><td><strong>{managedUser.workNo}</strong><span>{managedUser.displayName}</span></td><td>{roleLabels[managedUser.role]}<small>{personnelLabels[managedUser.personnelType]}</small></td><td>{managedUser.storeName ?? "公司管理员"}</td><td>{managedUser.phoneMasked ?? "未绑定"}</td><td>{statusBadge(managedUser.active)}{managedUser.mustChangePassword ? <small>待改密码</small> : null}</td><td>{userActions(managedUser)}</td></tr>)}</tbody>
           </table>
         </div>
         <Pagination
-          onPageChange={userPagination.setPage}
-          page={userPagination.page}
-          totalItems={filteredUsers.length}
+          onPageChange={(nextPage) => onUserPageChange?.(nextPage)}
+          page={userPage}
+          totalItems={userTotal}
         />
       </section>
 

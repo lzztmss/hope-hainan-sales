@@ -6,6 +6,8 @@ export interface SalesReportFilters {
   storeId?: string;
   sellerId?: string;
   groupBy?: ReportGroupBy;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface SalesReportMetrics {
@@ -47,4 +49,7 @@ export interface SalesReportResponse {
   };
   totals: SalesReportMetrics;
   rows: SalesReportRow[];
+  total: number;
+  page: number;
+  pageSize: number;
 }

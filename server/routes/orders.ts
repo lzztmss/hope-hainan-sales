@@ -84,6 +84,7 @@ const listQuerySchema = z.object({
   dateFrom: dateSchema.optional(),
   dateTo: dateSchema.optional(),
   cursor: z.string().max(500).optional(),
+  page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
@@ -169,6 +170,7 @@ const parseListFilters = (
       dateFrom,
       dateTo,
       cursor: parsed.data.cursor,
+      page: parsed.data.page ?? (parsed.data.cursor ? undefined : 1),
       limit: parsed.data.limit,
     },
   };

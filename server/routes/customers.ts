@@ -9,7 +9,8 @@ const querySchema = z.object({
   query: z.string().trim().max(120).optional(),
   storeId: z.string().uuid().optional(),
   sellerId: z.string().uuid().optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(100),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 
 const resolveUser = async (
@@ -38,7 +39,8 @@ export const registerCustomerRoutes = async (
         query: parsed.data.query,
         storeId: parsed.data.storeId,
         sellerId: parsed.data.sellerId,
-        limit: parsed.data.limit,
+        page: parsed.data.page,
+        pageSize: parsed.data.pageSize,
       },
     );
   });

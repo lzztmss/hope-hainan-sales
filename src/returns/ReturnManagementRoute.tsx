@@ -28,6 +28,8 @@ export const ReturnManagementRoute = ({
   api = returnManagementApi,
 }: ReturnManagementRouteProps) => {
   const [items, setItems] = useState<readonly ReturnRecordDto[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [status, setStatus] = useState<ReturnStatus | "">("");
   const [storeId, setStoreId] = useState("");
   const [sellerId, setSellerId] = useState("");
@@ -36,13 +38,16 @@ export const ReturnManagementRoute = ({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadVersion, setReloadVersion] = useState(0);
 
-  const load = useCallback(async (background = false) => {
+  const load = useCallback(async (background = false, requestedPage = 1) => {
     if (!background) {
       setLoading(true);
       setLoadError(null);
     }
     try {
-      setItems(await api.listReturns({ status: status || undefined, storeId: storeId || undefined, sellerId: sellerId || undefined }));
+      const result = await api.listReturns({ status: status || undefined, storeId: storeId || undefined, sellerId: sellerId || undefined, page: requestedPage, pageSize: 20 });
+      setItems(result.items);
+      setTotal(result.total);
+      setPage(result.page);
       setLoadError(null);
     } catch (error) {
       if (!background) {
@@ -65,7 +70,7 @@ export const ReturnManagementRoute = ({
   usePageAutoRefresh({
     enabled: !loading,
     intervalMs: 15_000,
-    onRefresh: () => load(true),
+    onRefresh: () => load(true, page),
   });
 
   const replaceRecord = (next: ReturnRecordDto) => {
@@ -78,6 +83,9 @@ export const ReturnManagementRoute = ({
     <ReturnManagementPage
       actor={actor}
       items={items}
+      page={page}
+      total={total}
+      onPageChange={(nextPage) => void load(false, nextPage)}
       loadError={loadError}
       loading={loading}
       onComplete={async (input) => {

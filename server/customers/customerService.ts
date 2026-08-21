@@ -20,15 +20,16 @@ export interface CustomerRepository {
   list(
     scope: UserScope,
     filters: { storeId?: string; ownerUserId?: string },
-    limit: number,
-  ): Promise<readonly CustomerListRecord[]>;
+    paging: { page: number; pageSize: number; unpaged?: boolean },
+  ): Promise<{ items: readonly CustomerListRecord[]; total: number }>;
 }
 
 export interface CustomerListFilters {
   query?: string;
   storeId?: string;
   sellerId?: string;
-  limit?: number;
+  page?: number;
+  pageSize?: number;
 }
 
 export const createCustomerService = (options: {
@@ -37,42 +38,47 @@ export const createCustomerService = (options: {
 }) => ({
   async listCustomers(user: AuthenticatedUser, filters: CustomerListFilters = {}) {
     const normalized = filters.query?.trim().toLocaleLowerCase("zh-CN") ?? "";
-    const limit = filters.limit ?? 100;
-    const rows = await options.repository.list(
+    const page = filters.page ?? 1;
+    const pageSize = filters.pageSize ?? 20;
+    const result = await options.repository.list(
       scopeForUser(user),
       { storeId: filters.storeId, ownerUserId: filters.sellerId },
-      normalized ? 500 : limit,
+      { page, pageSize, unpaged: Boolean(normalized) },
     );
+    const filtered = result.items
+      .map((row) => {
+        const name = options.decryptPii(row.nameEncrypted);
+        const phone = options.decryptPii(row.phoneEncrypted);
+        return {
+          id: row.id,
+          storeId: row.storeId,
+          storeName: row.storeName,
+          ownerUserId: row.ownerUserId,
+          ownerName: row.ownerName,
+          name,
+          phoneMasked: `${phone.slice(0, 3)}****${phone.slice(-4)}`,
+          roomType: row.roomType,
+          elderCount: row.elderCount,
+          quoteCount: row.quoteCount,
+          orderCount: row.orderCount,
+          lastQuoteAt: row.lastQuoteAt?.toISOString() ?? null,
+          updatedAt: row.updatedAt.toISOString(),
+        };
+      })
+      .filter((row) =>
+        !normalized ||
+        row.name.toLocaleLowerCase("zh-CN").includes(normalized) ||
+        row.phoneMasked.replace("****", "").includes(normalized) ||
+        row.phoneMasked.endsWith(normalized) ||
+        row.ownerName.toLocaleLowerCase("zh-CN").includes(normalized) ||
+        row.storeName.toLocaleLowerCase("zh-CN").includes(normalized),
+      );
+    const start = normalized ? (page - 1) * pageSize : 0;
     return {
-      items: rows
-        .map((row) => {
-          const name = options.decryptPii(row.nameEncrypted);
-          const phone = options.decryptPii(row.phoneEncrypted);
-          return {
-            id: row.id,
-            storeId: row.storeId,
-            storeName: row.storeName,
-            ownerUserId: row.ownerUserId,
-            ownerName: row.ownerName,
-            name,
-            phoneMasked: `${phone.slice(0, 3)}****${phone.slice(-4)}`,
-            roomType: row.roomType,
-            elderCount: row.elderCount,
-            quoteCount: row.quoteCount,
-            orderCount: row.orderCount,
-            lastQuoteAt: row.lastQuoteAt?.toISOString() ?? null,
-            updatedAt: row.updatedAt.toISOString(),
-          };
-        })
-        .filter((row) =>
-          !normalized ||
-          row.name.toLocaleLowerCase("zh-CN").includes(normalized) ||
-          row.phoneMasked.replace("****", "").includes(normalized) ||
-          row.phoneMasked.endsWith(normalized) ||
-          row.ownerName.toLocaleLowerCase("zh-CN").includes(normalized) ||
-          row.storeName.toLocaleLowerCase("zh-CN").includes(normalized),
-        )
-        .slice(0, limit),
+      items: normalized ? filtered.slice(start, start + pageSize) : filtered,
+      total: normalized ? filtered.length : result.total,
+      page,
+      pageSize,
     };
   },
 });

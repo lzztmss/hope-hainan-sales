@@ -128,7 +128,8 @@ export interface ReturnRepository {
   listRequests(
     scope: UserScope,
     filters: { orderId?: string; status?: ReturnRequestStatus; storeId?: string; sellerId?: string },
-  ): Promise<ReturnRequestRecord[]>;
+    paging?: { page: number; pageSize: number },
+  ): Promise<{ items: ReturnRequestRecord[]; total: number }>;
   saveDecision(
     id: string,
     decision: ReturnDecisionWrite,
@@ -261,9 +262,12 @@ export const createReturnService = (options: ReturnServiceOptions) => {
   return {
     async listReturns(
       actor: AuthenticatedUser,
-      filters: { status?: ReturnRequestStatus; storeId?: string; sellerId?: string } = {},
-    ): Promise<ReturnRequestRecord[]> {
-      return options.repository.listRequests(scopeForUser(actor), filters);
+      filters: { status?: ReturnRequestStatus; storeId?: string; sellerId?: string; page?: number; pageSize?: number } = {},
+    ) {
+      const page = filters.page ?? 1;
+      const pageSize = filters.pageSize ?? 20;
+      const result = await options.repository.listRequests(scopeForUser(actor), filters, { page, pageSize });
+      return { ...result, page, pageSize };
     },
 
     async listOrderReturns(
@@ -271,7 +275,7 @@ export const createReturnService = (options: ReturnServiceOptions) => {
       orderId: string,
     ): Promise<ReturnRequestRecord[]> {
       await requireScopedOrder(options.repository, actor, orderId);
-      return options.repository.listRequests(scopeForUser(actor), { orderId });
+      return (await options.repository.listRequests(scopeForUser(actor), { orderId })).items;
     },
 
     async requestReturn(

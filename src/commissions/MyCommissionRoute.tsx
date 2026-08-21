@@ -40,15 +40,17 @@ export const MyCommissionRoute = ({
     useState<MyCommissionDashboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [page, setPage] = useState(1);
 
-  const load = useCallback(async (background = false) => {
+  const load = useCallback(async (background = false, requestedPage = 1) => {
     if (!background) {
       setDashboard(null);
       setError(null);
     }
     try {
-      const nextDashboard = await client.getMyCommissionDashboard({ month, limit: 100 });
+      const nextDashboard = await client.getMyCommissionDashboard({ month, limit: 20, page: requestedPage });
       setDashboard(nextDashboard);
+      setPage(nextDashboard.page);
       setError(null);
     } catch (loadError) {
       if (!background) setError(errorMessage(loadError));
@@ -62,7 +64,7 @@ export const MyCommissionRoute = ({
   usePageAutoRefresh({
     enabled: Boolean(dashboard),
     intervalMs: 60_000,
-    onRefresh: () => load(true),
+    onRefresh: () => load(true, page),
   });
 
   if (error) {
@@ -86,5 +88,5 @@ export const MyCommissionRoute = ({
     );
   }
 
-  return <MyCommissionPage dashboard={dashboard} />;
+  return <MyCommissionPage dashboard={dashboard} onPageChange={(nextPage) => void load(false, nextPage)} />;
 };

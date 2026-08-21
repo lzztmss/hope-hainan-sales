@@ -93,13 +93,16 @@ export interface QuoteListQuery {
   dateFrom?: string;
   dateTo?: string;
   deletedOnly?: boolean;
-  limit?: number;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface CustomerListQuery {
   query?: string;
   storeId?: string;
   sellerId?: string;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface CustomerListItemDto {
@@ -187,11 +190,15 @@ export interface CopyCommissionPolicyInput {
 export interface MyCommissionDashboardQuery {
   month: string;
   cursor?: string;
+  page?: number;
   limit?: number;
 }
 
 export type MyCommissionDashboardResponse = MyCommissionDashboard & {
   nextCursor?: string | null;
+  total: number;
+  page: number;
+  pageSize: number;
 };
 
 export interface OrderCustomerDto {
@@ -258,12 +265,16 @@ export interface OrderListApiQuery {
   status?: OrderStatus;
   paymentMode?: OrderPaymentMode;
   cursor?: string;
+  page?: number;
   limit?: number;
 }
 
 export interface OrderListApiResponse {
   items: readonly OrderDto[];
   nextCursor: string | null;
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface OrderFilterOptionsApiResponse {
@@ -362,8 +373,8 @@ export interface ApiClient {
     idempotencyKey: string,
   ): Promise<ConfirmedQuoteSummary>;
   getQuote(quoteId: string): Promise<QuoteDetailDto>;
-  listQuotes(query?: QuoteListQuery): Promise<{ items: readonly QuoteDetailDto[] }>;
-  listCustomers(query?: CustomerListQuery): Promise<{ items: readonly CustomerListItemDto[] }>;
+  listQuotes(query?: QuoteListQuery): Promise<{ items: readonly QuoteDetailDto[]; total: number; page: number; pageSize: number }>;
+  listCustomers(query?: CustomerListQuery): Promise<{ items: readonly CustomerListItemDto[]; total: number; page: number; pageSize: number }>;
   updateQuote(
     quoteId: string,
     input: ConfirmQuoteInput,
@@ -662,18 +673,30 @@ export const createApiClient = ({
       if (query.dateFrom) parameters.set("dateFrom", query.dateFrom);
       if (query.dateTo) parameters.set("dateTo", query.dateTo);
       if (query.deletedOnly) parameters.set("deletedOnly", "true");
-      parameters.set("limit", String(query.limit ?? 50));
+      parameters.set("page", String(query.page ?? 1));
+      parameters.set("pageSize", String(query.pageSize ?? 20));
       const payload = await request(`/api/quotes?${parameters.toString()}`);
       const items = readProperty<unknown[]>(payload, "items").map(readQuoteDetail);
-      return { items };
+      return {
+        items,
+        total: readProperty<number>(payload, "total"),
+        page: readProperty<number>(payload, "page"),
+        pageSize: readProperty<number>(payload, "pageSize"),
+      };
     },
     async listCustomers(query = {}) {
-      const parameters = new URLSearchParams({ limit: "100" });
+      const parameters = new URLSearchParams({
+        page: String(query.page ?? 1),
+        pageSize: String(query.pageSize ?? 20),
+      });
       if (query.query?.trim()) parameters.set("query", query.query.trim());
       if (query.storeId) parameters.set("storeId", query.storeId);
       if (query.sellerId) parameters.set("sellerId", query.sellerId);
       return (await request(`/api/customers?${parameters.toString()}`)) as {
         items: readonly CustomerListItemDto[];
+        total: number;
+        page: number;
+        pageSize: number;
       };
     },
     async updateQuote(quoteId, input, expectedVersion) {
@@ -702,6 +725,7 @@ export const createApiClient = ({
     async getMyCommissionDashboard(query) {
       const parameters = new URLSearchParams({ month: query.month });
       if (query.cursor) parameters.set("cursor", query.cursor);
+      if (query.page) parameters.set("page", String(query.page));
       if (query.limit !== undefined) {
         parameters.set("limit", String(query.limit));
       }
@@ -721,6 +745,7 @@ export const createApiClient = ({
       if (query.status) parameters.set("status", query.status);
       if (query.paymentMode) parameters.set("paymentMode", query.paymentMode);
       if (query.cursor) parameters.set("cursor", query.cursor);
+      if (query.page) parameters.set("page", String(query.page));
       parameters.set("limit", String(query.limit ?? 100));
       const path = query.recycleBin
         ? "/api/orders/recycle-bin"

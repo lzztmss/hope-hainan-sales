@@ -10,7 +10,7 @@ class RecordingRepository implements CustomerRepository {
   async list(scope: UserScope, filters: { storeId?: string; ownerUserId?: string }) {
     this.scope = scope;
     this.filters = filters;
-    return [
+    const items = [
       {
         id: "customer-1",
         storeId: "store-1",
@@ -27,6 +27,7 @@ class RecordingRepository implements CustomerRepository {
         updatedAt: new Date("2026-08-13T02:00:00.000Z"),
       },
     ];
+    return { items, total: items.length };
   }
 }
 

@@ -1,5 +1,6 @@
 import {
   and,
+  count,
   desc,
   eq,
   exists,
@@ -522,6 +523,7 @@ export class DrizzleOrderRepository implements OrderRepository {
     }
     if (filters.dateFrom) conditions.push(gte(orders.createdAt, filters.dateFrom));
     if (filters.dateTo) conditions.push(lt(orders.createdAt, filters.dateTo));
+    const countConditions = [...conditions];
     if (filters.cursor) {
       const cursor = decodeCursor(filters.cursor);
       conditions.push(
@@ -532,15 +534,30 @@ export class DrizzleOrderRepository implements OrderRepository {
       );
     }
 
-    const rows = await this.executor
+    const [totalRow] = await this.executor
+      .select({ value: count() })
+      .from(orders)
+      .where(and(...countConditions));
+    let query = this.executor
       .select()
       .from(orders)
       .where(and(...conditions))
-      .orderBy(desc(orders.createdAt), desc(orders.id))
-      .limit(filters.query ? 500 : filters.limit + 1);
+      .orderBy(desc(orders.createdAt), desc(orders.id));
     if (filters.query) {
-      return { items: await Promise.all(rows.map((row) => this.hydrate(row))), nextCursor: null };
+      const rows = await query;
+      return { items: await Promise.all(rows.map((row) => this.hydrate(row))), nextCursor: null, total: rows.length };
     }
+    if (filters.page) {
+      const rows = await query
+        .limit(filters.limit)
+        .offset((filters.page - 1) * filters.limit);
+      return {
+        items: await Promise.all(rows.map((row) => this.hydrate(row))),
+        nextCursor: null,
+        total: Number(totalRow?.value ?? 0),
+      };
+    }
+    const rows = await query.limit(filters.limit + 1);
     const hasNext = rows.length > filters.limit;
     const pageRows = hasNext ? rows.slice(0, filters.limit) : rows;
     return {
@@ -549,6 +566,7 @@ export class DrizzleOrderRepository implements OrderRepository {
         hasNext && pageRows.length > 0
           ? encodeCursor(pageRows[pageRows.length - 1]!)
           : null,
+      total: Number(totalRow?.value ?? 0),
     };
   }
 

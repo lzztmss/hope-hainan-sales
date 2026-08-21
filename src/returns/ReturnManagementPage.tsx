@@ -6,7 +6,7 @@ import type {
   ReturnRecordDto,
 } from "../api/client";
 import { PageLayout } from "../components/layout";
-import { Pagination, usePagination } from "../components/Pagination";
+import { Pagination } from "../components/Pagination";
 import type { ReturnStatus } from "../orders/types";
 import type {
   CompleteManagedReturnInput,
@@ -17,6 +17,9 @@ import "./returns.css";
 export interface ReturnManagementPageProps {
   actor: AuthenticatedUser;
   items: readonly ReturnRecordDto[];
+  page?: number;
+  total?: number;
+  onPageChange?(page: number): void;
   status?: ReturnStatus | "";
   loading?: boolean;
   loadError?: string | null;
@@ -323,14 +326,12 @@ export const ReturnManagementPage = ({
   stores = [],
   sellers = [],
   status = "",
+  page = 1,
+  total = items.length,
+  onPageChange,
 }: ReturnManagementPageProps) => {
   const [approval, setApproval] = useState<ReturnRecordDto | null>(null);
   const [completion, setCompletion] = useState<ReturnRecordDto | null>(null);
-  const pagination = usePagination(items);
-
-  useEffect(() => {
-    pagination.resetPage();
-  }, [sellerId, status, storeId, pagination.resetPage]);
 
   useEffect(() => {
     if (!approval && !completion) return;
@@ -398,7 +399,7 @@ export const ReturnManagementPage = ({
         <table aria-label="退单列表" className="returns-desktop-table">
           <thead><tr><th>退单与订单</th><th>申请信息</th><th>原因与商品</th><th>退款金额</th><th>状态</th><th><span className="returns-visually-hidden">操作</span></th></tr></thead>
           <tbody>
-            {pagination.visibleItems.map((record) => (
+            {items.map((record) => (
               <tr key={record.id}>
                 <td><strong>{record.returnNo}</strong><Link className="returns-order-link" to={`/orders/${record.orderId}`}>原订单 {record.orderNo}</Link><small>{record.returnType === "full" ? "整单退单" : "部分退单"}</small></td>
                 <td><strong>申请人 ID：{record.requestedBy}</strong><span>{formatDateTime(record.requestedAt)}</span></td>
@@ -413,7 +414,7 @@ export const ReturnManagementPage = ({
       </div>
 
       <ul aria-label="移动端退单列表" className="returns-mobile-list">
-        {pagination.visibleItems.map((record) => (
+        {items.map((record) => (
           <li key={record.id}>
             <article className="returns-mobile-card">
               <header><div><span>{record.returnType === "full" ? "整单退单" : "部分退单"}</span><strong>{record.returnNo}</strong></div><ReturnStatusBadge status={record.status} /></header>
@@ -427,9 +428,9 @@ export const ReturnManagementPage = ({
         ))}
       </ul>
       <Pagination
-        onPageChange={pagination.setPage}
-        page={pagination.page}
-        totalItems={items.length}
+        onPageChange={(nextPage) => onPageChange?.(nextPage)}
+        page={page}
+        totalItems={total}
       />
 
       {approval ? <ApprovalDialog actor={actor} onClose={() => setApproval(null)} onDecide={onDecide} record={approval} /> : null}

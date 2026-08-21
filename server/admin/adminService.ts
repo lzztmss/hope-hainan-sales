@@ -77,6 +77,8 @@ export interface AdminUserFilters {
   active?: boolean;
   isPrimaryStoreManager?: boolean;
   query?: string;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface AdminStoreWrite {
@@ -149,7 +151,7 @@ export interface AdminRepository {
   updateStore(id: string, patch: AdminStorePatch): Promise<AdminStoreRecord | null>;
   assignStoreManager(storeId: string, userId: string | null): Promise<void>;
   listActiveUsersInStoreForUpdate(storeId: string): Promise<readonly string[]>;
-  listUsers(filters: AdminUserFilters): Promise<readonly AdminUserRecord[]>;
+  listUsers(filters: AdminUserFilters): Promise<{ items: readonly AdminUserRecord[]; total: number; activeTotal: number; mustChangePasswordTotal: number }>;
   findUserForUpdate(id: string): Promise<AdminUserRecord | null>;
   createUser(input: AdminUserWrite): Promise<AdminUserRecord>;
   updateUser(id: string, patch: AdminUserPatch): Promise<AdminUserRecord | null>;
@@ -521,14 +523,35 @@ export const createAdminService = (options: AdminServiceOptions) => {
     async listUsers(
       actor: AuthenticatedUser,
       filters: AdminUserFilters,
-    ): Promise<AdminUserView[]> {
+    ) {
       requireAdmin(actor);
-      return (
-        await options.repository.listUsers({
+      const page = filters.page ?? 1;
+      const pageSize = filters.pageSize ?? 20;
+      const result = await options.repository.listUsers({
           ...filters,
+          page,
+          pageSize,
           query: filters.query?.trim() || undefined,
-        })
-      ).map((user) => userView(user, options.pii));
+        });
+      const normalizedQuery = filters.query?.trim().toLocaleLowerCase("zh-CN");
+      const presented = result.items.map((user) => userView(user, options.pii));
+      const filtered = normalizedQuery
+        ? presented.filter((user) =>
+            [user.workNo, user.displayName, user.storeName ?? "", user.phoneMasked ?? ""]
+              .join(" ")
+              .toLocaleLowerCase("zh-CN")
+              .includes(normalizedQuery),
+          )
+        : presented;
+      const start = normalizedQuery ? (page - 1) * pageSize : 0;
+      return {
+        users: normalizedQuery ? filtered.slice(start, start + pageSize) : filtered,
+        total: normalizedQuery ? filtered.length : result.total,
+        activeTotal: result.activeTotal,
+        mustChangePasswordTotal: result.mustChangePasswordTotal,
+        page,
+        pageSize,
+      };
     },
 
     async createUser(

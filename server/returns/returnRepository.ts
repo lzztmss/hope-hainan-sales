@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, count, eq, inArray, sql } from "drizzle-orm";
 
 import type { AppDatabase, DbClient, DbTransaction } from "../db/client.js";
 import type { UserScope } from "../auth/authorization.js";
@@ -247,7 +247,8 @@ export class DrizzleReturnRepository implements ReturnRepository {
   async listRequests(
     scope: UserScope,
     filters: { orderId?: string; status?: ReturnRequestRecord["status"]; storeId?: string; sellerId?: string },
-  ): Promise<ReturnRequestRecord[]> {
+    paging?: { page: number; pageSize: number },
+  ): Promise<{ items: ReturnRequestRecord[]; total: number }> {
     const conditions = [];
     if (scope.kind === "store") conditions.push(eq(orders.storeId, scope.storeId));
     if (scope.kind === "seller") {
@@ -260,13 +261,26 @@ export class DrizzleReturnRepository implements ReturnRepository {
     if (filters.status) conditions.push(eq(returnTable.status, filters.status));
     if (filters.storeId) conditions.push(eq(orders.storeId, filters.storeId));
     if (filters.sellerId) conditions.push(eq(orders.sellerId, filters.sellerId));
-    const rows = await this.executor
+    const where = and(...conditions);
+    const [totalRow] = await this.executor
+      .select({ value: count() })
+      .from(returnTable)
+      .innerJoin(orders, eq(orders.id, returnTable.orderId))
+      .where(where);
+    let query = this.executor
       .select({ request: returnTable })
       .from(returnTable)
       .innerJoin(orders, eq(orders.id, returnTable.orderId))
-      .where(and(...conditions))
+      .where(where)
       .orderBy(sql`${returnTable.requestedAt} DESC`, sql`${returnTable.id} DESC`);
-    return Promise.all(rows.map(({ request }) => this.loadRequest(request)));
+    if (paging) {
+      query = query.limit(paging.pageSize).offset((paging.page - 1) * paging.pageSize) as typeof query;
+    }
+    const rows = await query;
+    return {
+      items: await Promise.all(rows.map(({ request }) => this.loadRequest(request))),
+      total: Number(totalRow?.value ?? 0),
+    };
   }
 
   async saveDecision(

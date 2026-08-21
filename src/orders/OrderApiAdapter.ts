@@ -262,7 +262,7 @@ const mapDetail = (
   };
 };
 
-const listQueryFor = (filters: OrderListFilters) => {
+const listQueryFor = (filters: OrderListFilters, page = 1, pageSize = 20) => {
   const search = filters.search.trim();
   return {
     recycleBin: filters.recycleBin,
@@ -271,7 +271,8 @@ const listQueryFor = (filters: OrderListFilters) => {
     ...(filters.paymentMode ? { paymentMode: filters.paymentMode } : {}),
     ...(filters.storeQuery ? { storeQuery: filters.storeQuery.trim() } : {}),
     ...(filters.sellerQuery ? { sellerQuery: filters.sellerQuery.trim() } : {}),
-    limit: 100,
+    page,
+    limit: pageSize,
   };
 };
 
@@ -294,10 +295,10 @@ export const createOrderManagementAdapter = (
   };
 
   return {
-    async listOrders(filters) {
-      const response = await client.listOrders(listQueryFor(filters));
+    async listOrders(filters, page, pageSize) {
+      const response = await client.listOrders(listQueryFor(filters, page, pageSize));
       const items = response.items.map((order) => mapSummary(order, viewer));
-      return { items, total: items.length };
+      return { items, total: response.total };
     },
     async getOrder(orderId) {
       const [order, returns] = await Promise.all([

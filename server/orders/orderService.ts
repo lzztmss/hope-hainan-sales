@@ -137,12 +137,14 @@ export interface OrderListFilters {
   dateTo?: Date;
   cursor?: string;
   limit: number;
+  page?: number;
   deletedOnly?: boolean;
 }
 
 export interface OrderListResult {
   items: OrderRecord[];
   nextCursor: string | null;
+  total: number;
 }
 
 export interface OrderFilterOptions {
@@ -716,12 +718,19 @@ export const createOrderService = (options: OrderServiceOptions) => {
       });
       const query = filters.query?.trim().toLocaleLowerCase("zh-CN");
       const presented = result.items.map((order) => presentOrder(order, options.decryptPii));
+      const filtered = query
+        ? presented.filter((order, index) =>
+            matchesPresentedOrder(order, query, result.items[index]?.returnNos),
+          )
+        : presented;
+      const page = filters.page ?? 1;
       return {
         items: query
-          ? presented.filter((order, index) =>
-              matchesPresentedOrder(order, query, result.items[index]?.returnNos),
-            )
-          : presented,
+          ? filtered.slice((page - 1) * filters.limit, page * filters.limit)
+          : filtered,
+        total: query ? filtered.length : result.total,
+        page,
+        pageSize: filters.limit,
         nextCursor: result.nextCursor,
       };
     },
@@ -740,12 +749,19 @@ export const createOrderService = (options: OrderServiceOptions) => {
       });
       const query = filters.query?.trim().toLocaleLowerCase("zh-CN");
       const presented = result.items.map((order) => presentOrder(order, options.decryptPii));
+      const filtered = query
+        ? presented.filter((order, index) =>
+            matchesPresentedOrder(order, query, result.items[index]?.returnNos),
+          )
+        : presented;
+      const page = filters.page ?? 1;
       return {
         items: query
-          ? presented.filter((order, index) =>
-              matchesPresentedOrder(order, query, result.items[index]?.returnNos),
-            )
-          : presented,
+          ? filtered.slice((page - 1) * filters.limit, page * filters.limit)
+          : filtered,
+        total: query ? filtered.length : result.total,
+        page,
+        pageSize: filters.limit,
         nextCursor: result.nextCursor,
       };
     },

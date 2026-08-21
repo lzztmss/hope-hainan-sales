@@ -93,7 +93,8 @@ const listSchema = z.object({
   dateFrom: dateSchema.optional(),
   dateTo: dateSchema.optional(),
   deletedOnly: z.enum(["true", "false"]).transform((value) => value === "true").optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 
 const ensureTrustedOrigin = (
@@ -153,7 +154,8 @@ export const registerQuoteRoutes = async (
         dateFrom,
         dateTo,
         deletedOnly: parsed.data.deletedOnly,
-        limit: parsed.data.limit,
+        page: parsed.data.page,
+        pageSize: parsed.data.pageSize,
       });
     } catch (error) {
       return sendServiceError(reply, error);

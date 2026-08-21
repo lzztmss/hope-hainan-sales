@@ -81,6 +81,8 @@ const listUsersQuerySchema = z.object({
     .transform((value) => value === "true")
     .optional(),
   query: z.string().trim().min(1).max(120).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 
 const ensureTrustedOrigin = (
@@ -205,9 +207,7 @@ export const registerAdminRoutes = async (
     const parsed = listUsersQuerySchema.safeParse(request.query);
     if (!parsed.success) return invalidPayload(reply);
     try {
-      return {
-        users: await options.adminService.listUsers(actor, parsed.data),
-      };
+      return await options.adminService.listUsers(actor, parsed.data);
     } catch (error) {
       return sendServiceError(reply, error);
     }

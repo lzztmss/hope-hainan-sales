@@ -12,7 +12,7 @@ import {
 
 const api = (): UserStoreManagementApi => ({
   listStores: vi.fn().mockResolvedValue([]),
-  listUsers: vi.fn().mockResolvedValue([]),
+  listUsers: vi.fn().mockResolvedValue({ users: [], total: 0, activeTotal: 0, mustChangePasswordTotal: 0, page: 1, pageSize: 20 }),
   createStore: vi.fn(),
   updateStore: vi.fn(),
   createUser: vi.fn(),
@@ -74,7 +74,7 @@ describe("营业厅与账号路由", () => {
     view.rerender(<UserStoreManagementRoute api={managementApi} />);
     await waitFor(() => {
       expect(managementApi.listStores).toHaveBeenCalledTimes(1);
-      expect(managementApi.listUsers).toHaveBeenCalledTimes(1);
+      expect(managementApi.listUsers).toHaveBeenCalledTimes(2);
     });
     expect(screen.queryByText("正在加载营业厅与账号…")).not.toBeInTheDocument();
   });
@@ -97,7 +97,7 @@ describe("营业厅与账号路由", () => {
       createdAt: "2026-08-13T00:00:00.000Z",
       updatedAt: "2026-08-13T00:00:00.000Z",
     };
-    vi.mocked(managementApi.listUsers).mockResolvedValue([administrator]);
+    vi.mocked(managementApi.listUsers).mockResolvedValue({ users: [administrator], total: 1, activeTotal: 1, mustChangePasswordTotal: 0, page: 1, pageSize: 20 });
     vi.mocked(managementApi.resetPassword).mockResolvedValue(administrator);
     const onCurrentUserPasswordReset = vi.fn();
 
@@ -118,6 +118,6 @@ describe("营业厅与账号路由", () => {
 
     await waitFor(() => expect(onCurrentUserPasswordReset).toHaveBeenCalledOnce());
     expect(managementApi.listStores).toHaveBeenCalledTimes(1);
-    expect(managementApi.listUsers).toHaveBeenCalledTimes(1);
+    expect(managementApi.listUsers).toHaveBeenCalledTimes(2);
   });
 });

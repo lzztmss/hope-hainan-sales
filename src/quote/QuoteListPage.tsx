@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { Link, useSearchParams } from "react-router-dom";
 
 import type { ApiClient, AuthenticatedUser, OrderFilterOptionsApiResponse, QuoteDetailDto, QuoteStatus } from "../api/client";
-import { Pagination, usePagination } from "../components/Pagination";
+import { LIST_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { PageLayout } from "../components/layout";
 import { usePageAutoRefresh } from "../hooks/usePageAutoRefresh";
 import "./quoteManagement.css";
@@ -31,6 +31,8 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
   const [searchParams] = useSearchParams();
   const initialQuery = searchParams.get("query") ?? "";
   const [items, setItems] = useState<readonly QuoteDetailDto[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [query, setQuery] = useState(initialQuery);
   const [status, setStatus] = useState<QuoteStatus | "">("");
   const [dateFrom, setDateFrom] = useState("");
@@ -40,7 +42,6 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
   const [options, setOptions] = useState<OrderFilterOptionsApiResponse>({ stores: [], sellers: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const pagination = usePagination(items);
   const appliedFilters = useRef<AppliedQuoteFilters>({
     dateFrom: "",
     dateTo: "",
@@ -50,7 +51,7 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
     storeId: "",
   });
 
-  const load = useCallback(async (filters: AppliedQuoteFilters, background = false) => {
+  const load = useCallback(async (filters: AppliedQuoteFilters, requestedPage = 1, background = false) => {
     if (!background) {
       setLoading(true);
       setError(null);
@@ -63,17 +64,19 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
         sellerId: filters.sellerId || undefined,
         dateFrom: filters.dateFrom || undefined,
         dateTo: filters.dateTo || undefined,
-        limit: 100,
+        page: requestedPage,
+        pageSize: LIST_PAGE_SIZE,
       });
       setItems(result.items);
-      if (!background) pagination.resetPage();
+      setTotal(result.total);
+      setPage(result.page);
       setError(null);
     } catch (reason) {
       if (!background) setError(reason instanceof Error ? reason.message : "报价读取失败");
     } finally {
       if (!background) setLoading(false);
     }
-  }, [client, pagination.resetPage]);
+  }, [client]);
 
   useEffect(() => {
     appliedFilters.current = { ...appliedFilters.current, query: initialQuery };
@@ -87,7 +90,7 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
   usePageAutoRefresh({
     enabled: !loading,
     intervalMs: 15_000,
-    onRefresh: () => load(appliedFilters.current, true),
+    onRefresh: () => load(appliedFilters.current, page, true),
   });
 
   const submit = (event: FormEvent) => {
@@ -167,7 +170,7 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
         <div className="quote-management__empty">没有找到符合条件的报价。</div>
       ) : null}
       <div className="quote-management__list">
-        {pagination.visibleItems.map((quote) => (
+        {items.map((quote) => (
           <article key={quote.id}>
             <header>
               <div>
@@ -188,9 +191,9 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
         ))}
       </div>
       <Pagination
-        onPageChange={pagination.setPage}
-        page={pagination.page}
-        totalItems={items.length}
+        onPageChange={(nextPage) => void load(appliedFilters.current, nextPage)}
+        page={page}
+        totalItems={total}
       />
     </PageLayout>
   );

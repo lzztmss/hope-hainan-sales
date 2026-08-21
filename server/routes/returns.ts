@@ -45,6 +45,8 @@ const listSchema = z.object({
   status: z.enum(["requested", "approved", "rejected", "completed"]).optional(),
   storeId: z.string().uuid().optional(),
   sellerId: z.string().uuid().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 
 const trustedOrigin = (
@@ -94,9 +96,7 @@ export const registerReturnRoutes = async (
       return reply.status(400).send({ error: "退单查询条件不正确" });
     }
     try {
-      return {
-        items: await options.returnService.listReturns(user, parsed.data),
-      };
+      return await options.returnService.listReturns(user, parsed.data);
     } catch (error) {
       return serviceError(reply, error);
     }

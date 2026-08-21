@@ -17,7 +17,7 @@ export interface CompleteManagedReturnInput {
 }
 
 export interface ReturnManagementApi {
-  listReturns(filters?: { status?: ReturnStatus; storeId?: string; sellerId?: string }): Promise<readonly ReturnRecordDto[]>;
+  listReturns(filters?: { status?: ReturnStatus; storeId?: string; sellerId?: string; page?: number; pageSize?: number }): Promise<{ items: readonly ReturnRecordDto[]; total: number; page: number; pageSize: number }>;
   decideReturn(input: DecideManagedReturnInput): Promise<ReturnRecordDto>;
   completeReturn(input: CompleteManagedReturnInput): Promise<ReturnRecordDto>;
 }
@@ -129,8 +129,17 @@ export const createReturnManagementApi = ({
       if (filters.status) parameters.set("status", filters.status);
       if (filters.storeId) parameters.set("storeId", filters.storeId);
       if (filters.sellerId) parameters.set("sellerId", filters.sellerId);
+      parameters.set("page", String(filters.page ?? 1));
+      parameters.set("pageSize", String(filters.pageSize ?? 20));
       const query = parameters.size ? `?${parameters.toString()}` : "";
-      return readReturns(await request(`/api/returns${query}`));
+      const payload = await request(`/api/returns${query}`);
+      if (!isRecord(payload)) throw new ApiError("退单列表格式不正确", 500);
+      return {
+        items: readReturns(payload),
+        total: typeof payload.total === "number" ? payload.total : 0,
+        page: typeof payload.page === "number" ? payload.page : 1,
+        pageSize: typeof payload.pageSize === "number" ? payload.pageSize : 20,
+      };
     },
     async decideReturn(input) {
       return readReturn(

@@ -23,6 +23,7 @@ const monthSchema = z
 const pagingSchema = {
   month: monthSchema,
   cursor: z.string().trim().min(1).max(500).optional(),
+  page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 };
 
@@ -77,6 +78,7 @@ export const registerCommissionDashboardRoutes = async (
       beneficiaryId: user.id,
       storeId: user.storeId ?? undefined,
       cursor: parsed.data.cursor,
+      page: parsed.data.page,
       limit: parsed.data.limit,
     };
     try {
@@ -96,6 +98,7 @@ export const registerCommissionDashboardRoutes = async (
       storeId: parsed.data.storeId,
       beneficiaryId: parsed.data.beneficiaryId,
       cursor: parsed.data.cursor,
+      page: parsed.data.page,
       limit: parsed.data.limit,
     };
     try {

@@ -1,4 +1,4 @@
-import { Pagination, usePagination } from "../components/Pagination";
+import { Pagination } from "../components/Pagination";
 import { formatFen } from "../../shared/money";
 import "./myCommission.css";
 
@@ -37,10 +37,14 @@ export interface MyCommissionDashboard {
   summary: MyCommissionSummary;
   orders: MyCommissionOrder[];
   unconfiguredOrders: number;
+  total?: number;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface MyCommissionPageProps {
   dashboard: MyCommissionDashboard;
+  onPageChange?(page: number): void;
 }
 
 const displayMoney = (value: number, reversal = false): string => {
@@ -64,9 +68,7 @@ const summaryDefinitions: ReadonlyArray<{
   { key: "netLifetimeFen", label: "累计净提成", tone: "primary" },
 ];
 
-export const MyCommissionPage = ({ dashboard }: MyCommissionPageProps) => {
-  const pagination = usePagination(dashboard.orders);
-
+export const MyCommissionPage = ({ dashboard, onPageChange }: MyCommissionPageProps) => {
   return (
     <section className="my-commission-page" aria-labelledby="my-commission-title">
     <header className="my-commission-page__header">
@@ -116,7 +118,7 @@ export const MyCommissionPage = ({ dashboard }: MyCommissionPageProps) => {
       <div className="commission-order-list">
         {dashboard.orders.length === 0 ? (
           <p className="commission-order-empty">本期暂无提成订单</p>
-        ) : pagination.visibleItems.map((order) => (
+        ) : dashboard.orders.map((order) => (
           <article
             className={`commission-order-card is-${order.status}`}
             data-testid={`commission-order-${order.orderId}`}
@@ -154,9 +156,9 @@ export const MyCommissionPage = ({ dashboard }: MyCommissionPageProps) => {
         ))}
       </div>
       <Pagination
-        onPageChange={pagination.setPage}
-        page={pagination.page}
-        totalItems={dashboard.orders.length}
+        onPageChange={(nextPage) => onPageChange?.(nextPage)}
+        page={dashboard.page ?? 1}
+        totalItems={dashboard.total ?? dashboard.orders.length}
       />
     </section>
     </section>

@@ -95,7 +95,7 @@ describe("SQLite 报价持久化主链路", () => {
     expect(updated.calculation.heartMonthlyFen).toBeGreaterThan(
       loaded.calculation.heartMonthlyFen,
     );
-    const list = await service.listQuotes(seller, { query: "王女士", limit: 50 });
+    const list = await service.listQuotes(seller, { query: "王女士", page: 1, pageSize: 20 });
     expect(list.items.map((quote) => quote.id)).toContain(created.id);
 
     const orderService = createOrderService({

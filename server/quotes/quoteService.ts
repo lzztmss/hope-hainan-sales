@@ -91,11 +91,13 @@ export interface QuoteListFilters {
   dateFrom?: Date;
   dateTo?: Date;
   deletedOnly?: boolean;
-  limit: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface QuoteListResult {
   items: ConfirmedQuote[];
+  total: number;
 }
 
 export interface QuotePresentation {
@@ -447,10 +449,10 @@ export const createQuoteService = (options: QuoteServiceOptions) => {
     async listQuotes(
       user: AuthenticatedUser,
       filters: QuoteListFilters,
-    ): Promise<{ items: QuotePresentation[] }> {
+    ): Promise<{ items: QuotePresentation[]; total: number; page: number; pageSize: number }> {
       const result = await options.repository.list(scopeForUser(user), filters);
       const query = filters.query?.trim().toLocaleLowerCase("zh-CN");
-      const items = result.items.map(presentQuote).filter((quote) => {
+      const filtered = result.items.map(presentQuote).filter((quote) => {
         if (!query) return true;
         return (
           quote.quoteNo.toLocaleLowerCase("zh-CN").includes(query) ||
@@ -458,7 +460,21 @@ export const createQuoteService = (options: QuoteServiceOptions) => {
           quote.customer.phone.endsWith(query)
         );
       });
-      return { items: items.slice(0, filters.limit) };
+      if (query) {
+        const start = (filters.page - 1) * filters.pageSize;
+        return {
+          items: filtered.slice(start, start + filters.pageSize),
+          total: filtered.length,
+          page: filters.page,
+          pageSize: filters.pageSize,
+        };
+      }
+      return {
+        items: filtered,
+        total: result.total,
+        page: filters.page,
+        pageSize: filters.pageSize,
+      };
     },
 
     async updateQuote(

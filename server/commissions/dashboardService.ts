@@ -106,6 +106,7 @@ export interface CommissionDashboardFilters {
   beneficiaryId?: string;
   cursor?: string;
   limit?: number;
+  page?: number;
 }
 
 export interface CommissionDashboardSummary {
@@ -156,6 +157,9 @@ export interface CommissionDashboard {
   orders: CommissionDashboardOrder[];
   unconfiguredOrders: number;
   nextCursor: string | null;
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export class CommissionDashboardError extends Error {
@@ -722,7 +726,8 @@ const paginate = (
   orders: PresentedOrder[],
   cursor: string | undefined,
   limit: number,
-): { orders: CommissionDashboardOrder[]; nextCursor: string | null } => {
+  requestedPage = 1,
+): { orders: CommissionDashboardOrder[]; nextCursor: string | null; total: number; page: number } => {
   const sorted = [...orders].sort(
     (left, right) =>
       right.sortAt.getTime() - left.sortAt.getTime() ||
@@ -737,12 +742,15 @@ const paginate = (
             order.orderId.localeCompare(position.orderId) < 0),
       )
     : sorted;
-  const page = afterCursor.slice(0, limit + 1);
-  const hasMore = page.length > limit;
-  if (hasMore) page.pop();
+  const offset = position ? 0 : (requestedPage - 1) * limit;
+  const pageItems = afterCursor.slice(offset, offset + limit + 1);
+  const hasMore = pageItems.length > limit;
+  if (hasMore) pageItems.pop();
   return {
-    orders: page.map(({ sortAt: _sortAt, ...order }) => order),
-    nextCursor: hasMore && page.length > 0 ? encodeCursor(page[page.length - 1]!) : null,
+    orders: pageItems.map(({ sortAt: _sortAt, ...order }) => order),
+    nextCursor: hasMore && pageItems.length > 0 ? encodeCursor(pageItems[pageItems.length - 1]!) : null,
+    total: sorted.length,
+    page: requestedPage,
   };
 };
 
@@ -808,7 +816,8 @@ export const createCommissionDashboardService = (
         throw new CommissionDashboardError("每页数量必须为1至100", 400);
       }
       const loaded = await loadPresented(user, filters);
-      const page = paginate(loaded.orders, filters.cursor, limit);
+      const requestedPage = filters.page ?? 1;
+      const page = paginate(loaded.orders, filters.cursor, limit, requestedPage);
       return {
         periodLabel: period.label,
         summary: {
@@ -818,6 +827,9 @@ export const createCommissionDashboardService = (
         orders: page.orders,
         unconfiguredOrders: loaded.unconfiguredOrders,
         nextCursor: page.nextCursor,
+        total: page.total,
+        page: page.page,
+        pageSize: limit,
       };
     },
 

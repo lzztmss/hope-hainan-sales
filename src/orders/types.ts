@@ -151,7 +151,7 @@ export interface CompleteReturnInput {
 }
 
 export interface OrderManagementAdapter {
-  listOrders(filters: OrderListFilters): Promise<OrderListResult>;
+  listOrders(filters: OrderListFilters, page?: number, pageSize?: number): Promise<OrderListResult>;
   getOrder(orderId: string): Promise<OrderDetail>;
   transitionOrder(input: TransitionOrderInput): Promise<void>;
   softDeleteOrder(orderId: string): Promise<void>;
