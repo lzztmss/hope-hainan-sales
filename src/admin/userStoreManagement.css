@@ -201,6 +201,74 @@
   border-color: #d92d20;
 }
 
+.management-form .managed-store-picker {
+  border: 1px solid #cbd8e8;
+  border-radius: 6px;
+  margin: 0;
+  padding: 14px;
+}
+
+.managed-store-picker legend {
+  color: #26364d;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 0 6px;
+}
+
+.managed-store-picker__summary {
+  color: #56667c;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.managed-store-picker__options {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.management-form .managed-store-picker__options label {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #d6dfeb;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px 12px;
+}
+
+.management-form .managed-store-picker__options label:has(input:checked) {
+  background: #edf5ff;
+  border-color: #3975b7;
+}
+
+.management-form .managed-store-picker__options label.is-disabled {
+  background: #f3f5f8;
+  color: #7a8798;
+  cursor: not-allowed;
+}
+
+.management-form .managed-store-picker__options input {
+  flex: 0 0 auto;
+  height: 18px;
+  margin: 0;
+  min-height: 18px;
+  width: 18px;
+}
+
+.managed-store-picker__options span {
+  display: grid;
+  gap: 3px;
+}
+
+.managed-store-picker__options small {
+  color: #69788d;
+  font-size: 12px;
+}
+
 .user-store-management button:focus-visible,
 .user-store-management input:focus-visible,
 .user-store-management select:focus-visible {
