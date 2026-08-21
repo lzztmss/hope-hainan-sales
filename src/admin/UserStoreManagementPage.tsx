@@ -98,7 +98,7 @@ export interface UserStoreManagementPageProps {
   activeUserTotal?: number;
   mustChangePasswordTotal?: number;
   onUserPageChange?(page: number): void;
-  onUserQueryChange?(query: string): void;
+  onUserFiltersChange?(filters: ManagedUserFilters): void;
   onCreateStore?(input: CreateManagedStoreInput): Promise<void>;
   onUpdateStore?(id: string, input: UpdateManagedStoreInput): Promise<void>;
   onCreateUser?(input: CreateManagedUserInput): Promise<void>;
@@ -356,7 +356,7 @@ export const UserStoreManagementPage = ({
   activeUserTotal = users.filter((user) => user.active).length,
   mustChangePasswordTotal = users.filter((user) => user.mustChangePassword).length,
   onUserPageChange,
-  onUserQueryChange,
+  onUserFiltersChange,
   onCreateStore,
   onUpdateStore,
   onCreateUser,
@@ -374,7 +374,9 @@ export const UserStoreManagementPage = ({
   const [managerUserId, setManagerUserId] = useState("");
   const [managerReason, setManagerReason] = useState("");
   const [search, setSearch] = useState("");
-  const lastReportedSearch = useRef("");
+  const [roleFilter, setRoleFilter] = useState<ManagedUserRole | "">("");
+  const [storeFilter, setStoreFilter] = useState("");
+  const [activeFilter, setActiveFilter] = useState<"" | "true" | "false">("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -408,16 +410,6 @@ export const UserStoreManagementPage = ({
     () => stores.filter((store) => store.active),
     [stores],
   );
-  useEffect(() => {
-    const normalized = search.trim();
-    if (normalized === lastReportedSearch.current) return;
-    const timer = window.setTimeout(() => {
-      lastReportedSearch.current = normalized;
-      onUserQueryChange?.(normalized);
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [onUserQueryChange, search]);
-
   const begin = (): void => {
     setBusy(true);
     setError(null);
@@ -830,7 +822,32 @@ export const UserStoreManagementPage = ({
           </form>
         ) : null}
 
-        <label className="management-search">搜索账号<input type="search" placeholder="工号、姓名、营业厅或手机号后四位" value={search} onChange={(event) => setSearch(event.currentTarget.value)} /></label>
+        <form
+          className="management-user-filters"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onUserFiltersChange?.({
+              ...(search.trim() ? { query: search.trim() } : {}),
+              ...(roleFilter ? { role: roleFilter } : {}),
+              ...(storeFilter ? { storeId: storeFilter } : {}),
+              ...(activeFilter ? { active: activeFilter === "true" } : {}),
+            });
+          }}
+        >
+          <div className="management-user-filters__heading">
+            <div><h3>筛选账号</h3><p>按工号、姓名、角色、状态和营业厅查询。</p></div>
+          </div>
+          <div className="management-user-filters__grid">
+            <label>搜索账号<input type="search" placeholder="工号、姓名或手机号后四位" value={search} onChange={(event) => setSearch(event.currentTarget.value)} /></label>
+            <label>账号角色<select value={roleFilter} onChange={(event) => setRoleFilter(event.currentTarget.value as ManagedUserRole | "")}><option value="">全部角色</option><option value="sales">销售员</option><option value="store_manager">营业厅经理</option>{!regionalOnly ? <><option value="regional_manager">大区经理</option><option value="admin">管理员</option></> : null}</select></label>
+            <label>账号状态<select value={activeFilter} onChange={(event) => setActiveFilter(event.currentTarget.value as "" | "true" | "false")}><option value="">全部状态</option><option value="true">启用</option><option value="false">停用</option></select></label>
+            <label>筛选营业厅<select value={storeFilter} onChange={(event) => setStoreFilter(event.currentTarget.value)}><option value="">全部营业厅</option>{stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</select></label>
+          </div>
+          <div className="management-user-filters__actions">
+            <button type="button" onClick={() => { setSearch(""); setRoleFilter(""); setStoreFilter(""); setActiveFilter(""); onUserFiltersChange?.({}); }}>重置</button>
+            <button className="management-primary" type="submit">查询</button>
+          </div>
+        </form>
 
         <div className="management-mobile-list" aria-label="账号移动列表">
           {users.map((managedUser) => (
