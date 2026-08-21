@@ -38,6 +38,7 @@ const EMPTY_FILTERS: OrderListFilters = {
 const ROLE_TITLES: Readonly<Record<OrderViewer["role"], string>> = {
   sales: "我的订单",
   store_manager: "本厅订单",
+  regional_manager: "大区订单",
   admin: "全部订单",
 };
 

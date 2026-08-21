@@ -88,6 +88,7 @@ const isDashboardLedgerEntryType = (
 const ledgerScopeCondition = (scope: UserScope): SQL | undefined => {
   if (scope.kind === "global") return undefined;
   if (scope.kind === "store") return eq(commissionLedger.storeId, scope.storeId);
+  if (scope.kind === "region") return inArray(commissionLedger.storeId, [...scope.storeIds]);
   return and(
     eq(commissionLedger.storeId, scope.storeId),
     eq(commissionLedger.beneficiaryId, scope.sellerId),
@@ -116,6 +117,7 @@ const estimatedOrderScopeConditions = (
 ): SQL[] => {
   if (scope.kind === "global") return [];
   if (scope.kind === "store") return [eq(orders.storeId, scope.storeId)];
+  if (scope.kind === "region") return [inArray(orders.storeId, [...scope.storeIds])];
   return [
     eq(orders.storeId, scope.storeId),
     orderHasBeneficiary(executor, scope.sellerId),

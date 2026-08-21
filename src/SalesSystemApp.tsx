@@ -35,7 +35,7 @@ export type SalesSystemAppProps = {
 };
 
 const roleForShell = (role: ApiUserRole): AppRole =>
-  role === "store_manager" ? "manager" : role;
+  role === "store_manager" ? "manager" : role === "regional_manager" ? "regional" : role;
 
 const SessionStatePage = ({
   error,
@@ -95,6 +95,11 @@ const AdminUsersRoute = () => {
       }}
     />
   );
+};
+
+const RegionalUsersRoute = () => {
+  const auth = useAuth();
+  return <UserStoreManagementRoute currentUserId={auth.user?.id} regionalOnly />;
 };
 
 const RequireAuthentication = () => {
@@ -253,7 +258,7 @@ const ReturnsRoute = ({ client }: { client: ApiClient }) => {
 const HomeRoute = () => {
   const { user } = useAuth();
   if (user?.role === "sales") return <SalesDashboardPage />;
-  if (user?.role === "store_manager") {
+  if (user?.role === "store_manager" || user?.role === "regional_manager") {
     return <Navigate replace to="/reports/team" />;
   }
   return <Navigate replace to="/reports" />;
@@ -288,7 +293,7 @@ export const SalesSystemRoutes = ({ client }: SalesSystemRoutesProps) => (
             <Route path="/commissions/my" element={<MyCommissionRoute client={client} />} />
           </Route>
 
-          <Route element={<RequireRole allowed={["sales", "store_manager", "admin"]} />}>
+          <Route element={<RequireRole allowed={["sales", "store_manager", "regional_manager", "admin"]} />}>
             <Route path="/quotes" element={<QuoteListRoute client={client} />} />
             <Route path="/quotes/:quoteId/edit" element={<QuoteEditRoute client={client} />} />
             <Route path="/quotes/:quoteId" element={<QuoteDetailRoute client={client} />} />
@@ -298,9 +303,13 @@ export const SalesSystemRoutes = ({ client }: SalesSystemRoutesProps) => (
             <Route path="/profile" element={<PlaceholderPage title="个人中心" />} />
           </Route>
 
-          <Route element={<RequireRole allowed={["store_manager", "admin"]} />}>
+          <Route element={<RequireRole allowed={["store_manager", "regional_manager", "admin"]} />}>
             <Route path="/returns" element={<ReturnsRoute client={client} />} />
             <Route path="/reports/team" element={<TeamReportPage />} />
+          </Route>
+
+          <Route element={<RequireRole allowed={["regional_manager"]} />}>
+            <Route path="/regional/users" element={<RegionalUsersRoute />} />
           </Route>
 
           <Route element={<RequireRole allowed={["store_manager"]} />}>

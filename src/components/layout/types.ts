@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type AppRole = "sales" | "manager" | "admin";
+export type AppRole = "sales" | "manager" | "regional" | "admin";
 
 export type AppShellUser = {
   displayName: string;

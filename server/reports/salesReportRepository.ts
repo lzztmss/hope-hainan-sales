@@ -65,6 +65,7 @@ const key = (storeId: string, sellerId: string): string => `${storeId}:${sellerI
 const toUserScope = (scope: SalesReportScope): UserScope => {
   if (scope.kind === "seller") return scope;
   if (scope.kind === "store") return { kind: "store", storeId: scope.storeId };
+  if (scope.kind === "region") return { kind: "region", storeIds: scope.storeIds };
   return { kind: "global" };
 };
 
@@ -132,6 +133,13 @@ export class DrizzleSalesReportRepository implements SalesReportRepository {
     ): { clause: string; params: string[] } => {
       const clauses: string[] = [];
       const params: string[] = [];
+      if (scope.kind === "region" && !scope.storeId) {
+        if (scope.storeIds.length === 0) clauses.push("AND 1 = 0");
+        else {
+          clauses.push(`AND ${tableAlias}.store_id IN (${scope.storeIds.map(() => "?").join(", ")})`);
+          params.push(...scope.storeIds);
+        }
+      }
       if (scope.storeId) {
         clauses.push(`AND ${tableAlias}.store_id = ?`);
         params.push(scope.storeId);

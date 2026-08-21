@@ -1,4 +1,4 @@
-export type OrderViewerRole = "sales" | "store_manager" | "admin";
+export type OrderViewerRole = "sales" | "store_manager" | "regional_manager" | "admin";
 
 export interface OrderViewer {
   id: string;

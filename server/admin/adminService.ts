@@ -20,6 +20,8 @@ export interface AdminStoreRecord {
   activeUserCount: number;
   managerUserId: string | null;
   managerName: string | null;
+  regionalManagerUserId: string | null;
+  regionalManagerName: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,6 +34,8 @@ export interface AdminStoreView {
   activeUserCount: number;
   managerUserId: string | null;
   managerName: string | null;
+  regionalManagerUserId: string | null;
+  regionalManagerName: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -53,6 +57,7 @@ export interface AdminUserRecord {
   lastLoginAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  managedStoreIds: readonly string[];
 }
 
 export interface AdminUserView {
@@ -69,6 +74,7 @@ export interface AdminUserView {
   lastLoginAt: string | null;
   createdAt: string;
   updatedAt: string;
+  managedStoreIds: readonly string[];
 }
 
 export interface AdminUserFilters {
@@ -79,6 +85,7 @@ export interface AdminUserFilters {
   query?: string;
   page?: number;
   pageSize?: number;
+  allowedStoreIds?: readonly string[];
 }
 
 export interface AdminStoreWrite {
@@ -155,6 +162,7 @@ export interface AdminRepository {
   findUserForUpdate(id: string): Promise<AdminUserRecord | null>;
   createUser(input: AdminUserWrite): Promise<AdminUserRecord>;
   updateUser(id: string, patch: AdminUserPatch): Promise<AdminUserRecord | null>;
+  replaceRegionalManagerStores(userId: string, storeIds: readonly string[], at: Date): Promise<void>;
   listActiveAdminsForUpdate(): Promise<readonly string[]>;
   deleteSessionsForUser(userId: string): Promise<void>;
   writeAudit(input: AdminAuditInput): Promise<void>;
@@ -180,6 +188,7 @@ export interface CreateAdminUserInput {
   role: UserRole;
   personnelType: PersonnelType;
   storeId: string | null;
+  managedStoreIds?: readonly string[];
   active?: boolean;
   initialPassword: string;
   reason: string;
@@ -192,6 +201,7 @@ export interface UpdateAdminUserInput {
   role?: UserRole;
   personnelType?: PersonnelType;
   storeId?: string | null;
+  managedStoreIds?: readonly string[];
   active?: boolean;
   reason: string;
 }
@@ -221,6 +231,12 @@ export interface AdminServiceOptions {
 const requireAdmin = (actor: AuthenticatedUser): void => {
   if (actor.role !== "admin") {
     throw new AdminServiceError("仅管理员可管理营业厅与账号", 403);
+  }
+};
+
+const requirePersonnelManager = (actor: AuthenticatedUser): void => {
+  if (actor.role !== "admin" && actor.role !== "regional_manager") {
+    throw new AdminServiceError("仅管理员或大区经理可管理账号", 403);
   }
 };
 
@@ -266,12 +282,15 @@ const mapPersistenceError = (error: unknown): never => {
     const constraint =
       typeof error === "object" && error !== null && "constraint_name" in error
         ? String(error.constraint_name)
-        : "";
+        : String(error);
     if (constraint.includes("phone")) {
       throw new AdminServiceError("该手机号已绑定其他账号", 409);
     }
     if (constraint.includes("stores_code")) {
       throw new AdminServiceError("营业厅编码已存在", 409);
+    }
+    if (constraint.includes("regional_manager_stores") || constraint.includes("store_id")) {
+      throw new AdminServiceError("所选营业厅已由其他大区经理管理", 409);
     }
     throw new AdminServiceError("工号已存在", 409);
   }
@@ -286,6 +305,8 @@ const storeView = (store: AdminStoreRecord): AdminStoreView => ({
   activeUserCount: store.activeUserCount,
   managerUserId: store.managerUserId,
   managerName: store.managerName,
+  regionalManagerUserId: store.regionalManagerUserId,
+  regionalManagerName: store.regionalManagerName,
   createdAt: store.createdAt.toISOString(),
   updatedAt: store.updatedAt.toISOString(),
 });
@@ -298,6 +319,8 @@ const storeAuditSnapshot = (store: AdminStoreRecord): Record<string, unknown> =>
   activeUserCount: store.activeUserCount,
   managerUserId: store.managerUserId,
   managerName: store.managerName,
+  regionalManagerUserId: store.regionalManagerUserId,
+  regionalManagerName: store.regionalManagerName,
 });
 
 const safeDecryptPhone = (
@@ -329,6 +352,7 @@ const userView = (
   lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
   createdAt: user.createdAt.toISOString(),
   updatedAt: user.updatedAt.toISOString(),
+  managedStoreIds: user.managedStoreIds,
 });
 
 const userAuditSnapshot = (
@@ -393,6 +417,12 @@ export const createAdminService = (options: AdminServiceOptions) => {
       }
       return null;
     }
+    if (role === "regional_manager") {
+      if (personnelType === "admin" || storeId !== null) {
+        throw new AdminServiceError("大区经理不绑定单一营业厅，且须使用非管理员人员类型", 400);
+      }
+      return null;
+    }
     if (personnelType === "admin" || !storeId) {
       throw new AdminServiceError(
         "销售及厅经理必须绑定营业厅和非管理员人员类型",
@@ -409,8 +439,12 @@ export const createAdminService = (options: AdminServiceOptions) => {
 
   return {
     async listStores(actor: AuthenticatedUser): Promise<AdminStoreView[]> {
-      requireAdmin(actor);
-      return (await options.repository.listStores()).map(storeView);
+      requirePersonnelManager(actor);
+      const stores = await options.repository.listStores();
+      const visible = actor.role === "regional_manager"
+        ? stores.filter((store) => (actor.managedStores ?? []).some((managed) => managed.id === store.id))
+        : stores;
+      return visible.map(storeView);
     },
 
     async createStore(
@@ -524,11 +558,18 @@ export const createAdminService = (options: AdminServiceOptions) => {
       actor: AuthenticatedUser,
       filters: AdminUserFilters,
     ) {
-      requireAdmin(actor);
+      requirePersonnelManager(actor);
       const page = filters.page ?? 1;
       const pageSize = filters.pageSize ?? 20;
+      const allowedStoreIds = actor.role === "regional_manager"
+        ? (actor.managedStores ?? []).map((store) => store.id)
+        : undefined;
+      if (filters.storeId && allowedStoreIds && !allowedStoreIds.includes(filters.storeId)) {
+        throw new AdminServiceError("无权查看该营业厅账号", 403);
+      }
       const result = await options.repository.listUsers({
           ...filters,
+          allowedStoreIds,
           page,
           pageSize,
           query: filters.query?.trim() || undefined,
@@ -558,11 +599,21 @@ export const createAdminService = (options: AdminServiceOptions) => {
       actor: AuthenticatedUser,
       input: CreateAdminUserInput,
     ): Promise<AdminUserView> {
-      requireAdmin(actor);
+      requirePersonnelManager(actor);
       const reason = normalizeReason(input.reason);
       validateInitialPassword(input.initialPassword);
       const at = now();
       const active = input.active ?? true;
+      if (actor.role === "regional_manager") {
+        const allowed = (actor.managedStores ?? []).map((store) => store.id);
+        if (!input.storeId || !allowed.includes(input.storeId)) {
+          throw new AdminServiceError("只能在名下营业厅创建账号", 403);
+        }
+        if (input.role !== "sales" && input.role !== "store_manager") {
+          throw new AdminServiceError("大区经理只能创建销售员或营业厅经理账号", 403);
+        }
+        if (input.managedStoreIds?.length) throw new AdminServiceError("无权分配大区", 403);
+      }
       try {
         return await options.repository.runTransaction(async (repository) => {
           await repository.lockAdministration();
@@ -590,6 +641,16 @@ export const createAdminService = (options: AdminServiceOptions) => {
             createdAt: at,
             updatedAt: at,
           });
+          if (created.role === "regional_manager") {
+            const managedStoreIds = [...new Set(input.managedStoreIds ?? [])];
+            for (const managedStoreId of managedStoreIds) {
+              const managedStore = await repository.findStoreForUpdate(managedStoreId);
+              if (!managedStore?.active) throw new AdminServiceError("大区经理只能管理启用的营业厅", 400);
+            }
+            await repository.replaceRegionalManagerStores(created.id, managedStoreIds, at);
+          }
+          const completeCreated = await repository.findUserForUpdate(created.id);
+          if (!completeCreated) throw new AdminServiceError("账号创建后读取失败", 500);
           await audit(
             repository,
             {
@@ -599,12 +660,12 @@ export const createAdminService = (options: AdminServiceOptions) => {
               entityId: created.id,
               action: "create_user",
               beforeSnapshot: null,
-              afterSnapshot: userAuditSnapshot(created, options.pii),
+              afterSnapshot: userAuditSnapshot(completeCreated, options.pii),
               reason,
             },
             at,
           );
-          return userView(created, options.pii);
+          return userView(completeCreated, options.pii);
         });
       } catch (error) {
         return mapPersistenceError(error);
@@ -616,7 +677,7 @@ export const createAdminService = (options: AdminServiceOptions) => {
       userId: string,
       input: UpdateAdminUserInput,
     ): Promise<AdminUserView> {
-      requireAdmin(actor);
+      requirePersonnelManager(actor);
       const reason = normalizeReason(input.reason);
       const hasMutation = Object.entries(input).some(
         ([key, value]) => key !== "reason" && value !== undefined,
@@ -628,6 +689,14 @@ export const createAdminService = (options: AdminServiceOptions) => {
           await repository.lockAdministration();
           const existing = await repository.findUserForUpdate(userId);
           if (!existing) throw new AdminServiceError("账号不存在", 404);
+          if (actor.role === "regional_manager") {
+            const allowed = (actor.managedStores ?? []).map((store) => store.id);
+            if (!existing.storeId || !allowed.includes(existing.storeId)) throw new AdminServiceError("无权管理该账号", 403);
+            if (existing.role !== "sales" && existing.role !== "store_manager") throw new AdminServiceError("无权管理该角色", 403);
+            if (input.role !== undefined && input.role !== existing.role) throw new AdminServiceError("大区经理不能修改账号角色", 403);
+            if (input.storeId !== undefined && (!input.storeId || !allowed.includes(input.storeId))) throw new AdminServiceError("不能将账号移出名下营业厅", 403);
+            if (input.managedStoreIds !== undefined) throw new AdminServiceError("无权分配大区", 403);
+          }
           const next = {
             workNo:
               input.workNo === undefined
@@ -683,6 +752,18 @@ export const createAdminService = (options: AdminServiceOptions) => {
             updatedAt: at,
           });
           if (!updated) throw new AdminServiceError("账号不存在", 404);
+          if (actor.role === "admin" && (next.role === "regional_manager" || existing.role === "regional_manager")) {
+            const managedStoreIds = next.role === "regional_manager"
+              ? [...new Set(input.managedStoreIds ?? existing.managedStoreIds)]
+              : [];
+            for (const managedStoreId of managedStoreIds) {
+              const managedStore = await repository.findStoreForUpdate(managedStoreId);
+              if (!managedStore?.active) throw new AdminServiceError("大区经理只能管理启用的营业厅", 400);
+            }
+            await repository.replaceRegionalManagerStores(userId, managedStoreIds, at);
+          }
+          const completeUpdated = await repository.findUserForUpdate(userId);
+          if (!completeUpdated) throw new AdminServiceError("账号更新后读取失败", 500);
           if (existing.active && !updated.active) {
             await repository.deleteSessionsForUser(userId);
           }
@@ -700,7 +781,7 @@ export const createAdminService = (options: AdminServiceOptions) => {
             },
             at,
           );
-          return userView(updated, options.pii);
+          return userView(completeUpdated, options.pii);
         });
       } catch (error) {
         return mapPersistenceError(error);
@@ -712,7 +793,7 @@ export const createAdminService = (options: AdminServiceOptions) => {
       userId: string,
       input: ResetUserPasswordInput,
     ): Promise<AdminUserView> {
-      requireAdmin(actor);
+      requirePersonnelManager(actor);
       const reason = normalizeReason(input.reason);
       validateInitialPassword(input.initialPassword);
       const at = now();
@@ -720,6 +801,12 @@ export const createAdminService = (options: AdminServiceOptions) => {
         await repository.lockAdministration();
         const existing = await repository.findUserForUpdate(userId);
         if (!existing) throw new AdminServiceError("账号不存在", 404);
+        if (actor.role === "regional_manager") {
+          const allowed = (actor.managedStores ?? []).map((store) => store.id);
+          if (!existing.storeId || !allowed.includes(existing.storeId) || (existing.role !== "sales" && existing.role !== "store_manager")) {
+            throw new AdminServiceError("无权重置该账号密码", 403);
+          }
+        }
         const updated = await repository.updateUser(userId, {
           passwordHash: await hashPassword(input.initialPassword),
           mustChangePassword: actor.id !== userId,

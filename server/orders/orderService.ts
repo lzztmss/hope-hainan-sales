@@ -639,6 +639,9 @@ export const createOrderService = (options: OrderServiceOptions) => {
       user: AuthenticatedUser,
       orderId: string,
     ): Promise<OrderRecord> {
+      if (user.role === "regional_manager") {
+        throw new OrderServiceError("大区经理仅可查看订单", 403);
+      }
       const order = await requireVisibleOrder(user, orderId);
       if (order.deletedAt) return order;
       if (order.status !== "pending" && order.status !== "accepted") {

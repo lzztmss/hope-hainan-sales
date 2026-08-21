@@ -20,7 +20,7 @@ import type {
 } from "../orders/types";
 import { APP_BASE_PATH } from "../appBasePath";
 
-export type ApiUserRole = "sales" | "store_manager" | "admin";
+export type ApiUserRole = "sales" | "store_manager" | "regional_manager" | "admin";
 
 export interface AuthenticatedUser {
   id: string;
@@ -29,6 +29,7 @@ export interface AuthenticatedUser {
   storeId: string | null;
   storeName?: string | null;
   mustChangePassword: boolean;
+  managedStores?: readonly { id: string; name: string }[];
 }
 
 export interface LoginInput {

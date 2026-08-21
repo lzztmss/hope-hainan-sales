@@ -1,4 +1,4 @@
-import { and, count, desc, eq, isNull, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
 
 import type { UserScope } from "../auth/authorization.js";
 import type { DbClient } from "../db/client.js";
@@ -8,6 +8,7 @@ import type { CustomerListRecord, CustomerRepository } from "./customerService.j
 const scopeCondition = (scope: UserScope): SQL | undefined => {
   if (scope.kind === "global") return undefined;
   if (scope.kind === "store") return eq(customers.storeId, scope.storeId);
+  if (scope.kind === "region") return inArray(customers.storeId, [...scope.storeIds]);
   return and(
     eq(customers.storeId, scope.storeId),
     eq(customers.ownerUserId, scope.sellerId),

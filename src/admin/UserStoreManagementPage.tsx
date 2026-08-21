@@ -10,7 +10,7 @@ import { APP_BASE_PATH } from "../appBasePath";
 import { Pagination } from "../components/Pagination";
 import "./userStoreManagement.css";
 
-export type ManagedUserRole = "sales" | "store_manager" | "admin";
+export type ManagedUserRole = "sales" | "store_manager" | "regional_manager" | "admin";
 export type ManagedPersonnelType = "unicom" | "auxiliary" | "admin";
 
 export interface ManagedStoreView {
@@ -21,6 +21,8 @@ export interface ManagedStoreView {
   activeUserCount: number;
   managerUserId: string | null;
   managerName: string | null;
+  regionalManagerUserId?: string | null;
+  regionalManagerName?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -33,6 +35,7 @@ export interface ManagedUserView {
   role: ManagedUserRole;
   personnelType: ManagedPersonnelType;
   storeId: string | null;
+  managedStoreIds?: readonly string[];
   storeName: string | null;
   active: boolean;
   mustChangePassword: boolean;
@@ -61,6 +64,7 @@ export interface CreateManagedUserInput {
   role: ManagedUserRole;
   personnelType: ManagedPersonnelType;
   storeId: string | null;
+  managedStoreIds?: readonly string[];
   active: boolean;
   initialPassword: string;
   reason: string;
@@ -73,6 +77,7 @@ export interface UpdateManagedUserInput {
   role?: ManagedUserRole;
   personnelType?: ManagedPersonnelType;
   storeId?: string | null;
+  managedStoreIds?: readonly string[];
   active?: boolean;
   reason: string;
 }
@@ -84,6 +89,7 @@ export interface ResetManagedPasswordInput {
 
 export interface UserStoreManagementPageProps {
   currentUserId?: string;
+  regionalOnly?: boolean;
   stores: readonly ManagedStoreView[];
   users: readonly ManagedUserView[];
   managerCandidates?: readonly ManagedUserView[];
@@ -234,6 +240,7 @@ export const createUserStoreManagementApi = (
 const roleLabels: Record<ManagedUserRole, string> = {
   sales: "销售员",
   store_manager: "营业厅经理",
+  regional_manager: "大区经理",
   admin: "管理员",
 };
 
@@ -250,6 +257,7 @@ const initialUserDraft = {
   role: "sales" as ManagedUserRole,
   personnelType: "unicom" as ManagedPersonnelType,
   storeId: "",
+  managedStoreIds: [] as string[],
   initialPassword: "",
   reason: "",
 };
@@ -262,6 +270,7 @@ interface EditDraft {
   role: ManagedUserRole;
   personnelType: ManagedPersonnelType;
   storeId: string;
+  managedStoreIds: string[];
   reason: string;
 }
 
@@ -291,6 +300,7 @@ const statusBadge = (active: boolean) => (
 
 export const UserStoreManagementPage = ({
   currentUserId,
+  regionalOnly = false,
   stores,
   users,
   managerCandidates = users,
@@ -399,7 +409,8 @@ export const UserStoreManagementPage = ({
       ...current,
       role,
       personnelType: role === "admin" ? "admin" : current.personnelType === "admin" ? "unicom" : current.personnelType,
-      storeId: role === "admin" ? "" : current.storeId,
+      storeId: role === "admin" || role === "regional_manager" ? "" : current.storeId,
+      managedStoreIds: role === "regional_manager" ? current.managedStoreIds : [],
     }));
   };
 
@@ -415,7 +426,7 @@ export const UserStoreManagementPage = ({
       setError("新增账号原因至少填写 2 个字符");
       return;
     }
-    if (userDraft.role !== "admin" && !userDraft.storeId) {
+    if (userDraft.role !== "admin" && userDraft.role !== "regional_manager" && !userDraft.storeId) {
       setError("请选择所属营业厅");
       return;
     }
@@ -427,7 +438,8 @@ export const UserStoreManagementPage = ({
         ...(userDraft.phone.trim() ? { phone: userDraft.phone.trim() } : {}),
         role: userDraft.role,
         personnelType: userDraft.personnelType,
-        storeId: userDraft.role === "admin" ? null : userDraft.storeId,
+        storeId: userDraft.role === "admin" || userDraft.role === "regional_manager" ? null : userDraft.storeId,
+        managedStoreIds: userDraft.role === "regional_manager" ? userDraft.managedStoreIds : [],
         active: true,
         initialPassword: userDraft.initialPassword,
         reason: userDraft.reason.trim(),
@@ -451,6 +463,7 @@ export const UserStoreManagementPage = ({
       role: user.role,
       personnelType: user.personnelType,
       storeId: user.storeId ?? "",
+      managedStoreIds: [...(user.managedStoreIds ?? [])],
       reason: "",
     });
     setResetDraft(null);
@@ -470,7 +483,7 @@ export const UserStoreManagementPage = ({
       setError("编辑账号原因至少填写 2 个字符");
       return;
     }
-    if (editDraft.role !== "admin" && !editDraft.storeId) {
+    if (editDraft.role !== "admin" && editDraft.role !== "regional_manager" && !editDraft.storeId) {
       setError("请选择所属营业厅");
       return;
     }
@@ -482,7 +495,8 @@ export const UserStoreManagementPage = ({
         ...(editDraft.phone.trim() ? { phone: editDraft.phone.trim() } : {}),
         role: editDraft.role,
         personnelType: editDraft.personnelType,
-        storeId: editDraft.role === "admin" ? null : editDraft.storeId,
+        storeId: editDraft.role === "admin" || editDraft.role === "regional_manager" ? null : editDraft.storeId,
+        managedStoreIds: editDraft.role === "regional_manager" ? editDraft.managedStoreIds : [],
         reason: editDraft.reason.trim(),
       });
       setEditDraft(null);
@@ -671,9 +685,9 @@ export const UserStoreManagementPage = ({
     <section className="user-store-management" aria-labelledby="user-store-title">
       <header className="user-store-management__header">
         <div>
-          <p>管理员专区</p>
-          <h1 id="user-store-title">营业厅与账号管理</h1>
-          <span>统一维护销售归属、登录权限与人员状态；历史订单快照不会被改写。</span>
+          <p>{regionalOnly ? "大区人员管理" : "管理员专区"}</p>
+          <h1 id="user-store-title">{regionalOnly ? "名下账号" : "营业厅与账号管理"}</h1>
+          <span>{regionalOnly ? "查看并维护所管营业厅的销售员与营业厅经理账号。" : "统一维护销售归属、登录权限与人员状态；历史订单快照不会被改写。"}</span>
         </div>
       </header>
 
@@ -688,7 +702,7 @@ export const UserStoreManagementPage = ({
         {error ? <p id={passwordInvalid ? "initial-password-error" : undefined} role="alert">{error}</p> : null}
       </div>
 
-      <section className="management-section" aria-labelledby="stores-title">
+      {!regionalOnly ? <section className="management-section" aria-labelledby="stores-title">
         <div className="management-section__heading">
           <div><h2 id="stores-title">营业厅管理</h2><p>停用前须先停用或转移该厅全部启用账号。</p></div>
           <button type="button" className="management-primary" onClick={() => setShowStoreForm((value) => !value)}>
@@ -722,7 +736,7 @@ export const UserStoreManagementPage = ({
             <tbody>{stores.map((store) => <tr key={store.id}><td>{store.code}</td><td>{store.name}</td><td>{store.managerName ?? "未指定"}</td><td>{store.activeUserCount} 人</td><td>{statusBadge(store.active)}</td><td>{storeActions(store)}</td></tr>)}</tbody>
           </table>
         </div>
-      </section>
+      </section> : null}
 
       {managerStoreId ? (
         <section ref={actionPanelRef} className="management-action-panel" aria-labelledby="manager-action-title">
@@ -758,9 +772,10 @@ export const UserStoreManagementPage = ({
               <label>工号<input required autoCapitalize="characters" value={userDraft.workNo} onChange={(event) => setUserDraft({ ...userDraft, workNo: event.currentTarget.value.toUpperCase() })} /></label>
               <label>姓名<input required value={userDraft.displayName} onChange={(event) => setUserDraft({ ...userDraft, displayName: event.currentTarget.value })} /></label>
               <label>手机号（选填）<input inputMode="tel" value={userDraft.phone} onChange={(event) => setUserDraft({ ...userDraft, phone: event.currentTarget.value })} /></label>
-              <label>账号角色<select value={userDraft.role} onChange={(event) => changeCreateRole(event.currentTarget.value as ManagedUserRole)}><option value="sales">销售员</option><option value="store_manager">营业厅经理</option><option value="admin">管理员</option></select></label>
+              <label>账号角色<select value={userDraft.role} onChange={(event) => changeCreateRole(event.currentTarget.value as ManagedUserRole)}><option value="sales">销售员</option><option value="store_manager">营业厅经理</option>{!regionalOnly ? <><option value="regional_manager">大区经理</option><option value="admin">管理员</option></> : null}</select></label>
               <label>人员类型<select value={userDraft.personnelType} disabled={userDraft.role === "admin"} onChange={(event) => setUserDraft({ ...userDraft, personnelType: event.currentTarget.value as ManagedPersonnelType })}><option value="unicom">联通人员</option><option value="auxiliary">辅助销售</option><option value="admin">管理员</option></select></label>
-              <label>所属营业厅<select required={userDraft.role !== "admin"} disabled={userDraft.role === "admin"} value={userDraft.storeId} onChange={(event) => setUserDraft({ ...userDraft, storeId: event.currentTarget.value })}><option value="">请选择营业厅</option>{activeStores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</select></label>
+              <label>所属营业厅<select required={userDraft.role !== "admin" && userDraft.role !== "regional_manager"} disabled={userDraft.role === "admin" || userDraft.role === "regional_manager"} value={userDraft.storeId} onChange={(event) => setUserDraft({ ...userDraft, storeId: event.currentTarget.value })}><option value="">{userDraft.role === "regional_manager" ? "大区经理不绑定单一营业厅" : "请选择营业厅"}</option>{activeStores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</select></label>
+              {userDraft.role === "regional_manager" ? <label className="management-wide">管理营业厅（可多选）<select multiple size={Math.min(6, Math.max(3, activeStores.length))} value={(userDraft as typeof userDraft & { managedStoreIds?: string[] }).managedStoreIds ?? []} onChange={(event) => setUserDraft({ ...userDraft, managedStoreIds: Array.from(event.currentTarget.selectedOptions, (option) => option.value) } as typeof userDraft)}> {activeStores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}</select></label> : null}
               <label>初始密码（8 至 128 位）<input type="password" required minLength={8} maxLength={128} aria-invalid={passwordInvalid} aria-describedby={passwordInvalid ? "initial-password-error" : undefined} value={userDraft.initialPassword} onChange={(event) => { setPasswordInvalid(false); setUserDraft({ ...userDraft, initialPassword: event.currentTarget.value }); }} /></label>
               <label className="management-wide">新增账号原因（至少 2 个字符）<input required minLength={2} value={userDraft.reason} onChange={(event) => setUserDraft({ ...userDraft, reason: event.currentTarget.value })} /></label>
               <div className="management-form-actions"><button type="submit" className="management-primary" disabled={busy || !onCreateUser}>创建账号</button></div>
@@ -800,9 +815,10 @@ export const UserStoreManagementPage = ({
             <label>编辑工号<input required value={editDraft.workNo} onChange={(event) => setEditDraft({ ...editDraft, workNo: event.currentTarget.value.toUpperCase() })} /></label>
             <label>编辑姓名<input required value={editDraft.displayName} onChange={(event) => setEditDraft({ ...editDraft, displayName: event.currentTarget.value })} /></label>
             <label>更新手机号（留空保持）<input inputMode="tel" value={editDraft.phone} onChange={(event) => setEditDraft({ ...editDraft, phone: event.currentTarget.value })} /></label>
-            <label>编辑角色<select value={editDraft.role} onChange={(event) => { const role = event.currentTarget.value as ManagedUserRole; setEditDraft({ ...editDraft, role, personnelType: role === "admin" ? "admin" : editDraft.personnelType === "admin" ? "unicom" : editDraft.personnelType, storeId: role === "admin" ? "" : editDraft.storeId }); }}><option value="sales">销售员</option><option value="store_manager">营业厅经理</option><option value="admin">管理员</option></select></label>
+            <label>编辑角色<select value={editDraft.role} disabled={regionalOnly} onChange={(event) => { const role = event.currentTarget.value as ManagedUserRole; setEditDraft({ ...editDraft, role, personnelType: role === "admin" ? "admin" : editDraft.personnelType === "admin" ? "unicom" : editDraft.personnelType, storeId: role === "admin" || role === "regional_manager" ? "" : editDraft.storeId, managedStoreIds: role === "regional_manager" ? editDraft.managedStoreIds : [] }); }}><option value="sales">销售员</option><option value="store_manager">营业厅经理</option>{!regionalOnly ? <><option value="regional_manager">大区经理</option><option value="admin">管理员</option></> : null}</select></label>
             <label>编辑人员类型<select disabled={editDraft.role === "admin"} value={editDraft.personnelType} onChange={(event) => setEditDraft({ ...editDraft, personnelType: event.currentTarget.value as ManagedPersonnelType })}><option value="unicom">联通人员</option><option value="auxiliary">辅助销售</option><option value="admin">管理员</option></select></label>
-            <label>编辑所属营业厅<select disabled={editDraft.role === "admin"} required={editDraft.role !== "admin"} value={editDraft.storeId} onChange={(event) => setEditDraft({ ...editDraft, storeId: event.currentTarget.value })}><option value="">请选择营业厅</option>{stores.map((store) => <option key={store.id} value={store.id}>{store.name}{store.active ? "" : "（已停用）"}</option>)}</select></label>
+            <label>编辑所属营业厅<select disabled={editDraft.role === "admin" || editDraft.role === "regional_manager"} required={editDraft.role !== "admin" && editDraft.role !== "regional_manager"} value={editDraft.storeId} onChange={(event) => setEditDraft({ ...editDraft, storeId: event.currentTarget.value })}><option value="">{editDraft.role === "regional_manager" ? "大区经理不绑定单一营业厅" : "请选择营业厅"}</option>{stores.map((store) => <option key={store.id} value={store.id}>{store.name}{store.active ? "" : "（已停用）"}</option>)}</select></label>
+            {editDraft.role === "regional_manager" ? <label className="management-wide">管理营业厅（可多选）<select multiple size={Math.min(6, Math.max(3, activeStores.length))} value={editDraft.managedStoreIds} onChange={(event) => setEditDraft({ ...editDraft, managedStoreIds: Array.from(event.currentTarget.selectedOptions, (option) => option.value) })}>{activeStores.map((store) => <option key={store.id} value={store.id}>{store.name}{store.regionalManagerUserId && !editDraft.managedStoreIds.includes(store.id) ? `（已归属 ${store.regionalManagerName ?? "其他大区经理"}）` : ""}</option>)}</select></label> : null}
             <label className="management-wide">编辑账号原因（至少 2 个字符）<input required minLength={2} value={editDraft.reason} onChange={(event) => setEditDraft({ ...editDraft, reason: event.currentTarget.value })} /></label>
             <div className="management-form-actions"><button type="button" onClick={() => setEditDraft(null)}>取消</button><button type="submit" className="management-primary" disabled={busy}>保存账号修改</button></div>
           </fieldset></form>

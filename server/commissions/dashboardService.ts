@@ -274,6 +274,9 @@ const normalizeFilters = (
   filters: CommissionDashboardFilters,
 ): { scope: UserScope; repository: CommissionDashboardRepositoryFilters } => {
   const scope = scopeForUser(user);
+  if (scope.kind === "region") {
+    throw new CommissionDashboardError("大区经理提成功能暂未开放", 403);
+  }
   if (scope.kind === "seller") {
     if (filters.storeId && filters.storeId !== scope.storeId) {
       throw new CommissionDashboardError("无权查询其他营业厅提成", 403);

@@ -22,6 +22,13 @@
       "when": 1787120570000,
       "tag": "0002_monthly_return_refund_cap",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1787280000000,
+      "tag": "0003_regional_managers",
+      "breakpoints": true
     }
   ]
 }

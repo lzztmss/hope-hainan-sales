@@ -25,6 +25,7 @@ export interface SalesReportFact {
 export type SalesReportScope =
   | { kind: "seller"; storeId: string; sellerId: string }
   | { kind: "store"; storeId: string; sellerId?: string }
+  | { kind: "region"; storeIds: readonly string[]; storeId?: string; sellerId?: string }
   | { kind: "global"; storeId?: string; sellerId?: string };
 
 export interface ReportExportAudit {
@@ -125,6 +126,18 @@ const normalizeScope = (
       ...(filters.sellerId ? { sellerId: filters.sellerId } : {}),
     };
   }
+  if (user.role === "regional_manager") {
+    const storeIds = (user.managedStores ?? []).map((store) => store.id);
+    if (filters.storeId && !storeIds.includes(filters.storeId)) {
+      throw new ReportAuthorizationError();
+    }
+    return {
+      kind: "region",
+      storeIds,
+      ...(filters.storeId ? { storeId: filters.storeId } : {}),
+      ...(filters.sellerId ? { sellerId: filters.sellerId } : {}),
+    };
+  }
   return {
     kind: "global",
     ...(filters.storeId ? { storeId: filters.storeId } : {}),
@@ -175,7 +188,7 @@ export const createSalesReportService = (options: {
     const period = parseReportPeriod(filters.from, filters.to, generatedAt);
     const scope = normalizeScope(user, filters);
     const facts = await options.repository.loadFacts(scope, period);
-    const requestedGroup = filters.groupBy ?? (user.role === "admin" ? "store" : user.role === "store_manager" ? "seller" : "none");
+    const requestedGroup = filters.groupBy ?? (user.role === "admin" || user.role === "regional_manager" ? "store" : user.role === "store_manager" ? "seller" : "none");
     const groupBy = user.role === "sales" ? "none" : requestedGroup;
     const allRows = groupBy === "none" ? [] : groupFacts(facts, groupBy);
     const page = filters.page ?? 1;
@@ -193,6 +206,8 @@ export const createSalesReportService = (options: {
             ? "本人"
             : scope.kind === "store"
               ? "本营业厅"
+              : scope.kind === "region"
+                ? "所管营业厅"
               : "全公司",
       },
       totals: metricsForFacts(facts),
@@ -215,7 +230,7 @@ export const createSalesReportService = (options: {
       const normalizedFilters = {
         from: report.period.from,
         to: report.period.to,
-        groupBy: filters.groupBy ?? (user.role === "admin" ? "store" : user.role === "store_manager" ? "seller" : "none"),
+        groupBy: filters.groupBy ?? (user.role === "admin" || user.role === "regional_manager" ? "store" : user.role === "store_manager" ? "seller" : "none"),
         ...(filters.storeId ? { storeId: filters.storeId } : {}),
         ...(filters.sellerId ? { sellerId: filters.sellerId } : {}),
       };

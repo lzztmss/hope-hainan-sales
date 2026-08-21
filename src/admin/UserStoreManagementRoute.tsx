@@ -12,6 +12,7 @@ export interface UserStoreManagementRouteProps {
   api?: UserStoreManagementApi;
   currentUserId?: string;
   onCurrentUserPasswordReset?(): Promise<void> | void;
+  regionalOnly?: boolean;
 }
 
 const messageFor = (error: unknown): string =>
@@ -21,6 +22,7 @@ export const UserStoreManagementRoute = ({
   api: providedApi,
   currentUserId,
   onCurrentUserPasswordReset,
+  regionalOnly = false,
 }: UserStoreManagementRouteProps) => {
   const api = useMemo(
     () => providedApi ?? createUserStoreManagementApi(),
@@ -111,6 +113,7 @@ export const UserStoreManagementRoute = ({
   return (
     <UserStoreManagementPage
       currentUserId={currentUserId}
+      regionalOnly={regionalOnly}
       stores={stores}
       users={users}
       managerCandidates={managerCandidates}

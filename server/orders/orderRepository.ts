@@ -55,6 +55,7 @@ type OrderRow = typeof orders.$inferSelect;
 const scopeCondition = (scope: UserScope): SQL | undefined => {
   if (scope.kind === "global") return undefined;
   if (scope.kind === "store") return eq(orders.storeId, scope.storeId);
+  if (scope.kind === "region") return inArray(orders.storeId, [...scope.storeIds]);
   return and(
     eq(orders.storeId, scope.storeId),
     eq(orders.sellerId, scope.sellerId),
@@ -211,6 +212,8 @@ export class DrizzleOrderRepository implements OrderRepository {
         ? undefined
         : scope.kind === "store"
           ? eq(quotes.storeId, scope.storeId)
+          : scope.kind === "region"
+            ? inArray(quotes.storeId, [...scope.storeIds])
           : and(
               eq(quotes.storeId, scope.storeId),
               eq(quotes.sellerId, scope.sellerId),
@@ -433,6 +436,8 @@ export class DrizzleOrderRepository implements OrderRepository {
       );
     } else if (scope.kind === "store") {
       conditions.push(eq(orders.storeId, scope.storeId));
+    } else if (scope.kind === "region") {
+      conditions.push(inArray(orders.storeId, [...scope.storeIds]));
     }
     conditions.push(filters.deletedOnly ? isNotNull(orders.deletedAt) : isNull(orders.deletedAt));
     if (filters.orderNo) {
@@ -572,10 +577,16 @@ export class DrizzleOrderRepository implements OrderRepository {
 
   async listFilterOptions(scope: Parameters<OrderRepository["listFilterOptions"]>[0]): Promise<OrderFilterOptions> {
     if (scope.kind === "seller") return { stores: [], sellers: [] };
-    const storeCondition = scope.kind === "store" ? eq(stores.id, scope.storeId) : eq(stores.active, true);
+    const storeCondition = scope.kind === "store"
+      ? eq(stores.id, scope.storeId)
+      : scope.kind === "region"
+        ? inArray(stores.id, [...scope.storeIds])
+        : eq(stores.active, true);
     const sellerCondition =
       scope.kind === "store"
         ? and(eq(users.storeId, scope.storeId), eq(users.active, true), inArray(users.role, ["sales", "store_manager"]))
+        : scope.kind === "region"
+          ? and(inArray(users.storeId, [...scope.storeIds]), eq(users.active, true), inArray(users.role, ["sales", "store_manager"]))
         : and(eq(users.active, true), isNotNull(users.storeId), inArray(users.role, ["sales", "store_manager"]));
     const [storeRows, sellerRows] = await Promise.all([
       this.executor

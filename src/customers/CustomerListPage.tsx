@@ -63,7 +63,7 @@ export const CustomerListPage = ({ client, viewer }: { client: ApiClient; viewer
     <PageLayout
       eyebrow="客户档案"
       title="客户管理"
-      description={viewer.role === "admin" ? "查看全部客户，可按营业厅和销售员筛选。" : viewer.role === "store_manager" ? "仅展示本营业厅客户，可按本厅销售员筛选。" : "客户由正式报价自动建档，可查看归属、报价和订单情况。"}
+      description={viewer.role === "admin" ? "查看全部客户，可按营业厅和销售员筛选。" : viewer.role === "regional_manager" ? "只读查看所管营业厅客户，可按营业厅和销售员筛选。" : viewer.role === "store_manager" ? "仅展示本营业厅客户，可按本厅销售员筛选。" : "客户由正式报价自动建档，可查看归属、报价和订单情况。"}
     >
       <form className="customer-list__filters" onSubmit={submit}>
         <div className="customer-list__filter-row is-primary">
@@ -78,7 +78,7 @@ export const CustomerListPage = ({ client, viewer }: { client: ApiClient; viewer
           </label>
         </div>
         <div className="customer-list__filter-row is-secondary">
-          {viewer.role === "admin" ? <label><span>营业厅</span><select value={storeId} onChange={(event) => { setStoreId(event.currentTarget.value); setSellerId(""); }}><option value="">全部营业厅</option>{options.stores.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
+          {viewer.role === "admin" || viewer.role === "regional_manager" ? <label><span>营业厅</span><select value={storeId} onChange={(event) => { setStoreId(event.currentTarget.value); setSellerId(""); }}><option value="">全部营业厅</option>{options.stores.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
           {viewer.role !== "sales" ? <label><span>销售员</span><select value={sellerId} onChange={(event) => setSellerId(event.currentTarget.value)}><option value="">全部可见销售员</option>{options.sellers.filter((option) => !storeId || option.storeId === storeId).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
           <div className="customer-list__filter-actions">
             <button className="is-secondary" disabled={loading} onClick={reset} type="button">重置</button>

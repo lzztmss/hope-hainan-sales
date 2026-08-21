@@ -3,6 +3,7 @@ import type { AppRole, NavigationItem } from "./types";
 export const ROLE_LABELS: Record<AppRole, string> = {
   sales: "营业员",
   manager: "营业厅主管",
+  regional: "大区经理",
   admin: "管理员",
 };
 
@@ -42,6 +43,17 @@ const ADMIN_NAVIGATION: readonly NavigationItem[] = [
   { href: "/profile", label: "个人中心" },
 ];
 
+const REGIONAL_NAVIGATION: readonly NavigationItem[] = [
+  { href: "/", label: "大区工作台" },
+  { href: "/quotes", label: "报价查询" },
+  { href: "/customers", label: "客户查询" },
+  { href: "/orders", label: "订单查询" },
+  { href: "/returns", label: "退单查询" },
+  { href: "/reports/team", label: "大区报表" },
+  { href: "/regional/users", label: "名下账号" },
+  { href: "/profile", label: "个人中心" },
+];
+
 export const MOBILE_NAVIGATION: readonly NavigationItem[] = [
   { href: "/", label: "工作台" },
   { href: "/quotes/new", label: "报价" },
@@ -60,6 +72,8 @@ export const navigationForRole = (
   if (role === "manager") {
     return MANAGER_NAVIGATION;
   }
+
+  if (role === "regional") return REGIONAL_NAVIGATION;
 
   return SALES_NAVIGATION;
 };

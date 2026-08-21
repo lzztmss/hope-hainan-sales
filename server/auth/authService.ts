@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 
 import { hash, verify, type Options as Argon2Options } from "@node-rs/argon2";
 
-import type { AuthenticatedUser, UserRole } from "./authorization.js";
+import type { AuthenticatedUser, ManagedStore, UserRole } from "./authorization.js";
 
 export const AUTHENTICATION_FAILED_MESSAGE = "账号或密码错误";
 const DEFAULT_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
@@ -18,6 +18,7 @@ export interface AuthUserRecord {
   storeName: string | null;
   active: boolean;
   mustChangePassword: boolean;
+  managedStores?: readonly ManagedStore[];
 }
 
 export interface StoredSession {
@@ -64,6 +65,7 @@ const toAuthenticatedUser = (user: AuthUserRecord): AuthenticatedUser => ({
   storeId: user.storeId,
   storeName: user.storeName,
   mustChangePassword: user.mustChangePassword,
+  managedStores: user.managedStores ?? [],
 });
 
 const normalizeIdentifier = (

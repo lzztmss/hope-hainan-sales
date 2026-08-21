@@ -251,6 +251,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
   ): Promise<{ items: ReturnRequestRecord[]; total: number }> {
     const conditions = [];
     if (scope.kind === "store") conditions.push(eq(orders.storeId, scope.storeId));
+    if (scope.kind === "region") conditions.push(inArray(orders.storeId, [...scope.storeIds]));
     if (scope.kind === "seller") {
       conditions.push(
         eq(orders.storeId, scope.storeId),

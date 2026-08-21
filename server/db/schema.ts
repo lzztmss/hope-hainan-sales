@@ -19,6 +19,7 @@ const pgEnum = <const Values extends readonly [string, ...string[]]>(
 export const userRoleEnum = pgEnum("user_role", [
   "sales",
   "store_manager",
+  "regional_manager",
   "admin",
 ]);
 export const personnelTypeEnum = pgEnum("personnel_type", [
@@ -178,6 +179,27 @@ export const users = sqliteTable(
     uniqueIndex("users_primary_store_manager_unique")
       .on(table.storeId)
       .where(sql`${table.isPrimaryStoreManager} = 1`),
+  ],
+);
+
+export const regionalManagerStores = sqliteTable(
+  "regional_manager_stores",
+  {
+    regionalManagerId: text("regional_manager_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    storeId: text("store_id")
+      .notNull()
+      .references(() => stores.id, { onDelete: "restrict" }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("regional_manager_stores_store_unique").on(table.storeId),
+    uniqueIndex("regional_manager_stores_manager_store_unique").on(
+      table.regionalManagerId,
+      table.storeId,
+    ),
+    index("regional_manager_stores_manager_idx").on(table.regionalManagerId),
   ],
 );
 

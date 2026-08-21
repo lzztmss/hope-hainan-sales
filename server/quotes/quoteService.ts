@@ -528,6 +528,7 @@ export const createQuoteService = (options: QuoteServiceOptions) => {
       user: AuthenticatedUser,
       quoteId: string,
     ): Promise<ConfirmedQuote> {
+      if (user.role === "regional_manager") throw new AuthorizationError("大区经理仅可查看报价");
       await requireVisibleQuote(user, quoteId);
       const updated = await options.repository.setDeletedAt(quoteId, now());
       if (!updated) throw new Error("报价单不存在");
@@ -545,6 +546,7 @@ export const createQuoteService = (options: QuoteServiceOptions) => {
       user: AuthenticatedUser,
       quoteId: string,
     ): Promise<ConfirmedQuote> {
+      if (user.role === "regional_manager") throw new AuthorizationError("大区经理仅可查看报价");
       await requireVisibleQuote(user, quoteId);
       const updated = await options.repository.setDeletedAt(quoteId, null);
       if (!updated) throw new Error("报价单不存在");
