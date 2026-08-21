@@ -187,7 +187,35 @@ export const createSalesReportService = (options: {
     const generatedAt = now();
     const period = parseReportPeriod(filters.from, filters.to, generatedAt);
     const scope = normalizeScope(user, filters);
-    const facts = await options.repository.loadFacts(scope, period);
+    const loadedFacts = await options.repository.loadFacts(scope, period);
+    const visibleStores = scope.kind === "region"
+      ? (user.managedStores ?? []).filter((store) => !scope.storeId || store.id === scope.storeId)
+      : [];
+    const facts = scope.kind === "region" && !filters.sellerId
+      ? [
+          ...loadedFacts,
+          ...visibleStores
+            .filter((store) => !loadedFacts.some((fact) => fact.storeId === store.id))
+            .map((store): SalesReportFact => ({
+              storeId: store.id,
+              storeName: store.name,
+              sellerId: "",
+              sellerName: "",
+              quoteCount: 0,
+              orderCount: 0,
+              oneTimeOriginalFen: 0,
+              returnedFen: 0,
+              fttrMonthlyFen: 0,
+              heartMonthlyFen: 0,
+              contract36Fen: 0,
+              commissionEstimatedFen: 0,
+              commissionPendingSettlementFen: 0,
+              commissionPaidFen: 0,
+              commissionReversedFen: 0,
+              commissionNetFen: 0,
+            })),
+        ]
+      : loadedFacts;
     const requestedGroup = filters.groupBy ?? (user.role === "admin" || user.role === "regional_manager" ? "store" : user.role === "store_manager" ? "seller" : "none");
     const groupBy = user.role === "sales" ? "none" : requestedGroup;
     const allRows = groupBy === "none" ? [] : groupFacts(facts, groupBy);

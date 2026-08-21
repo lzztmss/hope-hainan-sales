@@ -678,15 +678,15 @@ export const UserStoreManagementPage = ({
 
   const userActions = (managedUser: ManagedUserView) => (
     <div className="management-row-actions">
-      <button
+      {!regionalOnly || managedUser.role === "sales" || managedUser.role === "store_manager" ? <button
         type="button"
         disabled={busy || !onUpdateUser}
         aria-label="编辑账号"
         onClick={() => startEdit(managedUser)}
       >
         编辑
-      </button>
-      <button
+      </button> : null}
+      {!regionalOnly || managedUser.role === "sales" || managedUser.role === "store_manager" ? <button
         type="button"
         disabled={busy || !onResetPassword}
         aria-label="重置密码"
@@ -704,8 +704,8 @@ export const UserStoreManagementPage = ({
         }}
       >
         重置密码
-      </button>
-      <button
+      </button> : null}
+      {!regionalOnly || managedUser.role === "sales" || managedUser.role === "store_manager" ? <button
         type="button"
         className={managedUser.active ? "management-danger" : "management-secondary"}
         disabled={busy || !onUpdateUser}
@@ -724,7 +724,7 @@ export const UserStoreManagementPage = ({
         }}
       >
         {managedUser.active ? "停用" : "启用"}
-      </button>
+      </button> : null}
     </div>
   );
 

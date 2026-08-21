@@ -220,6 +220,7 @@ export class DrizzleAdminRepository implements AdminRepository {
         filters.allowedStoreIds.length > 0
           ? inArray(users.storeId, [...filters.allowedStoreIds])
           : eq(users.id, "__no_access__"),
+        inArray(users.role, ["sales", "store_manager"]),
       );
     }
     if (filters.storeId) conditions.push(eq(users.storeId, filters.storeId));
