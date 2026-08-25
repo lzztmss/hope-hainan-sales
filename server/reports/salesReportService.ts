@@ -41,6 +41,7 @@ export interface ReportExportAudit {
 
 export interface SalesReportRepository {
   loadFacts(scope: SalesReportScope, period: ReportPeriod): Promise<readonly SalesReportFact[]>;
+  listActiveStores(storeId?: string): Promise<readonly { id: string; name: string }[]>;
   recordExportAudit(event: ReportExportAudit): Promise<void>;
 }
 
@@ -188,10 +189,16 @@ export const createSalesReportService = (options: {
     const period = parseReportPeriod(filters.from, filters.to, generatedAt);
     const scope = normalizeScope(user, filters);
     const loadedFacts = await options.repository.loadFacts(scope, period);
-    const visibleStores = scope.kind === "region"
-      ? (user.managedStores ?? []).filter((store) => !scope.storeId || store.id === scope.storeId)
-      : [];
-    const facts = scope.kind === "region" && !filters.sellerId
+    const requestedGroup = filters.groupBy ?? (user.role === "admin" || user.role === "regional_manager" ? "store" : user.role === "store_manager" ? "seller" : "none");
+    const shouldCompleteStoreRows = requestedGroup === "store" && !filters.sellerId;
+    const visibleStores = !shouldCompleteStoreRows
+      ? []
+      : scope.kind === "region"
+        ? (user.managedStores ?? []).filter((store) => !scope.storeId || store.id === scope.storeId)
+        : scope.kind === "global"
+          ? await options.repository.listActiveStores(scope.storeId)
+          : [];
+    const facts = shouldCompleteStoreRows && (scope.kind === "region" || scope.kind === "global")
       ? [
           ...loadedFacts,
           ...visibleStores
@@ -216,7 +223,6 @@ export const createSalesReportService = (options: {
             })),
         ]
       : loadedFacts;
-    const requestedGroup = filters.groupBy ?? (user.role === "admin" || user.role === "regional_manager" ? "store" : user.role === "store_manager" ? "seller" : "none");
     const groupBy = user.role === "sales" ? "none" : requestedGroup;
     const allRows = groupBy === "none" ? [] : groupFacts(facts, groupBy);
     const page = filters.page ?? 1;

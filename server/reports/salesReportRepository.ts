@@ -121,6 +121,15 @@ export const allocateEstimatedCommission = (
 export class DrizzleSalesReportRepository implements SalesReportRepository {
   constructor(private readonly client: DbClient) {}
 
+  async listActiveStores(storeId?: string): Promise<readonly { id: string; name: string }[]> {
+    return this.client.raw.prepare(`
+      SELECT id, name
+      FROM stores
+      WHERE active = 1 ${storeId ? "AND id = ?" : ""}
+      ORDER BY code ASC
+    `).all(...(storeId ? [storeId] : [])) as Array<{ id: string; name: string }>;
+  }
+
   async loadFacts(
     scope: SalesReportScope,
     period: ReportPeriod,
