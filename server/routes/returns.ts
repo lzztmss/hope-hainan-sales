@@ -30,7 +30,7 @@ const requestSchema = z.object({
   serviceType: z.literal("refund"),
   type: z.enum(["full", "partial"]),
   kind: z.enum(["normal", "special"]),
-  reasonCategory: z.enum(["no_reason", "quality", "other"]),
+  reasonCategory: z.enum(["no_reason", "quality", "order_mismatch", "service_issue", "other"]),
   reason: z.string().trim().min(2).max(1_000),
   requestedRefundFen: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
   items: z

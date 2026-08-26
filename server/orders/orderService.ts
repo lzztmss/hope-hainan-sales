@@ -87,6 +87,7 @@ export interface OrderWriteRecord {
   storeId: string;
   sellerId: string;
   status: OrderStatus;
+  salesChannel: "online" | "offline";
   paymentMode: PaymentMode;
   fttrKind: FttrKind;
   fttrPlan: number | null;
@@ -293,6 +294,7 @@ const presentOrder = (
     sellerId: order.sellerId,
     storeId: order.storeId,
     status: order.status,
+    salesChannel: order.salesChannel,
     paymentMode: order.paymentMode,
     fttrKind: order.fttrKind,
     fttrPlan: order.fttrPlan,
@@ -442,6 +444,7 @@ export const createOrderService = (options: OrderServiceOptions) => {
     async createOrderFromQuote(
       user: AuthenticatedUser,
       quoteId: string,
+      salesChannel: "online" | "offline",
       attributions: OrderAttributionInput[] | undefined,
       idempotencyKey: string,
     ): Promise<OrderRecord> {
@@ -509,6 +512,7 @@ export const createOrderService = (options: OrderServiceOptions) => {
             storeId: quote.storeId,
             sellerId: quote.sellerId,
             status: "pending",
+            salesChannel,
             paymentMode: quote.paymentMode,
             fttrKind: quote.fttrKind,
             fttrPlan: quote.fttrPlan,

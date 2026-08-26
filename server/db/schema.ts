@@ -40,6 +40,7 @@ export const paymentModeEnum = pgEnum("payment_mode", [
   "one_time",
   "contract_36",
 ]);
+export const salesChannelEnum = pgEnum("sales_channel", ["online", "offline"]);
 export const fttrKindEnum = pgEnum("fttr_kind", [
   "none",
   "standard",
@@ -79,6 +80,8 @@ export const returnKindEnum = pgEnum("return_kind", ["normal", "special"]);
 export const returnReasonCategoryEnum = pgEnum("return_reason_category", [
   "no_reason",
   "quality",
+  "order_mismatch",
+  "service_issue",
   "other",
 ]);
 export const returnStatusEnum = pgEnum("return_status", [
@@ -443,6 +446,7 @@ export const orders = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
     status: orderStatusEnum("status").notNull(),
+    salesChannel: salesChannelEnum("sales_channel").default("offline").notNull(),
     paymentMode: paymentModeEnum("payment_mode").notNull(),
     fttrKind: fttrKindEnum("fttr_kind").notNull(),
     fttrPlan: integer("fttr_plan"),

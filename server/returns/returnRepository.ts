@@ -139,6 +139,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
         sellerId: orders.sellerId,
         storeId: orders.storeId,
         status: orders.status,
+        salesChannel: orders.salesChannel,
         signedAt: orders.signedAt,
         paymentMode: orders.paymentMode,
         refundedFen: orders.refundedFen,

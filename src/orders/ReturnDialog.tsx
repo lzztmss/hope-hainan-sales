@@ -90,7 +90,7 @@ export const ReturnDialog = ({
   }, [elapsedDays, open, order.id, order.version]);
 
   const normalDeadlineDays = 7;
-  const normalUnavailable = elapsedDays !== null && elapsedDays > normalDeadlineDays;
+  const outsideNormalWindow = elapsedDays !== null && elapsedDays > normalDeadlineDays;
 
   const returnableLines = useMemo(
     () =>
@@ -164,8 +164,16 @@ export const ReturnDialog = ({
         return;
       }
     }
-    if (kind === "normal" && normalUnavailable) {
+    if (kind === "normal" && outsideNormalWindow) {
       setError(`已超过普通退货退款的 ${normalDeadlineDays} 日期限，请选择特殊处理`);
+      return;
+    }
+    if (kind === "special" && !outsideNormalWindow) {
+      setError("签收后7日内只能使用普通处理");
+      return;
+    }
+    if (reasonCategory === "no_reason" && (order.salesChannel !== "online" || outsideNormalWindow)) {
+      setError("7天无理由退货仅适用于签收后7日内的线上订单");
       return;
     }
     if (requestedRefundFen === null) {
@@ -219,10 +227,14 @@ export const ReturnDialog = ({
           noValidate
           onSubmit={(event) => void submit(event)}
         >
+          <p className="return-order-channel">
+            <strong>{order.salesChannel === "online" ? "线上订单" : "线下订单"}</strong>
+            <span>{outsideNormalWindow ? `已签收 ${elapsedDays} 天，按7天外特殊退货处理` : "签收后7日内，按普通退货处理"}</span>
+          </p>
           <fieldset className="return-type-picker">
             <legend>1. 选择处理类型</legend>
-            <label><input checked={kind === "normal"} disabled={normalUnavailable} name="return-kind" onChange={() => setKind("normal")} type="radio" /><span><strong>普通处理</strong><small>{normalUnavailable ? `已签收 ${elapsedDays} 天，超过 ${normalDeadlineDays} 日普通处理期限` : "签收后 7 日内可申请普通退货退款"}</small></span></label>
-            <label><input checked={kind === "special"} name="return-kind" onChange={() => setKind("special")} type="radio" /><span><strong>特殊处理</strong><small>期限内外均可申请，需详细说明具体情况</small></span></label>
+            <label><input checked={kind === "normal"} disabled={outsideNormalWindow} name="return-kind" onChange={() => setKind("normal")} type="radio" /><span><strong>普通处理（7天内）</strong><small>{outsideNormalWindow ? `已签收 ${elapsedDays} 天，超过普通处理期限` : "当前可申请普通退货退款"}</small></span></label>
+            <label><input checked={kind === "special"} disabled={!outsideNormalWindow} name="return-kind" onChange={() => setKind("special")} type="radio" /><span><strong>特殊处理（7天外）</strong><small>{outsideNormalWindow ? "当前须按特殊退货处理，并详细说明情况" : "签收未超过7天，暂不开放特殊处理"}</small></span></label>
           </fieldset>
           {kind === "special" ? (
             <p className="return-component-note" role="status">
@@ -232,8 +244,10 @@ export const ReturnDialog = ({
           <label className="return-reason-field">
             <span>申请原因类型</span>
             <select value={reasonCategory} onChange={(event) => setReasonCategory(event.currentTarget.value as ReturnReasonCategory)}>
-              <option value="no_reason">无理由退货（仅限线上销售）</option>
+              {order.salesChannel === "online" && !outsideNormalWindow ? <option value="no_reason">7天无理由退货（仅限线上订单）</option> : null}
               <option value="quality">产品质量问题</option>
+              <option value="order_mismatch">商品错发、漏发或与订单不符</option>
+              <option value="service_issue">配送、安装或服务履约问题</option>
               <option value="other">其他业务原因</option>
             </select>
           </label>
@@ -347,6 +361,19 @@ export const ReturnDialog = ({
                 </div>
                 <span>{type === "full" ? "随整套一并退回" : "不可单独选择"}</span>
               </header>
+              {packageLines.length > 0 ? (
+                <div className="return-component-price-reference">
+                  <strong>对应套餐价格参考</strong>
+                  {packageLines.map((line) => (
+                    <span key={line.id}>
+                      {line.label}：{order.paymentMode === "contract_36"
+                        ? `${formatOrderMoney(line.monthlySubtotalFen)}/月（36个月合约月付）`
+                        : `${formatOrderMoney(line.oneTimeSubtotalFen)}（一次性支付）`}
+                    </span>
+                  ))}
+                  <small>{order.paymentMode === "contract_36" ? "申请退款时请结合实际已收取的月费填写。" : "申请退款时可按订单一次性支付金额参考填写。"}</small>
+                </div>
+              ) : null}
               {componentLines.map((line) => (
                 <article className="return-component-line" key={line.id}>
                   <div>

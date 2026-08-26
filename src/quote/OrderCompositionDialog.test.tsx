@@ -26,7 +26,9 @@ describe("生成订单前销售构成确认", () => {
     expect(screen.getByText("睡眠监测床垫 × 1 张")).toBeInTheDocument();
     expect(screen.getByText("套餐")).toBeInTheDocument();
     expect(screen.getByText("独立单品")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认并生成订单" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("radio", { name: /线上订单/ }));
     fireEvent.click(screen.getByRole("button", { name: "确认并生成订单" }));
-    expect(onConfirm).toHaveBeenCalledOnce();
+    expect(onConfirm).toHaveBeenCalledWith("online");
   });
 });

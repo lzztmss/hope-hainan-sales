@@ -14,6 +14,7 @@ import { sendValidationError } from "./validationError.js";
 
 const orderFieldLabels = {
   quoteId: "报价单",
+  salesChannel: "销售渠道",
   attributions: "销售归属",
   command: "订单状态操作",
   expectedVersion: "订单版本",
@@ -33,6 +34,7 @@ const attributionSchema = z.object({
 
 const createSchema = z.object({
   quoteId: z.string().uuid(),
+  salesChannel: z.enum(["online", "offline"]),
   attributions: z.array(attributionSchema).min(1).max(20).optional(),
 });
 
@@ -130,6 +132,7 @@ const mutationResponse = (order: OrderRecord) => ({
   orderNo: order.orderNo,
   quoteId: order.quoteId,
   status: order.status,
+  salesChannel: order.salesChannel,
   sellerId: order.sellerId,
   storeId: order.storeId,
   paymentMode: order.paymentMode,
@@ -201,6 +204,7 @@ export const registerOrderRoutes = async (
       const order = await options.orderService.createOrderFromQuote(
         user,
         parsed.data.quoteId,
+        parsed.data.salesChannel,
         parsed.data.attributions,
         idempotencyKey,
       );

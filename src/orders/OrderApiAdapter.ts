@@ -101,6 +101,7 @@ const mapSummary = (order: OrderDto, viewer: OrderViewer): OrderSummary => ({
     readSnapshotString(order.storeSnapshot, "name", "storeName") ??
     `营业厅名称未提供（${order.storeId}）`,
   status: order.status,
+  salesChannel: order.salesChannel,
   paymentMode: order.paymentMode,
   oneTimeFen: order.oneTimeFen,
   monthlyTotalFen: order.monthlyTotalFen,

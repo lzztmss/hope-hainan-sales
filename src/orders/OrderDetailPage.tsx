@@ -21,8 +21,10 @@ import "./orders.css";
 const afterSalesLabel = (record: Pick<ReturnRecordView, "serviceType" | "kind">): string =>
   `${record.kind === "special" ? "特殊" : "普通"}${record.serviceType === "refund" ? "退货退款" : "换货"}`;
 const RETURN_REASON_LABELS = {
-  no_reason: "无理由退货（仅限线上销售）",
+  no_reason: "7天无理由退货（仅限线上订单）",
   quality: "产品质量问题",
+  order_mismatch: "商品错发、漏发或与订单不符",
+  service_issue: "配送、安装或服务履约问题",
   other: "其他业务原因",
 } as const;
 
@@ -455,6 +457,7 @@ export const OrderDetailPage = ({
       <dl className="order-detail-facts">
         <div><dt>营业厅</dt><dd>{order.storeName}</dd></div>
         <div><dt>销售员</dt><dd>{order.sellerName}</dd></div>
+        <div><dt>订单渠道</dt><dd>{order.salesChannel === "online" ? "线上订单" : "线下订单"}</dd></div>
         <div><dt>服务地址</dt><dd>{order.customerAddress}</dd></div>
         <div><dt>FTTR 档位</dt><dd>{order.fttrLabel}</dd></div>
         <div><dt>{hasMonthlyAdjustment ? "原心连心月增费" : "心连心月增费"}</dt><dd>{formatOrderMoney(order.heartMonthlyFen)}/月</dd></div>

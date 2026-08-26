@@ -200,6 +200,40 @@ describe("退单状态与提成冲销一致性", () => {
     await client.close();
   });
 
+  it("7日内禁止特殊处理，且无理由退货仅允许线上订单", async () => {
+    const signedAt = new Date("2026-08-20T02:00:00.000Z");
+    const { client, order, seller } = await createFixture("signed", signedAt);
+    const service = createReturnService({
+      repository: new DrizzleReturnRepository(client),
+      now: () => new Date("2026-08-25T02:00:00.000Z"),
+      numberSuffix: () => "CHANNEL",
+    });
+
+    await expect(service.requestReturn(
+      seller,
+      order.id,
+      { type: "full", kind: "special", reasonCategory: "quality", requestedRefundFen: 0, reason: "期限内尝试特殊处理", items: [] },
+      "return-request-early-special-001",
+    )).rejects.toThrow("签收后7日内");
+
+    await expect(service.requestReturn(
+      seller,
+      order.id,
+      { type: "full", kind: "normal", reasonCategory: "no_reason", requestedRefundFen: 0, reason: "线下订单尝试无理由退货", items: [] },
+      "return-request-offline-no-reason-001",
+    )).rejects.toThrow("仅适用于签收后7日内的线上订单");
+
+    await client.db.update(orders).set({ salesChannel: "online" }).where(eq(orders.id, order.id));
+    const requested = await service.requestReturn(
+      seller,
+      order.id,
+      { type: "full", kind: "normal", reasonCategory: "no_reason", requestedRefundFen: 0, reason: "线上订单七天无理由退货", items: [] },
+      "return-request-online-no-reason-001",
+    );
+    expect(requested.reasonCategory).toBe("no_reason");
+    await client.close();
+  });
+
   it("拒绝通过服务层直接创建换货申请", async () => {
     const { client, order, seller } = await createFixture("signed");
     const repository = new DrizzleReturnRepository(client);

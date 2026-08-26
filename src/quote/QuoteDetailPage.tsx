@@ -5,7 +5,7 @@ import type { ApiClient, AuthenticatedUser, OrderMutationDto, QuoteDetailDto } f
 import { PageLayout } from "../components/layout";
 import { createClientKey } from "../utils/clientKey";
 import { QuotePrintDocument } from "./QuotePrintDocument";
-import { OrderCompositionDialog } from "./OrderCompositionDialog";
+import { OrderCompositionDialog, type OrderSalesChannel } from "./OrderCompositionDialog";
 import "./quoteManagement.css";
 
 const orderKey = () => createClientKey("order-create");
@@ -31,13 +31,13 @@ export const QuoteDetailPage = ({ client, quoteId, viewer }: { client: ApiClient
     navigate(`/quotes/${quote.id}/print?autoprint=1`);
   };
 
-  const convert = async () => {
+  const convert = async (salesChannel: OrderSalesChannel) => {
     if (!quote) return;
     setBusy(true);
     setError(null);
     try {
       key.current ??= orderKey();
-      setOrder(await client.createOrderFromQuote(quote.id, key.current));
+      setOrder(await client.createOrderFromQuote(quote.id, key.current, salesChannel));
       setQuote({ ...quote, status: "converted" });
       setOrderCompositionOpen(false);
     } catch (reason) {
@@ -99,7 +99,7 @@ export const QuoteDetailPage = ({ client, quoteId, viewer }: { client: ApiClient
           busy={busy}
           lines={quote.calculation.chargeLines}
           onClose={() => setOrderCompositionOpen(false)}
-          onConfirm={() => void convert()}
+          onConfirm={(channel) => void convert(channel)}
         />
       ) : null}
     </PageLayout>

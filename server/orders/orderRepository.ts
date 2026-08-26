@@ -91,6 +91,7 @@ const baseOrder = (row: OrderRow): Omit<OrderRecord, "lines" | "attributions"> =
   storeId: row.storeId,
   sellerId: row.sellerId,
   status: row.status,
+  salesChannel: row.salesChannel,
   paymentMode: row.paymentMode,
   fttrKind: row.fttrKind,
   fttrPlan: row.fttrPlan,

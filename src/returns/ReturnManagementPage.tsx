@@ -87,8 +87,10 @@ const afterSalesLabel = (record: Pick<ReturnRecordDto, "serviceType" | "returnKi
   `${record.returnKind === "special" ? "特殊" : "普通"}${record.serviceType === "refund" ? "退货退款" : "换货"}`;
 
 const RETURN_REASON_LABELS = {
-  no_reason: "无理由退货（仅限线上销售）",
+  no_reason: "7天无理由退货（仅限线上订单）",
   quality: "产品质量问题",
+  order_mismatch: "商品错发、漏发或与订单不符",
+  service_issue: "配送、安装或服务履约问题",
   other: "其他业务原因",
 } as const;
 

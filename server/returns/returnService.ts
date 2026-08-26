@@ -38,6 +38,7 @@ export interface ReturnOrderRecord {
   sellerId: string;
   storeId: string;
   status: ReturnableOrderStatus;
+  salesChannel: "online" | "offline";
   signedAt: Date | null;
   refundedFen: number;
   lines: ReturnOrderLineRecord[];
@@ -68,7 +69,7 @@ export interface ReturnRequestRecord {
   serviceType: "refund" | "exchange";
   returnType: "full" | "partial";
   returnKind: "normal" | "special";
-  reasonCategory: "no_reason" | "quality" | "other";
+  reasonCategory: "no_reason" | "quality" | "order_mismatch" | "service_issue" | "other";
   orderStatusBefore: ReturnableOrderStatus | null;
   status: ReturnRequestStatus;
   reason: string;
@@ -92,7 +93,7 @@ export interface ReturnRequestWrite {
   serviceType: "refund" | "exchange";
   returnType: "full" | "partial";
   returnKind: "normal" | "special";
-  reasonCategory: "no_reason" | "quality" | "other";
+  reasonCategory: "no_reason" | "quality" | "order_mismatch" | "service_issue" | "other";
   orderStatusBefore: ReturnableOrderStatus;
   reason: string;
   requestedBy: string;
@@ -172,7 +173,7 @@ export interface RequestReturnInput {
   serviceType?: "refund" | "exchange";
   type: "full" | "partial";
   kind?: "normal" | "special";
-  reasonCategory?: "no_reason" | "quality" | "other";
+  reasonCategory?: "no_reason" | "quality" | "order_mismatch" | "service_issue" | "other";
   requestedRefundFen?: number;
   reason: string;
   items: readonly { orderLineId: string; quantity: number }[];
@@ -354,6 +355,15 @@ export const createReturnService = (options: ReturnServiceOptions) => {
         }
         if (returnKind === "normal" && elapsedDays > 7) {
           throw new Error("订单签收已超过7日，请改为特殊退货退款申请");
+        }
+        if (returnKind === "special" && elapsedDays <= 7) {
+          throw new Error("订单仍在签收后7日内，请使用普通退货退款申请");
+        }
+        if (
+          reasonCategory === "no_reason" &&
+          (order.salesChannel !== "online" || elapsedDays > 7 || returnKind !== "normal")
+        ) {
+          throw new Error("7天无理由退货仅适用于签收后7日内的线上订单");
         }
         const created = await repository.createRequest({
           returnNo: `XLX-RT-${shanghaiDate(requestedAt)}-${numberSuffix()}`,

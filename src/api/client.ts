@@ -232,6 +232,7 @@ export interface OrderDto {
   sellerId: string;
   storeId: string;
   status: OrderStatus;
+  salesChannel: "online" | "offline";
   paymentMode: OrderPaymentMode;
   fttrKind: "none" | "standard" | "custom";
   fttrPlan: number | null;
@@ -299,6 +300,7 @@ export interface OrderMutationDto {
   id: string;
   orderNo: string;
   status: OrderStatus;
+  salesChannel: "online" | "offline";
   version: number;
   deletedAt: string | null;
   updatedAt: string;
@@ -321,7 +323,7 @@ export interface ReturnRecordDto {
   serviceType: "refund" | "exchange";
   returnType: ReturnType;
   returnKind: "normal" | "special";
-  reasonCategory: "no_reason" | "quality" | "other";
+  reasonCategory: "no_reason" | "quality" | "order_mismatch" | "service_issue" | "other";
   status: ReturnStatus;
   reason: string;
   requestedBy: string;
@@ -342,7 +344,7 @@ export interface RequestOrderReturnApiInput {
   serviceType: "refund" | "exchange";
   type: ReturnType;
   kind: "normal" | "special";
-  reasonCategory: "no_reason" | "quality" | "other";
+  reasonCategory: "no_reason" | "quality" | "order_mismatch" | "service_issue" | "other";
   requestedRefundFen: number;
   reason: string;
   items: readonly { orderLineId: string; quantity: number }[];
@@ -381,6 +383,7 @@ export interface ApiClient {
   createOrderFromQuote(
     quoteId: string,
     idempotencyKey: string,
+    salesChannel: "online" | "offline",
     attributions?: readonly OrderAttributionApiInput[],
   ): Promise<OrderMutationDto>;
   confirmQuote(
@@ -727,12 +730,13 @@ export const createApiClient = ({
         method: "POST",
       });
     },
-    async createOrderFromQuote(quoteId, orderKey, attributions) {
+    async createOrderFromQuote(quoteId, orderKey, salesChannel, attributions) {
       return (await request("/api/orders", {
         method: "POST",
         headers: { "Idempotency-Key": orderKey },
         body: JSON.stringify({
           quoteId,
+          salesChannel,
           ...(attributions ? { attributions } : {}),
         }),
       })) as OrderMutationDto;

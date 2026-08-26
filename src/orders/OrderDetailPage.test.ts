@@ -17,6 +17,7 @@ const order = (overrides: Partial<OrderDetail> = {}): OrderDetail => ({
   storeId: "store-1",
   storeName: "营业厅",
   status: "signed",
+  salesChannel: "offline",
   paymentMode: "contract_36",
   oneTimeFen: 0,
   monthlyTotalFen: 18900,

@@ -7,7 +7,7 @@ import type { OrderDetail } from "./types";
 afterEach(cleanup);
 
 const order: OrderDetail = {
-  signedAt: "2026-08-13T08:00:00.000Z",
+  signedAt: new Date().toISOString(),
   id: "order-1",
   orderNo: "XLXDD-001",
   customerMasked: "测*",
@@ -17,6 +17,7 @@ const order: OrderDetail = {
   storeId: "store-1",
   storeName: "营业厅",
   status: "signed",
+  salesChannel: "online",
   paymentMode: "one_time",
   oneTimeFen: 119800,
   monthlyTotalFen: 0,
@@ -98,6 +99,7 @@ describe("整单退单商品明细", () => {
     expect(within(components).getByText("迷你网关 × 1个")).toBeInTheDocument();
     expect(within(components).getByText("套餐内含 · 不另收费")).toBeInTheDocument();
     expect(within(components).getByText("随整套一并退回")).toBeInTheDocument();
+    expect(within(components).getByText("心连心·居家双护：¥899.00（一次性支付）")).toBeInTheDocument();
     expect(screen.getByRole("spinbutton", { name: "申请退款金额（元）" })).not.toHaveAttribute("placeholder");
     expect(screen.queryByText(/系统参考/)).not.toBeInTheDocument();
   });
@@ -111,14 +113,16 @@ describe("整单退单商品明细", () => {
           paymentMode: "contract_36",
           oneTimeFen: 0,
           monthlyTotalFen: 19_800,
-          lines: [{
-            ...order.lines[1]!,
-            label: "睡眠监测床垫",
-            refundableUnitFen: 4_000,
-            monthlyUnitFen: 4_000,
-            oneTimeSubtotalFen: 0,
-            monthlySubtotalFen: 4_000,
-          }],
+          lines: [
+            {
+              ...order.lines[0]!,
+              refundableUnitFen: 3_000,
+              monthlyUnitFen: 3_000,
+              oneTimeSubtotalFen: 0,
+              monthlySubtotalFen: 3_000,
+            },
+            order.lines[2]!,
+          ],
         }}
         onClose={vi.fn()}
         onSubmit={vi.fn()}
@@ -126,7 +130,19 @@ describe("整单退单商品明细", () => {
     );
 
     expect(screen.getByRole("spinbutton", { name: "申请退款金额（元）" })).toBeInTheDocument();
+    expect(screen.getByText("心连心·居家双护：¥30.00/月（36个月合约月付）")).toBeInTheDocument();
     expect(screen.queryByText(/系统参考/)).not.toBeInTheDocument();
+  });
+
+  it("7天内只开放普通处理，且无理由退货仅在线上订单显示", () => {
+    const { rerender } = render(<ReturnDialog open order={order} onClose={vi.fn()} onSubmit={vi.fn()} />);
+    expect(screen.getByRole("radio", { name: /普通处理/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /特殊处理/ })).toBeDisabled();
+    expect(screen.getByRole("option", { name: "7天无理由退货（仅限线上订单）" })).toBeInTheDocument();
+
+    rerender(<ReturnDialog open order={{ ...order, salesChannel: "offline" }} onClose={vi.fn()} onSubmit={vi.fn()} />);
+    expect(screen.queryByRole("option", { name: /无理由退货/ })).not.toBeInTheDocument();
+    expect(screen.getByText("线下订单")).toBeInTheDocument();
   });
 
   it("退货退款超过7日自动切换为特殊处理并禁用普通处理", () => {

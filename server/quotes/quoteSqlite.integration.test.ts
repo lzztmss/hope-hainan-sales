@@ -129,6 +129,7 @@ describe("SQLite 报价持久化主链路", () => {
         orderService.createOrderFromQuote(
           user,
           created.id,
+          "offline",
           undefined,
           `sqlite-order-${user.role}-123456`,
         ),
@@ -140,16 +141,19 @@ describe("SQLite 报价持久化主链路", () => {
     const order = await orderService.createOrderFromQuote(
       seller,
       created.id,
+      "online",
       undefined,
       "sqlite-order-key-123456",
     );
     const duplicate = await orderService.createOrderFromQuote(
       seller,
       created.id,
+      "online",
       undefined,
       "sqlite-order-key-another",
     );
     expect(duplicate.id).toBe(order.id);
+    expect(order.salesChannel).toBe("online");
     const converted = await service.getQuote(seller, created.id);
     expect(converted.status).toBe("converted");
     expect(converted.version).toBe(2);

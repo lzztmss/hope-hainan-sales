@@ -21,10 +21,11 @@ export type OrderStatus =
   | "voided";
 
 export type OrderPaymentMode = "one_time" | "contract_36";
+export type OrderSalesChannel = "online" | "offline";
 export type ReturnType = "full" | "partial";
 export type AfterSalesServiceType = "refund" | "exchange";
 export type ReturnKind = "normal" | "special";
-export type ReturnReasonCategory = "no_reason" | "quality" | "other";
+export type ReturnReasonCategory = "no_reason" | "quality" | "order_mismatch" | "service_issue" | "other";
 export type ReturnStatus = "requested" | "approved" | "rejected" | "completed";
 
 export interface OrderPermissions {
@@ -43,6 +44,7 @@ export interface OrderSummary {
   storeId: string;
   storeName: string;
   status: OrderStatus;
+  salesChannel: OrderSalesChannel;
   paymentMode: OrderPaymentMode;
   oneTimeFen: number;
   monthlyTotalFen: number;
