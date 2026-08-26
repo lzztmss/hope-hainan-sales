@@ -13,7 +13,9 @@ export type ReturnableOrderStatus =
   | "pending"
   | "accepted"
   | "activated"
-  | "completed"
+  | "signed"
+  | "reconciled"
+  | "paid"
   | "cancelled"
   | "return_pending"
   | "partially_returned"
@@ -36,6 +38,7 @@ export interface ReturnOrderRecord {
   sellerId: string;
   storeId: string;
   status: ReturnableOrderStatus;
+  signedAt: Date | null;
   refundedFen: number;
   lines: ReturnOrderLineRecord[];
 }
@@ -63,6 +66,9 @@ export interface ReturnRequestRecord {
   completionIdempotencyKey: string | null;
   orderId: string;
   returnType: "full" | "partial";
+  returnKind: "normal" | "special";
+  reasonCategory: "no_reason" | "quality" | "other";
+  orderStatusBefore: ReturnableOrderStatus | null;
   status: ReturnRequestStatus;
   reason: string;
   requestedBy: string;
@@ -82,6 +88,9 @@ export interface ReturnRequestWrite {
   idempotencyKey: string;
   orderId: string;
   returnType: "full" | "partial";
+  returnKind: "normal" | "special";
+  reasonCategory: "no_reason" | "quality" | "other";
+  orderStatusBefore: ReturnableOrderStatus;
   reason: string;
   requestedBy: string;
   requestedAt: Date;
@@ -157,15 +166,32 @@ export interface ReturnServiceOptions {
 
 export interface RequestReturnInput {
   type: "full" | "partial";
+  kind?: "normal" | "special";
+  reasonCategory?: "no_reason" | "quality" | "other";
   reason: string;
   items: readonly { orderLineId: string; quantity: number }[];
 }
 
 const RETURNABLE_STATUSES: readonly ReturnableOrderStatus[] = [
-  "activated",
-  "completed",
+  "signed",
+  "reconciled",
+  "paid",
   "partially_returned",
 ];
+
+const shanghaiCalendarDay = (value: Date): number => {
+  const formatted = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(value);
+  const [year, month, day] = formatted.split("-").map(Number);
+  return Date.UTC(year!, month! - 1, day!);
+};
+
+const daysAfterSigning = (signedAt: Date, requestedAt: Date): number =>
+  Math.max(0, Math.floor((shanghaiCalendarDay(requestedAt) - shanghaiCalendarDay(signedAt)) / 86_400_000));
 
 const validateIdempotencyKey = (value: string): void => {
   if (!/^[A-Za-z0-9:_-]{12,128}$/.test(value)) {
@@ -284,6 +310,7 @@ export const createReturnService = (options: ReturnServiceOptions) => {
       input: RequestReturnInput,
       idempotencyKey: string,
     ): Promise<ReturnRequestRecord> {
+      requireRole(actor, "sales", "store_manager", "regional_manager", "admin");
       validateIdempotencyKey(idempotencyKey);
       const existing =
         await options.repository.findByRequestIdempotencyKey(idempotencyKey);
@@ -297,6 +324,7 @@ export const createReturnService = (options: ReturnServiceOptions) => {
         if (!RETURNABLE_STATUSES.includes(order.status)) {
           throw new Error("当前订单状态不可退单");
         }
+        if (!order.signedAt) throw new Error("订单尚未签收，不能申请退单");
         const reason = input.reason.trim();
         if (reason.length < 2 || reason.length > 1_000) {
           throw new Error("请填写完整退单原因");
@@ -307,11 +335,20 @@ export const createReturnService = (options: ReturnServiceOptions) => {
           0,
         );
         const requestedAt = now();
+        const elapsedDays = daysAfterSigning(order.signedAt, requestedAt);
+        const returnKind = input.kind ?? "normal";
+        const reasonCategory = input.reasonCategory ?? "other";
+        if (elapsedDays > 15 && returnKind !== "special") {
+          throw new Error("订单签收已超过15日，请改为特殊退款申请");
+        }
         const created = await repository.createRequest({
           returnNo: `XLX-RT-${shanghaiDate(requestedAt)}-${numberSuffix()}`,
           idempotencyKey,
           orderId,
           returnType: input.type,
+          returnKind,
+          reasonCategory,
+          orderStatusBefore: order.status,
           reason,
           requestedBy: actor.id,
           requestedAt,
@@ -327,6 +364,9 @@ export const createReturnService = (options: ReturnServiceOptions) => {
           afterSnapshot: {
             returnNo: created.returnNo,
             type: created.returnType,
+            kind: created.returnKind,
+            reasonCategory: created.reasonCategory,
+            signedElapsedDays: elapsedDays,
             status: created.status,
             maxRefundFen: created.maxRefundFen,
             items: created.items,
@@ -343,7 +383,7 @@ export const createReturnService = (options: ReturnServiceOptions) => {
       decision: "approved" | "rejected",
       note: string,
     ): Promise<ReturnRequestRecord> {
-      requireRole(actor, "store_manager", "admin");
+      requireRole(actor, "store_manager", "regional_manager", "admin");
       return options.repository.runTransaction(async (repository) => {
         const request = await repository.findRequestById(returnId);
         if (!request) throw new Error("退单不存在");
@@ -354,7 +394,7 @@ export const createReturnService = (options: ReturnServiceOptions) => {
         );
         void order;
         if (request.requestedBy === actor.id && actor.role !== "admin") {
-          throw new Error("营业厅经理不能审批自己提交的退单，请由管理员处理");
+          throw new Error("不能审批自己提交的退单，请由其他经理或管理员处理");
         }
         if (request.status !== "requested") throw new Error("退单已完成审批");
         const normalizedNote = note.trim();
@@ -390,7 +430,7 @@ export const createReturnService = (options: ReturnServiceOptions) => {
       refundFen: number,
       idempotencyKey: string,
     ): Promise<ReturnRequestRecord> {
-      requireRole(actor, "store_manager", "admin");
+      requireRole(actor, "store_manager", "regional_manager", "admin");
       validateIdempotencyKey(idempotencyKey);
       const existing =
         await options.repository.findByCompletionIdempotencyKey(idempotencyKey);

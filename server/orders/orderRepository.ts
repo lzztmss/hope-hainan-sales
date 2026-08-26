@@ -110,6 +110,12 @@ const baseOrder = (row: OrderRow): Omit<OrderRecord, "lines" | "attributions"> =
   createdBy: row.createdBy,
   acceptedAt: row.acceptedAt,
   activatedAt: row.activatedAt,
+  signedAt: row.signedAt,
+  signedBy: row.signedBy,
+  reconciledAt: row.reconciledAt,
+  reconciledBy: row.reconciledBy,
+  paidAt: row.paidAt,
+  paidBy: row.paidBy,
   completedAt: row.completedAt,
   cancelledAt: row.cancelledAt,
   deletedAt: row.deletedAt,
@@ -377,11 +383,23 @@ export class DrizzleOrderRepository implements OrderRepository {
     expectedVersion: number,
     status: OrderStatus,
     at: Date,
+    actorUserId: string,
   ): Promise<OrderRecord | null> {
     const lifecycle: Partial<typeof orders.$inferInsert> = {};
     if (status === "accepted") lifecycle.acceptedAt = at;
     if (status === "activated") lifecycle.activatedAt = at;
-    if (status === "completed") lifecycle.completedAt = at;
+    if (status === "signed") {
+      lifecycle.signedAt = at;
+      lifecycle.signedBy = actorUserId;
+    }
+    if (status === "reconciled") {
+      lifecycle.reconciledAt = at;
+      lifecycle.reconciledBy = actorUserId;
+    }
+    if (status === "paid") {
+      lifecycle.paidAt = at;
+      lifecycle.paidBy = actorUserId;
+    }
     if (status === "cancelled" || status === "voided") {
       lifecycle.cancelledAt = at;
     }

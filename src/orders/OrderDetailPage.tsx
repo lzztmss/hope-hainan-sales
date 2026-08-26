@@ -18,6 +18,13 @@ import {
 } from "./types";
 import "./orders.css";
 
+const RETURN_KIND_LABELS = { normal: "普通退货", special: "特殊退款" } as const;
+const RETURN_REASON_LABELS = {
+  no_reason: "无理由退货",
+  quality: "产品质量问题",
+  other: "其他业务原因",
+} as const;
+
 export interface OrderDetailPageProps {
   order: OrderDetail;
   viewer: OrderViewer;
@@ -87,7 +94,7 @@ const ReturnApproval = ({
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const reviewerRole = viewer.role === "store_manager" || viewer.role === "admin";
+  const reviewerRole = viewer.role === "store_manager" || viewer.role === "regional_manager" || viewer.role === "admin";
   const isApplicant = record.requestedById === viewer.id;
   const administratorSelfReview = isApplicant && viewer.role === "admin";
   const mayReview =
@@ -98,8 +105,8 @@ const ReturnApproval = ({
     Boolean(onDecideReturn);
 
   if (record.status !== "requested") return null;
-  if (isApplicant && viewer.role === "store_manager") {
-    return <p className="return-self-review-note">营业厅经理不可审批自己提交的退单，请由管理员处理</p>;
+  if (isApplicant && viewer.role !== "admin") {
+    return <p className="return-self-review-note">申请人不可审批自己提交的退单，请由其他有权限人员处理</p>;
   }
   if (!mayReview) return null;
 
@@ -192,7 +199,7 @@ const ReturnCompletion = ({
   const [actualYuan, setActualYuan] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const reviewerRole = viewer.role === "store_manager" || viewer.role === "admin";
+  const reviewerRole = viewer.role === "store_manager" || viewer.role === "regional_manager" || viewer.role === "admin";
   const mayComplete =
     record.status === "approved" &&
     reviewerRole &&
@@ -278,6 +285,7 @@ export const availableTransitions = (
 ): Array<{ command: OrderTransitionCommand; label: string; tone: string }> => {
   if (order.deletedAt) return [];
   if (order.status === "pending") {
+    if (viewer.role === "hr" || viewer.role === "finance" || viewer.role === "regional_manager") return [];
     return [
       { command: "ACCEPT", label: "受理订单", tone: "order-primary-action" },
       { command: "CANCEL", label: "取消订单", tone: "order-danger-action" },
@@ -288,10 +296,10 @@ export const availableTransitions = (
       command: OrderTransitionCommand;
       label: string;
       tone: string;
-    }> = [
-      { command: "CANCEL", label: "取消订单", tone: "order-danger-action" },
-    ];
-    if (viewer.role === "store_manager" || viewer.role === "admin") {
+    }> = viewer.role === "sales" || viewer.role === "store_manager" || viewer.role === "admin"
+      ? [{ command: "CANCEL", label: "取消订单", tone: "order-danger-action" }]
+      : [];
+    if (viewer.role === "store_manager" || viewer.role === "regional_manager" || viewer.role === "admin") {
       transitions.unshift({
         command: "ACTIVATE",
         label: "激活订单",
@@ -300,13 +308,16 @@ export const availableTransitions = (
     }
     return transitions;
   }
-  if (
-    order.status === "activated" &&
-    viewer.role === "sales"
-  ) {
+  if (order.status === "activated") {
     return [
-      { command: "COMPLETE", label: "完成订单", tone: "order-primary-action" },
+      { command: "SIGN", label: "确认签收", tone: "order-primary-action" },
     ];
+  }
+  if (order.status === "signed" && (viewer.role === "hr" || viewer.role === "admin")) {
+    return [{ command: "RECONCILE", label: "确认对账", tone: "order-primary-action" }];
+  }
+  if (order.status === "reconciled" && (viewer.role === "finance" || viewer.role === "admin")) {
+    return [{ command: "MARK_PAID", label: "确认收款", tone: "order-primary-action" }];
   }
   return [];
 };
@@ -530,14 +541,14 @@ export const OrderDetailPage = ({
               <article key={record.id}>
                 <header>
                   <div>
-                    <strong>{record.returnNo}·{record.type === "full" ? "整单退单" : "部分退单"}</strong>
+                    <strong>{record.returnNo} · {RETURN_KIND_LABELS[record.kind]} · {record.type === "full" ? "整单退单" : "部分退单"}</strong>
                     <span>{record.requestedAt}·{record.requestedByName}</span>
                   </div>
                   <span className={`return-status is-${record.status}`}>
-                    {RETURN_STATUS_LABELS[record.status]}
+                    {record.kind === "special" ? `特殊退款${RETURN_STATUS_LABELS[record.status]}` : RETURN_STATUS_LABELS[record.status]}
                   </span>
                 </header>
-                <p>{record.reason}</p>
+                <p>{RETURN_REASON_LABELS[record.reasonCategory]}：{record.reason}</p>
                 <div className="order-return-items">
                   <span>
                     {record.status === "completed"

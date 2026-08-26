@@ -27,6 +27,9 @@ interface AppliedQuoteFilters {
   storeId: string;
 }
 
+const globalDataRole = (role: AuthenticatedUser["role"]): boolean =>
+  role === "admin" || role === "hr" || role === "finance";
+
 export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: AuthenticatedUser }) => {
   const [searchParams] = useSearchParams();
   const initialQuery = searchParams.get("query") ?? "";
@@ -121,8 +124,8 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
   return (
     <PageLayout
       eyebrow="销售报价"
-      title={viewer.role === "admin" ? "全部报价" : viewer.role === "regional_manager" ? "大区报价" : viewer.role === "store_manager" ? "本厅报价" : "我的报价"}
-      description={viewer.role === "admin" ? "查询全部营业厅报价，可按营业厅和销售员筛选。" : viewer.role === "regional_manager" ? "只读查询所管营业厅报价，可按营业厅和销售员筛选。" : viewer.role === "store_manager" ? "仅展示本营业厅报价，可按本厅销售员筛选。" : "查询已保存报价，未转订单的报价可以继续修改、打印或转为订单。"}
+      title={globalDataRole(viewer.role) ? "全部报价" : viewer.role === "regional_manager" ? "大区报价" : viewer.role === "store_manager" ? "本厅报价" : "我的报价"}
+      description={globalDataRole(viewer.role) ? "查询全公司营业厅报价，可按营业厅和销售员筛选。" : viewer.role === "regional_manager" ? "只读查询所管营业厅报价，可按营业厅和销售员筛选。" : viewer.role === "store_manager" ? "仅展示本营业厅报价，可按本厅销售员筛选。" : "查询已保存报价，未转订单的报价可以继续修改、打印或转为订单。"}
       actions={viewer.role === "sales" ? <Link className="quote-management__primary-link" to="/quotes/new">新建报价</Link> : null}
     >
       <form className="quote-management__filters" onSubmit={submit}>
@@ -155,7 +158,7 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
           </label>
         </div>
         <div className="quote-management__filter-row is-secondary">
-          {viewer.role === "admin" || viewer.role === "regional_manager" ? <label><span>营业厅</span><select value={storeId} onChange={(event) => { setStoreId(event.currentTarget.value); setSellerId(""); }}><option value="">全部营业厅</option>{options.stores.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
+          {globalDataRole(viewer.role) || viewer.role === "regional_manager" ? <label><span>营业厅</span><select value={storeId} onChange={(event) => { setStoreId(event.currentTarget.value); setSellerId(""); }}><option value="">全部营业厅</option>{options.stores.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
           {viewer.role !== "sales" ? <label><span>销售员</span><select value={sellerId} onChange={(event) => setSellerId(event.currentTarget.value)}><option value="">全部可见销售员</option>{options.sellers.filter((option) => !storeId || option.storeId === storeId).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
           <div className="quote-management__filter-actions">
             <button className="is-secondary" disabled={loading} onClick={reset} type="button">重置</button>

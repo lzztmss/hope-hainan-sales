@@ -110,6 +110,12 @@ export interface OrderRecord extends OrderWriteRecord {
   refundedFen: number;
   acceptedAt: Date | null;
   activatedAt: Date | null;
+  signedAt: Date | null;
+  signedBy: string | null;
+  reconciledAt: Date | null;
+  reconciledBy: string | null;
+  paidAt: Date | null;
+  paidBy: string | null;
   completedAt: Date | null;
   cancelledAt: Date | null;
   deletedAt: Date | null;
@@ -185,6 +191,7 @@ export interface OrderRepository {
     expectedVersion: number,
     status: OrderStatus,
     at: Date,
+    actorUserId: string,
   ): Promise<OrderRecord | null>;
   setDeletedAt(
     id: string,
@@ -310,6 +317,12 @@ const presentOrder = (
     attributions: order.attributions,
     acceptedAt: order.acceptedAt,
     activatedAt: order.activatedAt,
+    signedAt: order.signedAt,
+    signedBy: order.signedBy,
+    reconciledAt: order.reconciledAt,
+    reconciledBy: order.reconciledBy,
+    paidAt: order.paidAt,
+    paidBy: order.paidBy,
     completedAt: order.completedAt,
     cancelledAt: order.cancelledAt,
     deletedAt: order.deletedAt,
@@ -564,7 +577,7 @@ export const createOrderService = (options: OrderServiceOptions) => {
         throw new OrderServiceError("回收站中的订单不能变更状态", 409);
       }
       if (command === "ACTIVATE" && order.status === "activated") {
-        if (user.role !== "store_manager" && user.role !== "admin") {
+        if (user.role !== "store_manager" && user.role !== "regional_manager" && user.role !== "admin") {
           throw new OrderServiceError("不允许的订单状态变更", 400);
         }
         await options.commissionAccrual.accrueForActivatedOrder(
@@ -596,24 +609,12 @@ export const createOrderService = (options: OrderServiceOptions) => {
           );
         }
       }
-      if (nextStatus === "completed") {
-        try {
-          await options.commissionAccrual.accrueForActivatedOrder(
-            order.id,
-            `activation:${order.id}`,
-          );
-        } catch (error) {
-          throw new OrderServiceError(
-            error instanceof Error ? error.message : "订单提成生成失败",
-            409,
-          );
-        }
-      }
       const updated = await options.repository.transition(
         order.id,
         expectedVersion,
         nextStatus,
         changedAt,
+        user.id,
       );
       if (!updated) {
         throw new OrderServiceError("订单已被其他操作更新，请刷新后重试", 409);
@@ -639,8 +640,8 @@ export const createOrderService = (options: OrderServiceOptions) => {
       user: AuthenticatedUser,
       orderId: string,
     ): Promise<OrderRecord> {
-      if (user.role === "regional_manager") {
-        throw new OrderServiceError("大区经理仅可查看订单", 403);
+      if (user.role !== "sales" && user.role !== "store_manager" && user.role !== "admin") {
+        throw new OrderServiceError("当前角色无权删除订单", 403);
       }
       const order = await requireVisibleOrder(user, orderId);
       if (order.deletedAt) return order;

@@ -84,7 +84,7 @@ export const TeamReportPage = ({
     <PageLayout
       eyebrow="团队管理"
       title="团队销售报表"
-      description="主管仅查看本营业厅，管理员可查看全公司；导出沿用当前筛选范围。"
+      description="营业厅经理查看本厅，大区经理查看所管营业厅，人力资源、财务和管理员查看全公司；导出沿用当前筛选范围。"
     >
       <ReportFilters
         allowTeamFilters

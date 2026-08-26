@@ -56,6 +56,9 @@ const mapRequest = (
     completionIdempotencyKey: row.completionIdempotencyKey,
     orderId: row.orderId,
     returnType: row.returnType,
+    returnKind: row.returnKind,
+    reasonCategory: row.reasonCategory,
+    orderStatusBefore: row.orderStatusBefore,
     status: row.status,
     reason: row.reason,
     requestedBy: row.requestedBy,
@@ -134,6 +137,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
         sellerId: orders.sellerId,
         storeId: orders.storeId,
         status: orders.status,
+        signedAt: orders.signedAt,
         paymentMode: orders.paymentMode,
         refundedFen: orders.refundedFen,
       })
@@ -197,6 +201,9 @@ export class DrizzleReturnRepository implements ReturnRepository {
         idempotencyKey: input.idempotencyKey,
         orderId: input.orderId,
         returnType: input.returnType,
+        returnKind: input.returnKind,
+        reasonCategory: input.reasonCategory,
+        orderStatusBefore: input.orderStatusBefore,
         status: "requested",
         reason: input.reason,
         requestedBy: input.requestedBy,
@@ -229,7 +236,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
       .where(
         and(
           eq(orders.id, input.orderId),
-          inArray(orders.status, ["activated", "completed", "partially_returned"]),
+          inArray(orders.status, ["signed", "reconciled", "paid", "partially_returned"]),
         ),
       );
     return this.loadRequest(created);
@@ -301,29 +308,10 @@ export class DrizzleReturnRepository implements ReturnRepository {
       .returning();
     if (!updated) throw new Error("退单已被其他操作更新");
     if (decision.status === "rejected") {
-      const [order] = await this.executor
-        .select({ completedAt: orders.completedAt })
-        .from(orders)
-        .where(eq(orders.id, updated.orderId))
-        .limit(1);
-      const completedReturns = await this.executor
-        .select({ id: returnTable.id })
-        .from(returnTable)
-        .where(
-          and(
-            eq(returnTable.orderId, updated.orderId),
-            eq(returnTable.status, "completed"),
-          ),
-        );
       await this.executor
         .update(orders)
         .set({
-          status:
-            completedReturns.length > 0
-              ? "partially_returned"
-              : order?.completedAt
-                ? "completed"
-                : "activated",
+          status: updated.orderStatusBefore ?? "signed",
           updatedAt: decision.decidedAt,
           version: sql`${orders.version} + 1`,
         })
@@ -395,7 +383,9 @@ export class DrizzleReturnRepository implements ReturnRepository {
     await this.executor
       .update(orders)
       .set({
-        status: fullyReturned ? "returned" : "partially_returned",
+        // 部分退单是订单上的业务记录，不应覆盖“已签收/已对账/已收款”资金状态。
+        // 只有所有计价商品都退完时，订单主状态才进入“已退单”。
+        status: fullyReturned ? "returned" : current.orderStatusBefore ?? "signed",
         updatedAt: completion.completedAt,
       })
       .where(eq(orders.id, current.orderId));

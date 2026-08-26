@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import type { ApiClient, OrderMutationDto, QuoteDetailDto } from "../api/client";
+import type { ApiClient, AuthenticatedUser, OrderMutationDto, QuoteDetailDto } from "../api/client";
 import { PageLayout } from "../components/layout";
 import { createClientKey } from "../utils/clientKey";
 import { QuotePrintDocument } from "./QuotePrintDocument";
@@ -9,7 +9,7 @@ import { OrderCompositionDialog } from "./OrderCompositionDialog";
 import "./quoteManagement.css";
 
 const orderKey = () => createClientKey("order-create");
-export const QuoteDetailPage = ({ client, quoteId }: { client: ApiClient; quoteId: string }) => {
+export const QuoteDetailPage = ({ client, quoteId, viewer }: { client: ApiClient; quoteId: string; viewer: AuthenticatedUser }) => {
   const [quote, setQuote] = useState<QuoteDetailDto | null>(null);
   const [order, setOrder] = useState<OrderMutationDto | null>(null);
   const [busy, setBusy] = useState(false);
@@ -51,7 +51,7 @@ export const QuoteDetailPage = ({ client, quoteId }: { client: ApiClient; quoteI
     <PageLayout
       eyebrow="报价管理"
       title={quote?.quoteNo ?? "报价详情"}
-      description="查看已保存版本；未转订单的报价可以继续修改、打印或转为订单。"
+      description={viewer.role === "sales" ? "查看已保存版本；未转订单的报价可以继续修改、打印或转为订单。" : "查看已保存的报价版本和报价单；管理及职能账号不修改报价或转订单。"}
       actions={<Link className="quote-management__secondary-link" to="/quotes">返回报价列表</Link>}
     >
       {error ? <p className="quote-management__error" role="alert">{error}</p> : null}
@@ -69,12 +69,12 @@ export const QuoteDetailPage = ({ client, quoteId }: { client: ApiClient; quoteI
             roomType={quote.customer.roomType}
             version={quote.version}
             actions={<>
-              {quote.status === "confirmed" ? (
+              {viewer.role === "sales" && quote.status === "confirmed" ? (
                 <button type="button" onClick={() => navigate(`/quotes/${quote.id}/edit`)}>修改报价</button>
               ) : null}
               <button type="button" onClick={() => setPreviewOpen(true)}>预览报价单</button>
               <button type="button" onClick={() => void print()} disabled={busy}>打印报价</button>
-              {quote.status === "confirmed" ? (
+              {viewer.role === "sales" && quote.status === "confirmed" ? (
                 <button className="is-primary" type="button" onClick={() => setOrderCompositionOpen(true)} disabled={busy}>转为订单</button>
               ) : null}
               {order ? <Link to={`/orders/${order.id}`}>查看订单 {order.orderNo}</Link> : null}

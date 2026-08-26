@@ -39,6 +39,8 @@ const ROLE_TITLES: Readonly<Record<OrderViewer["role"], string>> = {
   sales: "我的订单",
   store_manager: "本厅订单",
   regional_manager: "大区订单",
+  hr: "全公司订单",
+  finance: "全公司订单",
   admin: "全部订单",
 };
 
@@ -46,6 +48,9 @@ const PAYMENT_LABELS: Readonly<Record<OrderPaymentMode, string>> = {
   one_time: "一次性支付",
   contract_36: "36 个月合约月付",
 };
+
+const globalDataRole = (role: OrderViewer["role"]): boolean =>
+  role === "admin" || role === "hr" || role === "finance";
 
 const scopeOrders = (items: OrderSummary[], viewer: OrderViewer): OrderSummary[] => {
   if (viewer.role === "sales") {
@@ -297,7 +302,7 @@ export const OrderListPage = ({
               )}
             </select>
           </label>
-          {viewer.role === "admin" ? (
+          {globalDataRole(viewer.role) || viewer.role === "regional_manager" ? (
             <label>
               <span>营业厅</span>
               <input

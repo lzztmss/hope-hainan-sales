@@ -15,7 +15,7 @@ export interface RegisterAdminRoutesOptions {
 }
 
 const reasonSchema = z.string().trim().min(2).max(500);
-const roleSchema = z.enum(["sales", "store_manager", "regional_manager", "admin"]);
+const roleSchema = z.enum(["sales", "store_manager", "regional_manager", "hr", "finance", "admin"]);
 const personnelTypeSchema = z.enum(["unicom", "auxiliary", "admin"]);
 const storeIdSchema = z.string().uuid();
 

@@ -20,7 +20,7 @@ import type {
 } from "../orders/types";
 import { APP_BASE_PATH } from "../appBasePath";
 
-export type ApiUserRole = "sales" | "store_manager" | "regional_manager" | "admin";
+export type ApiUserRole = "sales" | "store_manager" | "regional_manager" | "hr" | "finance" | "admin";
 
 export interface AuthenticatedUser {
   id: string;
@@ -248,6 +248,12 @@ export interface OrderDto {
   lines: readonly OrderLineDto[];
   acceptedAt: string | null;
   activatedAt: string | null;
+  signedAt: string | null;
+  signedBy: string | null;
+  reconciledAt: string | null;
+  reconciledBy: string | null;
+  paidAt: string | null;
+  paidBy: string | null;
   completedAt: string | null;
   cancelledAt: string | null;
   deletedAt: string | null;
@@ -313,6 +319,8 @@ export interface ReturnRecordDto {
   orderNo: string;
   orderId: string;
   returnType: ReturnType;
+  returnKind: "normal" | "special";
+  reasonCategory: "no_reason" | "quality" | "other";
   status: ReturnStatus;
   reason: string;
   requestedBy: string;
@@ -330,6 +338,8 @@ export interface ReturnRecordDto {
 
 export interface RequestOrderReturnApiInput {
   type: ReturnType;
+  kind: "normal" | "special";
+  reasonCategory: "no_reason" | "quality" | "other";
   reason: string;
   items: readonly { orderLineId: string; quantity: number }[];
 }

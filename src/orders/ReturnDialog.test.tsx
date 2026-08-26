@@ -5,6 +5,7 @@ import { ReturnDialog } from "./ReturnDialog";
 import type { OrderDetail } from "./types";
 
 const order: OrderDetail = {
+  signedAt: "2026-08-13T08:00:00.000Z",
   id: "order-1",
   orderNo: "XLXDD-001",
   customerMasked: "测*",
@@ -13,7 +14,7 @@ const order: OrderDetail = {
   sellerName: "销售员",
   storeId: "store-1",
   storeName: "营业厅",
-  status: "completed",
+  status: "signed",
   paymentMode: "one_time",
   oneTimeFen: 119800,
   monthlyTotalFen: 0,
@@ -106,5 +107,21 @@ describe("整单退单商品明细", () => {
     expect(
       screen.getByText(/月付商品按一个月的商品月费计算退款上限/),
     ).toBeInTheDocument();
+  });
+
+  it("签收超过15日自动切换为特殊退款并禁用普通退货", () => {
+    render(
+      <ReturnDialog
+        open
+        order={{ ...order, signedAt: "2026-07-01T02:00:00.000Z" }}
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const dialog = screen.getAllByRole("dialog").at(-1)!;
+    expect(within(dialog).getByRole("radio", { name: /普通退货/ })).toBeDisabled();
+    expect(within(dialog).getByRole("radio", { name: /特殊退款/ })).toBeChecked();
+    expect(within(dialog).getByText(/本申请将以“特殊退款”单独标识/)).toBeInTheDocument();
   });
 });

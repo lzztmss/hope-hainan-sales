@@ -189,7 +189,7 @@ export const createSalesReportService = (options: {
     const period = parseReportPeriod(filters.from, filters.to, generatedAt);
     const scope = normalizeScope(user, filters);
     const loadedFacts = await options.repository.loadFacts(scope, period);
-    const requestedGroup = filters.groupBy ?? (user.role === "admin" || user.role === "regional_manager" ? "store" : user.role === "store_manager" ? "seller" : "none");
+    const requestedGroup = filters.groupBy ?? (["admin", "hr", "finance", "regional_manager"].includes(user.role) ? "store" : user.role === "store_manager" ? "seller" : "none");
     const shouldCompleteStoreRows = requestedGroup === "store" && !filters.sellerId;
     const visibleStores = !shouldCompleteStoreRows
       ? []
@@ -264,7 +264,7 @@ export const createSalesReportService = (options: {
       const normalizedFilters = {
         from: report.period.from,
         to: report.period.to,
-        groupBy: filters.groupBy ?? (user.role === "admin" || user.role === "regional_manager" ? "store" : user.role === "store_manager" ? "seller" : "none"),
+        groupBy: filters.groupBy ?? (["admin", "hr", "finance", "regional_manager"].includes(user.role) ? "store" : user.role === "store_manager" ? "seller" : "none"),
         ...(filters.storeId ? { storeId: filters.storeId } : {}),
         ...(filters.sellerId ? { sellerId: filters.sellerId } : {}),
       };

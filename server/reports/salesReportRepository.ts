@@ -221,7 +221,9 @@ export class DrizzleSalesReportRepository implements SalesReportRepository {
         all<LedgerRow>(`
           SELECT cl.store_id, s.name AS store_name,
                  cl.beneficiary_id AS seller_id, u.display_name AS seller_name,
-                 COALESCE(SUM(CASE WHEN sb.id IS NULL OR sb.status = 'draft'
+                 COALESCE(SUM(CASE WHEN co.signed_at IS NOT NULL
+                                      AND co.paid_at IS NULL
+                                      AND (sb.id IS NULL OR sb.status != 'paid')
                    THEN cl.amount_fen ELSE 0 END), 0) AS pending_fen,
                  COALESCE(SUM(CASE WHEN cl.entry_type = 'return_reversal'
                    THEN ABS(cl.amount_fen) ELSE 0 END), 0) AS reversed_fen,
@@ -229,6 +231,7 @@ export class DrizzleSalesReportRepository implements SalesReportRepository {
           FROM commission_ledger cl
           JOIN stores s ON s.id = cl.store_id
           JOIN users u ON u.id = cl.beneficiary_id
+          LEFT JOIN orders co ON co.id = cl.order_id
           LEFT JOIN settlement_items si ON si.ledger_entry_id = cl.id
           LEFT JOIN settlement_batches sb ON sb.id = si.batch_id
           WHERE cl.entry_type IN ('accrual', 'return_reversal', 'manual_positive', 'manual_negative')

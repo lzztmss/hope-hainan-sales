@@ -9,6 +9,8 @@ import { sendValidationError } from "./validationError.js";
 
 const returnFieldLabels = {
   type: "退单类型",
+  kind: "申请类型",
+  reasonCategory: "原因类型",
   reason: "退单原因",
   items: "退货商品",
   decision: "审批结果",
@@ -24,6 +26,8 @@ export interface RegisterReturnRoutesOptions {
 
 const requestSchema = z.object({
   type: z.enum(["full", "partial"]),
+  kind: z.enum(["normal", "special"]),
+  reasonCategory: z.enum(["no_reason", "quality", "other"]),
   reason: z.string().trim().min(2).max(1_000),
   items: z
     .array(

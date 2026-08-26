@@ -67,19 +67,22 @@ const permissionsFor = (
   viewer: OrderViewer,
 ): OrderPermissions => {
   const reversibleStatus = order.status === "pending" || order.status === "accepted";
-  const reviewer = viewer.role === "store_manager" || viewer.role === "admin";
+  const reviewer = viewer.role === "store_manager" || viewer.role === "regional_manager" || viewer.role === "admin";
   const canAccessOrder =
-    viewer.role === "admin" ||
+    viewer.role === "admin" || viewer.role === "hr" || viewer.role === "finance" || viewer.role === "regional_manager" ||
     (viewer.role === "store_manager" && viewer.storeId === order.storeId) ||
     (viewer.role === "sales" &&
       viewer.storeId === order.storeId &&
       viewer.id === order.sellerId);
   return {
-    canDelete: order.deletedAt === null && reversibleStatus,
+    canDelete:
+      order.deletedAt === null &&
+      reversibleStatus &&
+      (viewer.role === "sales" || viewer.role === "store_manager" || viewer.role === "admin"),
     canRestore: order.deletedAt !== null && reviewer && reversibleStatus,
     // 权限只描述账号是否可操作该归属订单；审批中、已退完等业务状态
     // 由 OrderDetailPage 单独解释，避免把状态限制误报成“没有权限”。
-    canRequestReturn: canAccessOrder,
+    canRequestReturn: canAccessOrder && viewer.role !== "hr" && viewer.role !== "finance",
   };
 };
 
@@ -145,7 +148,9 @@ const timelineFor = (order: OrderDto): OrderTimelineEvent[] => {
   };
   append(order.acceptedAt, "accepted", "订单已受理");
   append(order.activatedAt, "activated", "订单已生效");
-  append(order.completedAt, "completed", "订单已完成");
+  append(order.signedAt, "signed", "订单已签收");
+  append(order.reconciledAt, "reconciled", "订单已对账");
+  append(order.paidAt, "paid", "订单已收款");
   append(order.cancelledAt, "cancelled", "订单已取消");
   return events;
 };
@@ -154,11 +159,13 @@ const mapReturn = (
   record: ReturnRecordDto,
   viewer: OrderViewer,
 ): ReturnRecordView => {
-  const reviewer = viewer.role === "store_manager" || viewer.role === "admin";
+  const reviewer = viewer.role === "store_manager" || viewer.role === "regional_manager" || viewer.role === "admin";
   return {
     id: record.id,
     returnNo: record.returnNo,
     type: record.returnType,
+    kind: record.returnKind,
+    reasonCategory: record.reasonCategory,
     status: record.status,
     reason: record.reason,
     requestedById: record.requestedBy,
@@ -244,6 +251,7 @@ const mapDetail = (
   const returned = completedQuantityByLine(returns);
   return {
     ...mapSummary(order, viewer),
+    signedAt: order.signedAt,
     customerAddress: order.customer.address?.trim() || "客户地址未提供",
     fttrLabel: fttrLabel(order),
     heartMonthlyFen: order.heartMonthlyFen,
@@ -323,6 +331,8 @@ export const createOrderManagementAdapter = (
     async requestReturn(input) {
       const body = {
         type: input.type,
+        kind: input.kind,
+        reasonCategory: input.reasonCategory,
         items: input.items,
         reason: input.reason,
       };

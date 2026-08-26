@@ -408,10 +408,10 @@ export const createAdminService = (options: AdminServiceOptions) => {
     storeId: string | null,
     active: boolean,
   ): Promise<AdminStoreRecord | null> => {
-    if (role === "admin") {
+    if (role === "admin" || role === "hr" || role === "finance") {
       if (personnelType !== "admin" || storeId !== null) {
         throw new AdminServiceError(
-          "管理员账号必须使用管理员人员类型且不绑定营业厅",
+          "管理员、人力资源和财务账号必须使用公司人员类型且不绑定营业厅",
           400,
         );
       }
@@ -599,21 +599,11 @@ export const createAdminService = (options: AdminServiceOptions) => {
       actor: AuthenticatedUser,
       input: CreateAdminUserInput,
     ): Promise<AdminUserView> {
-      requirePersonnelManager(actor);
+      requireAdmin(actor);
       const reason = normalizeReason(input.reason);
       validateInitialPassword(input.initialPassword);
       const at = now();
       const active = input.active ?? true;
-      if (actor.role === "regional_manager") {
-        const allowed = (actor.managedStores ?? []).map((store) => store.id);
-        if (!input.storeId || !allowed.includes(input.storeId)) {
-          throw new AdminServiceError("只能在名下营业厅创建账号", 403);
-        }
-        if (input.role !== "sales" && input.role !== "store_manager") {
-          throw new AdminServiceError("大区经理只能创建销售员或营业厅经理账号", 403);
-        }
-        if (input.managedStoreIds?.length) throw new AdminServiceError("无权分配大区", 403);
-      }
       try {
         return await options.repository.runTransaction(async (repository) => {
           await repository.lockAdministration();
@@ -677,7 +667,7 @@ export const createAdminService = (options: AdminServiceOptions) => {
       userId: string,
       input: UpdateAdminUserInput,
     ): Promise<AdminUserView> {
-      requirePersonnelManager(actor);
+      requireAdmin(actor);
       const reason = normalizeReason(input.reason);
       const hasMutation = Object.entries(input).some(
         ([key, value]) => key !== "reason" && value !== undefined,
@@ -689,14 +679,6 @@ export const createAdminService = (options: AdminServiceOptions) => {
           await repository.lockAdministration();
           const existing = await repository.findUserForUpdate(userId);
           if (!existing) throw new AdminServiceError("账号不存在", 404);
-          if (actor.role === "regional_manager") {
-            const allowed = (actor.managedStores ?? []).map((store) => store.id);
-            if (!existing.storeId || !allowed.includes(existing.storeId)) throw new AdminServiceError("无权管理该账号", 403);
-            if (existing.role !== "sales" && existing.role !== "store_manager") throw new AdminServiceError("无权管理该角色", 403);
-            if (input.role !== undefined && input.role !== existing.role) throw new AdminServiceError("大区经理不能修改账号角色", 403);
-            if (input.storeId !== undefined && (!input.storeId || !allowed.includes(input.storeId))) throw new AdminServiceError("不能将账号移出名下营业厅", 403);
-            if (input.managedStoreIds !== undefined) throw new AdminServiceError("无权分配大区", 403);
-          }
           const next = {
             workNo:
               input.workNo === undefined
@@ -793,7 +775,7 @@ export const createAdminService = (options: AdminServiceOptions) => {
       userId: string,
       input: ResetUserPasswordInput,
     ): Promise<AdminUserView> {
-      requirePersonnelManager(actor);
+      requireAdmin(actor);
       const reason = normalizeReason(input.reason);
       validateInitialPassword(input.initialPassword);
       const at = now();
@@ -801,12 +783,6 @@ export const createAdminService = (options: AdminServiceOptions) => {
         await repository.lockAdministration();
         const existing = await repository.findUserForUpdate(userId);
         if (!existing) throw new AdminServiceError("账号不存在", 404);
-        if (actor.role === "regional_manager") {
-          const allowed = (actor.managedStores ?? []).map((store) => store.id);
-          if (!existing.storeId || !allowed.includes(existing.storeId) || (existing.role !== "sales" && existing.role !== "store_manager")) {
-            throw new AdminServiceError("无权重置该账号密码", 403);
-          }
-        }
         const updated = await repository.updateUser(userId, {
           passwordHash: await hashPassword(input.initialPassword),
           mustChangePassword: actor.id !== userId,

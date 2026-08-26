@@ -437,7 +437,9 @@
 
 .order-status.is-accepted,
 .order-status.is-activated,
-.order-status.is-completed,
+.order-status.is-signed,
+.order-status.is-reconciled,
+.order-status.is-paid,
 .return-status.is-approved,
 .return-status.is-completed {
   background: var(--hfttr-color-success-100);

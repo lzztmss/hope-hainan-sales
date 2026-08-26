@@ -175,6 +175,9 @@ export class DrizzleCommissionDashboardRepository
         ruleFttrPlan: commissionRules.fttrPlan,
         ruleName: commissionRules.ruleName,
         activatedAt: orders.activatedAt,
+        signedAt: orders.signedAt,
+        reconciledAt: orders.reconciledAt,
+        orderPaidAt: orders.paidAt,
         orderCreatedAt: orders.createdAt,
         calculationSnapshot: orderCommissionSnapshots.calculationSnapshot,
         settlementStatus: settlementBatches.status,
@@ -229,6 +232,9 @@ export class DrizzleCommissionDashboardRepository
         }),
         ruleName: row.ruleName,
         activatedAt: row.activatedAt,
+        signedAt: row.signedAt,
+        reconciledAt: row.reconciledAt,
+        orderPaidAt: row.orderPaidAt,
         orderCreatedAt: row.orderCreatedAt,
         calculationSnapshot: row.calculationSnapshot,
         settlementStatus: row.settlementStatus,
@@ -352,7 +358,7 @@ export class DrizzleCommissionDashboardRepository
     filters: CommissionDashboardRepositoryFilters,
   ): Promise<readonly MissingCommissionOrder[]> {
     const conditions: SQL[] = [
-      inArray(orders.status, ["activated", "completed", "return_pending", "returned"]),
+      inArray(orders.status, ["activated", "signed", "reconciled", "paid", "return_pending", "partially_returned", "returned"]),
       isNull(orders.deletedAt),
       notExists(
         this.executor

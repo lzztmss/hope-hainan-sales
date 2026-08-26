@@ -205,8 +205,9 @@ const OrdersRoute = ({ client }: { client: ApiClient }) => {
 };
 
 const QuoteDetailRoute = ({ client }: { client: ApiClient }) => {
+  const { user } = useAuth();
   const { quoteId } = useParams();
-  return quoteId ? <QuoteDetailPage client={client} quoteId={quoteId} /> : null;
+  return quoteId && user ? <QuoteDetailPage client={client} quoteId={quoteId} viewer={user} /> : null;
 };
 
 const QuotePrintRoute = ({ client }: { client: ApiClient }) => {
@@ -290,12 +291,12 @@ export const SalesSystemRoutes = ({ client }: SalesSystemRoutesProps) => (
 
           <Route element={<RequireRole allowed={["sales"]} />}>
             <Route path="/quotes/new" element={<QuoteWorkflowPage client={client} />} />
+            <Route path="/quotes/:quoteId/edit" element={<QuoteEditRoute client={client} />} />
             <Route path="/commissions/my" element={<MyCommissionRoute client={client} />} />
           </Route>
 
-          <Route element={<RequireRole allowed={["sales", "store_manager", "regional_manager", "admin"]} />}>
+          <Route element={<RequireRole allowed={["sales", "store_manager", "regional_manager", "hr", "finance", "admin"]} />}>
             <Route path="/quotes" element={<QuoteListRoute client={client} />} />
-            <Route path="/quotes/:quoteId/edit" element={<QuoteEditRoute client={client} />} />
             <Route path="/quotes/:quoteId" element={<QuoteDetailRoute client={client} />} />
             <Route path="/customers" element={<CustomerListRoute client={client} />} />
             <Route path="/orders" element={<OrdersRoute client={client} />} />
@@ -303,7 +304,7 @@ export const SalesSystemRoutes = ({ client }: SalesSystemRoutesProps) => (
             <Route path="/profile" element={<PlaceholderPage title="个人中心" />} />
           </Route>
 
-          <Route element={<RequireRole allowed={["store_manager", "regional_manager", "admin"]} />}>
+          <Route element={<RequireRole allowed={["store_manager", "regional_manager", "hr", "finance", "admin"]} />}>
             <Route path="/returns" element={<ReturnsRoute client={client} />} />
             <Route path="/reports/team" element={<TeamReportPage />} />
           </Route>
@@ -316,8 +317,11 @@ export const SalesSystemRoutes = ({ client }: SalesSystemRoutesProps) => (
             <Route path="/commissions" element={<PlaceholderPage title="提成汇总" />} />
           </Route>
 
-          <Route element={<RequireRole allowed={["admin"]} />}>
+          <Route element={<RequireRole allowed={["hr", "finance", "admin"]} />}>
             <Route path="/reports" element={<TeamReportPage />} />
+          </Route>
+
+          <Route element={<RequireRole allowed={["admin"]} />}>
             <Route path="/admin/users" element={<AdminUsersRoute />} />
             <Route path="/admin/pricing" element={<PlaceholderPage title="价格版本" />} />
             <Route path="/admin/commissions" element={<AdminCommissionRoute client={client} />} />

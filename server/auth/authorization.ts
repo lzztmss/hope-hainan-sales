@@ -1,4 +1,10 @@
-export type UserRole = "sales" | "store_manager" | "regional_manager" | "admin";
+export type UserRole =
+  | "sales"
+  | "store_manager"
+  | "regional_manager"
+  | "hr"
+  | "finance"
+  | "admin";
 
 export interface ManagedStore {
   id: string;
@@ -36,7 +42,9 @@ export class AuthorizationError extends Error {
 }
 
 export const scopeForUser = (user: AuthenticatedUser): UserScope => {
-  if (user.role === "admin") return { kind: "global" };
+  if (user.role === "admin" || user.role === "hr" || user.role === "finance") {
+    return { kind: "global" };
+  }
   if (user.role === "regional_manager") {
     return { kind: "region", storeIds: (user.managedStores ?? []).map((store) => store.id) };
   }

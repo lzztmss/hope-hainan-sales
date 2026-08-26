@@ -16,7 +16,7 @@ const order = (overrides: Partial<OrderDetail> = {}): OrderDetail => ({
   sellerName: "销售员",
   storeId: "store-1",
   storeName: "营业厅",
-  status: "completed",
+  status: "signed",
   paymentMode: "contract_36",
   oneTimeFen: 0,
   monthlyTotalFen: 18900,
@@ -25,6 +25,7 @@ const order = (overrides: Partial<OrderDetail> = {}): OrderDetail => ({
   deletedAt: null,
   version: 1,
   permissions: { canDelete: false, canRestore: false, canRequestReturn: true },
+  signedAt: "2026-08-13T08:00:00.000Z",
   customerAddress: "未提供",
   fttrLabel: "FTTR 159 元/月",
   heartMonthlyFen: 3000,
@@ -121,14 +122,25 @@ describe("订单状态操作按钮", () => {
       .toContain("ACTIVATE");
     expect(availableTransitions(accepted, viewer("admin")).map((item) => item.command))
       .toContain("ACTIVATE");
+    expect(availableTransitions(accepted, viewer("regional_manager")).map((item) => item.command))
+      .toEqual(["ACTIVATE"]);
+    expect(availableTransitions(accepted, viewer("hr"))).toEqual([]);
+    expect(availableTransitions(accepted, viewer("finance"))).toEqual([]);
   });
 
-  it("已激活订单只向销售员展示完成", () => {
+  it("已激活订单向所有可操作角色展示确认签收", () => {
     const activated = order({ status: "activated" });
     expect(availableTransitions(activated, viewer("sales")).map((item) => item.command))
-      .toEqual(["COMPLETE"]);
-    expect(availableTransitions(activated, viewer("store_manager"))).toEqual([]);
-    expect(availableTransitions(activated, viewer("admin"))).toEqual([]);
+      .toEqual(["SIGN"]);
+    expect(availableTransitions(activated, viewer("store_manager")).map((item) => item.command)).toEqual(["SIGN"]);
+    expect(availableTransitions(activated, viewer("admin")).map((item) => item.command)).toEqual(["SIGN"]);
+  });
+
+  it("签收后由人事或管理员对账，对账后由财务或管理员收款", () => {
+    expect(availableTransitions(order({ status: "signed" }), viewer("hr")).map((item) => item.command)).toEqual(["RECONCILE"]);
+    expect(availableTransitions(order({ status: "signed" }), viewer("finance"))).toEqual([]);
+    expect(availableTransitions(order({ status: "reconciled" }), viewer("finance")).map((item) => item.command)).toEqual(["MARK_PAID"]);
+    expect(availableTransitions(order({ status: "reconciled" }), viewer("hr"))).toEqual([]);
   });
 });
 

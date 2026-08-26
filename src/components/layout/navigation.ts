@@ -4,6 +4,8 @@ export const ROLE_LABELS: Record<AppRole, string> = {
   sales: "营业员",
   manager: "营业厅主管",
   regional: "大区经理",
+  hr: "人力资源",
+  finance: "财务",
   admin: "管理员",
 };
 
@@ -47,11 +49,25 @@ const REGIONAL_NAVIGATION: readonly NavigationItem[] = [
   { href: "/", label: "大区工作台" },
   { href: "/quotes", label: "报价查询" },
   { href: "/customers", label: "客户查询" },
-  { href: "/orders", label: "订单查询" },
-  { href: "/returns", label: "退单查询" },
+  { href: "/orders", label: "订单管理" },
+  { href: "/returns", label: "退单审批" },
   { href: "/reports/team", label: "大区报表" },
   { href: "/regional/users", label: "名下账号" },
   { href: "/profile", label: "个人中心" },
+];
+
+const HR_NAVIGATION: readonly NavigationItem[] = [
+  { href: "/", label: "全局工作台" },
+  { href: "/customers", label: "客户查询" },
+  { href: "/quotes", label: "报价查询" },
+  { href: "/orders", label: "订单管理" },
+  { href: "/returns", label: "退单查询" },
+  { href: "/reports", label: "销售报表" },
+  { href: "/profile", label: "个人中心" },
+];
+
+const FINANCE_NAVIGATION: readonly NavigationItem[] = [
+  ...HR_NAVIGATION,
 ];
 
 export const MOBILE_NAVIGATION: readonly NavigationItem[] = [
@@ -74,6 +90,8 @@ export const navigationForRole = (
   }
 
   if (role === "regional") return REGIONAL_NAVIGATION;
+  if (role === "hr") return HR_NAVIGATION;
+  if (role === "finance") return FINANCE_NAVIGATION;
 
   return SALES_NAVIGATION;
 };

@@ -5,6 +5,8 @@ import { formatOrderMoney } from "./formatters";
 import type {
   OrderDetail,
   RequestReturnInput,
+  ReturnKind,
+  ReturnReasonCategory,
   ReturnType,
 } from "./types";
 import "./orders.css";
@@ -33,13 +35,36 @@ const buildPartialState = (order: OrderDetail): Record<string, PartialLineState>
       .map((line) => [line.id, { selected: false, quantity: "1" }]),
   );
 
+const shanghaiDayNumber = (value: Date): number => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const number = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0);
+  return Math.floor(Date.UTC(number("year"), number("month") - 1, number("day")) / 86_400_000);
+};
+
+const signedElapsedDays = (signedAt: string | null): number | null => {
+  if (!signedAt) return null;
+  const signed = new Date(signedAt);
+  if (Number.isNaN(signed.getTime())) return null;
+  return Math.max(0, shanghaiDayNumber(new Date()) - shanghaiDayNumber(signed));
+};
+
 export const ReturnDialog = ({
   onClose,
   onSubmit,
   open,
   order,
 }: ReturnDialogProps) => {
+  const elapsedDays = signedElapsedDays(order.signedAt);
+  const requiresSpecial = elapsedDays !== null && elapsedDays > 15;
   const [type, setType] = useState<ReturnType>("full");
+  const [kind, setKind] = useState<ReturnKind>("normal");
+  const [reasonCategory, setReasonCategory] = useState<ReturnReasonCategory>("other");
   const [partial, setPartial] = useState(() => buildPartialState(order));
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -48,11 +73,13 @@ export const ReturnDialog = ({
   useEffect(() => {
     if (!open) return;
     setType("full");
+    setKind(requiresSpecial ? "special" : "normal");
+    setReasonCategory("other");
     setPartial(buildPartialState(order));
     setReason("");
     setError(null);
     setSubmitting(false);
-  }, [open, order.id, order.version]);
+  }, [open, order.id, order.version, requiresSpecial]);
 
   const returnableLines = useMemo(
     () =>
@@ -136,6 +163,8 @@ export const ReturnDialog = ({
         orderId: order.id,
         orderVersion: order.version,
         type,
+        kind,
+        reasonCategory,
         items: selectedItems,
         reason: reason.trim(),
       });
@@ -172,6 +201,24 @@ export const ReturnDialog = ({
           noValidate
           onSubmit={(event) => void submit(event)}
         >
+          <fieldset className="return-type-picker">
+            <legend>申请类型</legend>
+            <label><input checked={kind === "normal"} disabled={requiresSpecial} name="return-kind" onChange={() => setKind("normal")} type="radio" /><span><strong>普通退货</strong><small>{requiresSpecial ? `已签收 ${elapsedDays} 天，不能再走普通退货` : "签收后15日内按普通规则申请"}</small></span></label>
+            <label><input checked={kind === "special"} name="return-kind" onChange={() => setKind("special")} type="radio" /><span><strong>特殊退款</strong><small>超过15日或不符合普通条件时申请</small></span></label>
+          </fieldset>
+          {kind === "special" ? (
+            <p className="return-component-note" role="status">
+              本申请将以“特殊退款”单独标识，审批流程不增加管理员终审，仍由有权限的营业厅经理、大区经理或管理员处理。
+            </p>
+          ) : null}
+          <label className="return-reason-field">
+            <span>申请原因类型</span>
+            <select value={reasonCategory} onChange={(event) => setReasonCategory(event.currentTarget.value as ReturnReasonCategory)}>
+              <option value="no_reason">无理由退货</option>
+              <option value="quality">产品质量问题</option>
+              <option value="other">其他业务原因</option>
+            </select>
+          </label>
           <fieldset className="return-type-picker">
             <legend>退单方式</legend>
             <label>
@@ -296,7 +343,7 @@ export const ReturnDialog = ({
           </div>
 
           <label className="return-reason-field">
-            <span>退单原因（至少 2 个字符）</span>
+            <span>{kind === "special" ? "特殊退款说明" : "退单原因"}（至少 2 个字符）</span>
             <textarea
               minLength={2}
               maxLength={500}
@@ -304,7 +351,7 @@ export const ReturnDialog = ({
                 setReason(event.currentTarget.value);
                 setError(null);
               }}
-              placeholder="必填，将进入审计记录"
+              placeholder={kind === "special" ? "必填，请说明超过普通退货期限后仍需退款的具体情况" : "必填，将进入审计记录"}
               rows={3}
               value={reason}
             />

@@ -124,15 +124,15 @@ export const UserStoreManagementRoute = ({
       mustChangePasswordTotal={userStats.mustChangePasswordTotal}
       onUserPageChange={(nextPage) => void loadUsers(false, nextPage, filters).catch(() => undefined)}
       onUserFiltersChange={changeFilters}
-      onCreateStore={(input) => refreshAfter(() => api.createStore(input))}
-      onUpdateStore={(id, input) =>
+      onCreateStore={regionalOnly ? undefined : (input) => refreshAfter(() => api.createStore(input))}
+      onUpdateStore={regionalOnly ? undefined : (id, input) =>
         refreshAfter(() => api.updateStore(id, input))
       }
-      onCreateUser={(input) => refreshAfter(() => api.createUser(input))}
-      onUpdateUser={(id, input) =>
+      onCreateUser={regionalOnly ? undefined : (input) => refreshAfter(() => api.createUser(input))}
+      onUpdateUser={regionalOnly ? undefined : (id, input) =>
         refreshAfter(() => api.updateUser(id, input))
       }
-      onResetPassword={(id, input) =>
+      onResetPassword={regionalOnly ? undefined : (id, input) =>
         id === currentUserId
           ? api.resetPassword(id, input).then(async () => {
               await onCurrentUserPasswordReset?.();

@@ -20,6 +20,8 @@ export const userRoleEnum = pgEnum("user_role", [
   "sales",
   "store_manager",
   "regional_manager",
+  "hr",
+  "finance",
   "admin",
 ]);
 export const personnelTypeEnum = pgEnum("personnel_type", [
@@ -55,7 +57,9 @@ export const orderStatusEnum = pgEnum("order_status", [
   "pending",
   "accepted",
   "activated",
-  "completed",
+  "signed",
+  "reconciled",
+  "paid",
   "cancelled",
   "return_pending",
   "partially_returned",
@@ -67,6 +71,12 @@ export const orderAttributionRoleEnum = pgEnum("order_attribution_role", [
   "collaborator",
 ]);
 export const returnTypeEnum = pgEnum("return_type", ["full", "partial"]);
+export const returnKindEnum = pgEnum("return_kind", ["normal", "special"]);
+export const returnReasonCategoryEnum = pgEnum("return_reason_category", [
+  "no_reason",
+  "quality",
+  "other",
+]);
 export const returnStatusEnum = pgEnum("return_status", [
   "requested",
   "approved",
@@ -460,6 +470,13 @@ export const orders = sqliteTable(
       .references(() => users.id, { onDelete: "restrict" }),
     acceptedAt: integer("accepted_at", { mode: "timestamp_ms" }),
     activatedAt: integer("activated_at", { mode: "timestamp_ms" }),
+    signedAt: integer("signed_at", { mode: "timestamp_ms" }),
+    signedBy: text("signed_by").references(() => users.id, { onDelete: "restrict" }),
+    reconciledAt: integer("reconciled_at", { mode: "timestamp_ms" }),
+    reconciledBy: text("reconciled_by").references(() => users.id, { onDelete: "restrict" }),
+    paidAt: integer("paid_at", { mode: "timestamp_ms" }),
+    paidBy: text("paid_by").references(() => users.id, { onDelete: "restrict" }),
+    // 兼容历史迁移；新流程不再写入 completed_at。
     completedAt: integer("completed_at", { mode: "timestamp_ms" }),
     cancelledAt: integer("cancelled_at", { mode: "timestamp_ms" }),
     deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
@@ -591,6 +608,9 @@ export const returns = sqliteTable(
       .notNull()
       .references(() => orders.id, { onDelete: "restrict" }),
     returnType: returnTypeEnum("return_type").notNull(),
+    returnKind: returnKindEnum("return_kind").default("normal").notNull(),
+    reasonCategory: returnReasonCategoryEnum("reason_category").default("other").notNull(),
+    orderStatusBefore: orderStatusEnum("order_status_before"),
     status: returnStatusEnum("status").notNull(),
     reason: text("reason").notNull(),
     requestedBy: text("requested_by")

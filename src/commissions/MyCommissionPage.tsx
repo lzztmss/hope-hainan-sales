@@ -75,7 +75,7 @@ export const MyCommissionPage = ({ dashboard, onPageChange }: MyCommissionPagePr
       <div>
         <p>销售激励</p>
         <h1 id="my-commission-title">我的提成</h1>
-        <span>{dashboard.periodLabel}·数据以订单生效和结算状态为准</span>
+        <span>{dashboard.periodLabel} · 数据按订单签收、公司收款和实际发放状态统计</span>
       </div>
     </header>
 
@@ -94,7 +94,7 @@ export const MyCommissionPage = ({ dashboard, onPageChange }: MyCommissionPagePr
       ))}
     </section>
     <p className="commission-summary-note">
-      已计提净额为本月已计提提成减本月退单扣回；累计净提成为历史全部已计提提成减全部退单扣回。客户实际退款与提成扣回分别核算。
+      待结算是订单已签收或已对账、仍在等待联通向公司付款的提成；待发放是公司已经收款、尚未向提成人员实际发放的提成。已计提净额为本月计提减本月退单扣回，客户退款与提成扣回分别核算。
     </p>
 
     {dashboard.unconfiguredOrders > 0 ? (

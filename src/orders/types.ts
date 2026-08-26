@@ -1,4 +1,4 @@
-export type OrderViewerRole = "sales" | "store_manager" | "regional_manager" | "admin";
+export type OrderViewerRole = "sales" | "store_manager" | "regional_manager" | "hr" | "finance" | "admin";
 
 export interface OrderViewer {
   id: string;
@@ -11,7 +11,9 @@ export type OrderStatus =
   | "pending"
   | "accepted"
   | "activated"
-  | "completed"
+  | "signed"
+  | "reconciled"
+  | "paid"
   | "cancelled"
   | "return_pending"
   | "partially_returned"
@@ -20,6 +22,8 @@ export type OrderStatus =
 
 export type OrderPaymentMode = "one_time" | "contract_36";
 export type ReturnType = "full" | "partial";
+export type ReturnKind = "normal" | "special";
+export type ReturnReasonCategory = "no_reason" | "quality" | "other";
 export type ReturnStatus = "requested" | "approved" | "rejected" | "completed";
 
 export interface OrderPermissions {
@@ -83,6 +87,8 @@ export interface ReturnRecordView {
   id: string;
   returnNo: string;
   type: ReturnType;
+  kind: ReturnKind;
+  reasonCategory: ReturnReasonCategory;
   status: ReturnStatus;
   reason: string;
   requestedById: string;
@@ -96,6 +102,7 @@ export interface ReturnRecordView {
 }
 
 export interface OrderDetail extends OrderSummary {
+  signedAt: string | null;
   customerAddress: string;
   fttrLabel: string;
   heartMonthlyFen: number;
@@ -123,6 +130,8 @@ export interface RequestReturnInput {
   orderId: string;
   orderVersion: number;
   type: ReturnType;
+  kind: ReturnKind;
+  reasonCategory: ReturnReasonCategory;
   items: Array<{ orderLineId: string; quantity: number }>;
   reason: string;
 }
@@ -136,7 +145,9 @@ export interface DecideReturnInput {
 export type OrderTransitionCommand =
   | "ACCEPT"
   | "ACTIVATE"
-  | "COMPLETE"
+  | "SIGN"
+  | "RECONCILE"
+  | "MARK_PAID"
   | "CANCEL";
 
 export interface TransitionOrderInput {
@@ -171,7 +182,9 @@ export const ORDER_STATUS_LABELS: Readonly<Record<OrderStatus, string>> = {
   pending: "待受理",
   accepted: "已受理",
   activated: "已生效",
-  completed: "已完成",
+  signed: "已签收",
+  reconciled: "已对账",
+  paid: "已收款",
   cancelled: "已取消",
   return_pending: "退单审批中",
   partially_returned: "已部分退单",
