@@ -79,11 +79,11 @@ describe("整单退单商品明细", () => {
     const list = screen.getByRole("region", { name: "整单退回商品" });
     expect(within(list).getByText("心连心·居家双护（套餐整套退回）")).toBeInTheDocument();
     expect(within(list).getByText("人体传感器")).toBeInTheDocument();
-    expect(screen.getByText("系统参考退款金额 ¥1,198.00")).toBeInTheDocument();
-    expect(screen.getByText(/仅供核对，不限制申请金额/)).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "申请退款金额（元）" })).not.toHaveAttribute("placeholder");
+    expect(screen.queryByText(/系统参考/)).not.toBeInTheDocument();
   });
 
-  it("月付商品展示一个计费月的退款参考金额且不作为限制", () => {
+  it("月付商品只要求填写申请退款金额", () => {
     render(
       <ReturnDialog
         open
@@ -106,8 +106,8 @@ describe("整单退单商品明细", () => {
       />,
     );
 
-    expect(screen.getByText("系统参考退款金额 ¥40.00")).toBeInTheDocument();
     expect(screen.getByRole("spinbutton", { name: "申请退款金额（元）" })).toBeInTheDocument();
+    expect(screen.queryByText(/系统参考/)).not.toBeInTheDocument();
   });
 
   it("退货退款超过7日自动切换为特殊处理并禁用普通处理", () => {

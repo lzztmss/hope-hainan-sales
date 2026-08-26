@@ -920,11 +920,13 @@
 
 .return-refund-summary {
   display: grid;
-  gap: var(--hfttr-space-1);
+  gap: var(--hfttr-space-3);
   padding: var(--hfttr-space-4);
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-left: 4px solid var(--app-color-primary);
   border-radius: var(--app-radius-control);
-  background: var(--app-color-primary-strong);
-  color: var(--app-color-text-inverse);
+  background: var(--app-color-surface-subtle);
+  color: var(--app-color-primary-strong);
 }
 
 .return-refund-summary strong {
@@ -932,7 +934,16 @@
 }
 
 .return-refund-summary small {
-  color: var(--app-color-text-inverse-muted);
+  color: var(--app-color-text-muted);
+  line-height: 1.6;
+}
+
+.return-refund-summary input {
+  min-height: 3.25rem;
+  border-color: var(--app-color-primary);
+  background: var(--app-color-surface);
+  font-size: var(--hfttr-font-size-lg);
+  font-weight: var(--app-font-weight-bold);
 }
 
 .return-dialog__actions {

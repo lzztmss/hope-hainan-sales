@@ -137,10 +137,6 @@ export const ReturnDialog = ({
     });
   }, [fullReturnLines, partial, returnableLines, type]);
 
-  const refundFen = selectedItems.reduce((total, item) => {
-    const line = order.lines.find((candidate) => candidate.id === item.orderLineId);
-    return total + (line?.refundableUnitFen ?? 0) * item.quantity;
-  }, 0);
   const requestedRefundFen = yuanToFen(requestedRefundYuan);
 
   if (!open) return null;
@@ -373,14 +369,11 @@ export const ReturnDialog = ({
 
           {serviceType === "refund" ? (
             <div className="return-refund-summary">
-              <strong>系统参考退款金额 {formatOrderMoney(refundFen)}</strong>
-              <small>仅供核对，不限制申请金额；审批和实际退款都会保留记录。</small>
-              {order.paymentMode === "contract_36" ? <small>月付订单只显示所选商品一个计费月的参考月费，系统不会按经过月份自动累加；请按实际业务填写申请金额。</small> : null}
               <label className="return-reason-field">
                 <span>申请退款金额（元）</span>
-                <input inputMode="decimal" min="0" onChange={(event) => { setRequestedRefundYuan(event.currentTarget.value); setError(null); }} placeholder="例如 50.00" step="0.01" type="number" value={requestedRefundYuan} />
+                <input inputMode="decimal" min="0" onChange={(event) => { setRequestedRefundYuan(event.currentTarget.value); setError(null); }} step="0.01" type="number" value={requestedRefundYuan} />
               </label>
-              {requestedRefundFen !== null && requestedRefundFen > refundFen ? <small role="status">申请金额高于系统参考金额，仍可提交，系统会在审批记录中标注。</small> : null}
+              <small>请按本次售后实际申请的退款金额填写，审批和最终退款都会保留记录。</small>
             </div>
           ) : (
             <div className="return-refund-summary"><strong>本申请不涉及退款</strong><small>换货完成后不会增加订单退款金额，也不会扣回销售提成。</small></div>

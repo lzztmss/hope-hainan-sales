@@ -151,7 +151,6 @@ const ReturnItems = ({ record }: { record: ReturnRecordDto }) => (
     {record.items.map((item) => (
       <li key={`${item.orderLineId}-${item.sku}`}>
         <strong>{item.label} ×{item.quantity}</strong>
-        <span>{record.serviceType === "refund" ? `参考 ${formatMoney(item.maxRefundFen)}` : "换货"}</span>
       </li>
     ))}
   </ul>
@@ -205,7 +204,7 @@ const ApprovalDialog = ({ actor, onClose, onDecide, record }: ApprovalDialogProp
             <strong>{afterSalesLabel(record)} · {RETURN_REASON_LABELS[record.reasonCategory]}</strong>
             <span>申请原因</span>
             <strong>{record.reason}</strong>
-            {record.serviceType === "refund" ? <><span>申请退款</span><strong>{formatMoney(record.requestedRefundFen)}</strong><span>系统参考</span><strong>{formatMoney(record.maxRefundFen)}（不限制申请金额）</strong></> : <><span>金额处理</span><strong>换货不涉及退款和提成扣回</strong></>}
+            {record.serviceType === "refund" ? <><span>申请退款金额</span><strong>{formatMoney(record.requestedRefundFen)}</strong></> : <><span>金额处理</span><strong>换货不涉及退款和提成扣回</strong></>}
           </div>
           {actor.role === "admin" && record.requestedBy === actor.id ? (
             <p className="returns-audit-note">管理员正在审批自己代客户提交的退单，本次自审会单独写入审计记录。</p>
@@ -286,7 +285,7 @@ const CompletionDialog = ({ onClose, onComplete, record }: CompletionDialogProps
           <button disabled={busy} onClick={onClose} type="button">关闭</button>
         </header>
         <div className="returns-dialog__body">
-          {record.serviceType === "refund" ? <><div className="returns-refund-limit"><span>申请退款 / 系统参考</span><strong>{formatMoney(record.requestedRefundFen)} / {formatMoney(record.maxRefundFen)}</strong></div><label>
+          {record.serviceType === "refund" ? <><div className="returns-refund-request"><span>申请退款金额</span><strong>{formatMoney(record.requestedRefundFen)}</strong></div><label className="returns-actual-refund-field">
             <span>实际退款金额（元）</span>
             <input
               disabled={busy}
@@ -295,10 +294,9 @@ const CompletionDialog = ({ onClose, onComplete, record }: CompletionDialogProps
                 setActualYuan(event.currentTarget.value);
                 setError(null);
               }}
-              placeholder="例如 800.00"
               value={actualYuan}
             />
-          </label>{yuanToFen(actualYuan) !== null && (yuanToFen(actualYuan)! > record.requestedRefundFen || yuanToFen(actualYuan)! > record.maxRefundFen) ? <p className="returns-audit-note">实际退款高于申请金额或系统参考金额，仍可完成；系统会将差异写入审计记录。</p> : null}<p className="returns-audit-note">实际退款金额由经办人按业务结果填写，不受系统参考金额限制。退货完成后，提成按退回商品的原提成快照扣回。</p></> : <p className="returns-audit-note">请确认换货已经实际完成。该操作不会产生退款，不会改变订单退款金额，也不会扣回销售提成。</p>}
+          </label>{yuanToFen(actualYuan) !== null && yuanToFen(actualYuan)! > record.requestedRefundFen ? <p className="returns-form-warning">实际退款金额高于申请退款金额，确认后会将差异写入审计记录。</p> : null}<p className="returns-dialog-guidance">请按最终实际退给客户的金额填写。退货完成后，系统会按退回商品的原提成快照扣回提成。</p></> : <p className="returns-dialog-guidance">请确认换货已经实际完成。该操作不会产生退款，不会改变订单退款金额，也不会扣回销售提成。</p>}
           {error ? <p className="returns-form-error" role="alert">{error}</p> : null}
         </div>
         <footer>
@@ -454,7 +452,7 @@ export const ReturnManagementPage = ({
                 <td><strong>{record.returnNo}</strong><Link className="returns-order-link" to={`/orders/${record.orderId}`}>原订单 {record.orderNo}</Link><small>{afterSalesLabel(record)} · {record.returnType === "full" ? "整单" : "部分商品"}</small></td>
                 <td><strong>申请人 ID：{record.requestedBy}</strong><span>{formatDateTime(record.requestedAt)}</span></td>
                 <td><small>{RETURN_REASON_LABELS[record.reasonCategory]}</small><p>{record.reason}</p><ReturnItems record={record} /></td>
-                <td>{record.serviceType === "refund" ? <><strong>申请退款 {formatMoney(record.requestedRefundFen)}</strong><small>系统参考 {formatMoney(record.maxRefundFen)}，不限制填写</small>{record.status === "completed" ? <span>实际退款 {formatMoney(record.refundFen)}</span> : null}</> : <><strong>换货不涉及退款</strong><small>不扣回提成</small></>}</td>
+                <td>{record.serviceType === "refund" ? <><strong>申请退款 {formatMoney(record.requestedRefundFen)}</strong>{record.status === "completed" ? <span>实际退款 {formatMoney(record.refundFen)}</span> : null}</> : <><strong>换货不涉及退款</strong><small>不扣回提成</small></>}</td>
                 <td><ReturnStatusBadge record={record} /></td>
                 <td>{actionFor(record)}</td>
               </tr>
@@ -471,7 +469,7 @@ export const ReturnManagementPage = ({
               <div className="returns-mobile-meta"><Link className="returns-order-link" to={`/orders/${record.orderId}`}>原订单 {record.orderNo}</Link><span>申请人 ID：{record.requestedBy}</span><span>{formatDateTime(record.requestedAt)}</span></div>
               <p>{RETURN_REASON_LABELS[record.reasonCategory]}：{record.reason}</p>
               <ReturnItems record={record} />
-              <div className="returns-mobile-amount">{record.serviceType === "refund" ? <><strong>申请退款 {formatMoney(record.requestedRefundFen)}</strong><small>系统参考 {formatMoney(record.maxRefundFen)}</small>{record.status === "completed" ? <span>实际退款 {formatMoney(record.refundFen)}</span> : null}</> : <><strong>换货不涉及退款</strong><small>不扣回提成</small></>}</div>
+              <div className="returns-mobile-amount">{record.serviceType === "refund" ? <><strong>申请退款 {formatMoney(record.requestedRefundFen)}</strong>{record.status === "completed" ? <span>实际退款 {formatMoney(record.refundFen)}</span> : null}</> : <><strong>换货不涉及退款</strong><small>不扣回提成</small></>}</div>
               <footer>{actionFor(record)}</footer>
             </article>
           </li>

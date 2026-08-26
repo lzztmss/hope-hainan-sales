@@ -243,7 +243,7 @@ const ReturnCompletion = ({
 
   return (
     <section className="return-completion" aria-label={`售后 ${record.returnNo} ${record.serviceType === "refund" ? "完成退款" : "完成换货"}`}>
-      {record.serviceType === "refund" ? <><p>申请退款 {formatOrderMoney(record.requestedRefundFen)} · 系统参考 {formatOrderMoney(record.maxRefundFen)}</p><label>
+      {record.serviceType === "refund" ? <><p>申请退款金额 {formatOrderMoney(record.requestedRefundFen)}</p><label>
         <span>实际退款金额（元）</span>
         <input
           disabled={busy}
@@ -252,10 +252,9 @@ const ReturnCompletion = ({
             setActualYuan(event.currentTarget.value);
             setError(null);
           }}
-          placeholder="例如 599.00"
           value={actualYuan}
         />
-      </label>{yuanToFen(actualYuan) !== null && (yuanToFen(actualYuan)! > record.requestedRefundFen || yuanToFen(actualYuan)! > record.maxRefundFen) ? <p className="return-completion__note">实际金额高于申请金额或系统参考金额，仍可完成，差异会写入审计记录。</p> : null}<p className="return-completion__note">系统参考金额不构成限制。提成按退回商品的原提成快照扣回，与实际退款金额分别核算。</p></> : <p className="return-completion__note">请确认商品已经完成更换。换货不产生退款，不改变订单退款金额，也不扣回提成。</p>}
+      </label>{yuanToFen(actualYuan) !== null && yuanToFen(actualYuan)! > record.requestedRefundFen ? <p className="return-completion__note">实际退款金额高于申请退款金额，确认后会将差异写入审计记录。</p> : null}<p className="return-completion__note">请按最终实际退给客户的金额填写。提成按退回商品的原提成快照扣回。</p></> : <p className="return-completion__note">请确认商品已经完成更换。换货不产生退款，不改变订单退款金额，也不扣回提成。</p>}
       {error ? <p className="order-form-error" role="alert">{error}</p> : null}
       <div>
         <button disabled={busy} onClick={() => setOpen(false)} type="button">取消</button>
@@ -554,7 +553,7 @@ export const OrderDetailPage = ({
                     {record.items.map((item) => (
                       <li key={item.orderLineId}>
                         <strong>{item.label} × {item.quantity}</strong>
-                        <small>{record.serviceType === "refund" ? `系统参考 ${formatOrderMoney(item.refundFen)}` : "换货"}</small>
+                        {record.serviceType === "exchange" ? <small>换货</small> : null}
                       </li>
                     ))}
                   </ul>
@@ -564,7 +563,7 @@ export const OrderDetailPage = ({
                     ? "换货不涉及退款和提成扣回"
                     : record.status === "completed"
                       ? `实际退款 ${formatOrderMoney(record.refundFen)}`
-                      : `申请退款 ${formatOrderMoney(record.requestedRefundFen)} · 系统参考 ${formatOrderMoney(record.maxRefundFen)}`}
+                      : `申请退款 ${formatOrderMoney(record.requestedRefundFen)}`}
                 </strong>
                 <ReturnApproval
                   onDecideReturn={onDecideReturn}
