@@ -7,7 +7,7 @@ import type {
 } from "../api/client";
 import { PageLayout } from "../components/layout";
 import { Pagination } from "../components/Pagination";
-import type { ReturnStatus } from "../orders/types";
+import type { AfterSalesServiceType, ReturnKind, ReturnStatus } from "../orders/types";
 import type {
   CompleteManagedReturnInput,
   DecideManagedReturnInput,
@@ -21,9 +21,13 @@ export interface ReturnManagementPageProps {
   total?: number;
   onPageChange?(page: number): void;
   status?: ReturnStatus | "";
+  serviceType?: AfterSalesServiceType | "";
+  returnKind?: ReturnKind | "";
   loading?: boolean;
   loadError?: string | null;
   onStatusChange?(status: ReturnStatus | ""): void;
+  onServiceTypeChange?(serviceType: AfterSalesServiceType | ""): void;
+  onReturnKindChange?(returnKind: ReturnKind | ""): void;
   onStoreChange?(storeId: string): void;
   onSellerChange?(sellerId: string): void;
   storeId?: string;
@@ -39,7 +43,7 @@ const RETURN_STATUS_LABELS: Readonly<Record<ReturnStatus, string>> = {
   requested: "待审批",
   approved: "已同意",
   rejected: "已驳回",
-  completed: "已完成退款",
+  completed: "已完成",
 };
 
 const formatMoney = (fen: number): string =>
@@ -79,13 +83,11 @@ const reviewerRole = (actor: AuthenticatedUser): boolean =>
 const globalDataRole = (actor: AuthenticatedUser): boolean =>
   actor.role === "admin" || actor.role === "hr" || actor.role === "finance";
 
-const RETURN_KIND_LABELS = {
-  normal: "普通退货",
-  special: "特殊退款",
-} as const;
+const afterSalesLabel = (record: Pick<ReturnRecordDto, "serviceType" | "returnKind">): string =>
+  `${record.returnKind === "special" ? "特殊" : "普通"}${record.serviceType === "refund" ? "退货退款" : "换货"}`;
 
 const RETURN_REASON_LABELS = {
-  no_reason: "无理由退货",
+  no_reason: "无理由退货（仅限线上销售）",
   quality: "产品质量问题",
   other: "其他业务原因",
 } as const;
@@ -114,7 +116,7 @@ const RecordAction = ({
   if (record.status === "requested") {
     return (
       <button
-        aria-label={`审批退单 ${record.returnNo}`}
+        aria-label={`审批售后 ${record.returnNo}`}
         className="returns-primary-button"
         onClick={() => onOpenApproval(record)}
         type="button"
@@ -126,21 +128,21 @@ const RecordAction = ({
   if (record.status === "approved") {
     return (
       <button
-        aria-label={`确认退款 ${record.returnNo}`}
+        aria-label={`${record.serviceType === "refund" ? "确认退款" : "确认换货完成"} ${record.returnNo}`}
         className="returns-primary-button"
         onClick={() => onOpenCompletion(record)}
         type="button"
       >
-        确认退款
+        {record.serviceType === "refund" ? "确认退款" : "确认换货完成"}
       </button>
     );
   }
   return <span className="returns-no-action">无待办操作</span>;
 };
 
-const ReturnStatusBadge = ({ kind, status }: { kind: ReturnRecordDto["returnKind"]; status: ReturnStatus }) => (
-  <span className={`returns-status is-${status}`}>
-    {kind === "special" ? `特殊退款${RETURN_STATUS_LABELS[status]}` : RETURN_STATUS_LABELS[status]}
+const ReturnStatusBadge = ({ record }: { record: ReturnRecordDto }) => (
+  <span className={`returns-status is-${record.status}`}>
+    {record.returnKind === "special" ? `${afterSalesLabel(record)}${RETURN_STATUS_LABELS[record.status]}` : record.serviceType === "exchange" && record.status === "completed" ? "换货已完成" : RETURN_STATUS_LABELS[record.status]}
   </span>
 );
 
@@ -149,7 +151,7 @@ const ReturnItems = ({ record }: { record: ReturnRecordDto }) => (
     {record.items.map((item) => (
       <li key={`${item.orderLineId}-${item.sku}`}>
         <strong>{item.label} ×{item.quantity}</strong>
-        <span>{formatMoney(item.maxRefundFen)}</span>
+        <span>{record.serviceType === "refund" ? `参考 ${formatMoney(item.maxRefundFen)}` : "换货"}</span>
       </li>
     ))}
   </ul>
@@ -179,7 +181,7 @@ const ApprovalDialog = ({ actor, onClose, onDecide, record }: ApprovalDialogProp
       await onDecide({ returnId: record.id, decision, note: normalized });
       onClose();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "退单审批失败，请重试");
+      setError(reason instanceof Error ? reason.message : "售后审批失败，请重试");
     } finally {
       setBusy(false);
     }
@@ -188,22 +190,22 @@ const ApprovalDialog = ({ actor, onClose, onDecide, record }: ApprovalDialogProp
   return (
     <div className="returns-dialog-backdrop">
       <section
-        aria-label={`审批退单 ${record.returnNo}`}
+        aria-label={`审批售后 ${record.returnNo}`}
         aria-modal="true"
         className="returns-dialog"
         role="dialog"
       >
         <header>
-          <div><span>{record.returnNo}</span><h2>审批退单</h2></div>
+          <div><span>{record.returnNo}</span><h2>审批{afterSalesLabel(record)}</h2></div>
           <button disabled={busy} onClick={onClose} type="button">关闭</button>
         </header>
         <div className="returns-dialog__body">
           <div className="returns-dialog-summary">
             <span>业务类型</span>
-            <strong>{RETURN_KIND_LABELS[record.returnKind]} · {RETURN_REASON_LABELS[record.reasonCategory]}</strong>
+            <strong>{afterSalesLabel(record)} · {RETURN_REASON_LABELS[record.reasonCategory]}</strong>
             <span>申请原因</span>
             <strong>{record.reason}</strong>
-            <span>最高可退 {formatMoney(record.maxRefundFen)}</span>
+            {record.serviceType === "refund" ? <><span>申请退款</span><strong>{formatMoney(record.requestedRefundFen)}</strong><span>系统参考</span><strong>{formatMoney(record.maxRefundFen)}（不限制申请金额）</strong></> : <><span>金额处理</span><strong>换货不涉及退款和提成扣回</strong></>}
           </div>
           {actor.role === "admin" && record.requestedBy === actor.id ? (
             <p className="returns-audit-note">管理员正在审批自己代客户提交的退单，本次自审会单独写入审计记录。</p>
@@ -226,7 +228,7 @@ const ApprovalDialog = ({ actor, onClose, onDecide, record }: ApprovalDialogProp
         </div>
         <footer>
           <button disabled={busy} onClick={() => void submit("rejected")} type="button">
-            {busy ? "正在提交…" : "驳回退单"}
+            {busy ? "正在提交…" : "驳回申请"}
           </button>
           <button
             className="returns-primary-button"
@@ -234,7 +236,7 @@ const ApprovalDialog = ({ actor, onClose, onDecide, record }: ApprovalDialogProp
             onClick={() => void submit("approved")}
             type="button"
           >
-            {busy ? "正在提交…" : "同意退单"}
+            {busy ? "正在提交…" : "同意申请"}
           </button>
         </footer>
       </section>
@@ -254,13 +256,9 @@ const CompletionDialog = ({ onClose, onComplete, record }: CompletionDialogProps
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
-    const refundFen = yuanToFen(actualYuan);
+    const refundFen = record.serviceType === "exchange" ? 0 : yuanToFen(actualYuan);
     if (refundFen === null) {
       setError("请输入正确的实际退款金额，最多保留两位小数");
-      return;
-    }
-    if (refundFen > record.maxRefundFen) {
-      setError("实际退款金额不能超过最高可退金额");
       return;
     }
     setBusy(true);
@@ -269,7 +267,7 @@ const CompletionDialog = ({ onClose, onComplete, record }: CompletionDialogProps
       await onComplete({ returnId: record.id, refundFen });
       onClose();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "退款确认失败，请重试");
+      setError(reason instanceof Error ? reason.message : `${record.serviceType === "refund" ? "退款" : "换货"}确认失败，请重试`);
     } finally {
       setBusy(false);
     }
@@ -278,21 +276,17 @@ const CompletionDialog = ({ onClose, onComplete, record }: CompletionDialogProps
   return (
     <div className="returns-dialog-backdrop">
       <section
-        aria-label={`确认退款 ${record.returnNo}`}
+        aria-label={`${record.serviceType === "refund" ? "确认退款" : "确认换货完成"} ${record.returnNo}`}
         aria-modal="true"
         className="returns-dialog"
         role="dialog"
       >
         <header>
-          <div><span>{record.returnNo}</span><h2>确认实际退款</h2></div>
+          <div><span>{record.returnNo}</span><h2>{record.serviceType === "refund" ? "确认实际退款" : "确认换货完成"}</h2></div>
           <button disabled={busy} onClick={onClose} type="button">关闭</button>
         </header>
         <div className="returns-dialog__body">
-          <div className="returns-refund-limit">
-            <span>最高可退</span>
-            <strong>{formatMoney(record.maxRefundFen)}</strong>
-          </div>
-          <label>
+          {record.serviceType === "refund" ? <><div className="returns-refund-limit"><span>申请退款 / 系统参考</span><strong>{formatMoney(record.requestedRefundFen)} / {formatMoney(record.maxRefundFen)}</strong></div><label>
             <span>实际退款金额（元）</span>
             <input
               disabled={busy}
@@ -304,10 +298,7 @@ const CompletionDialog = ({ onClose, onComplete, record }: CompletionDialogProps
               placeholder="例如 800.00"
               value={actualYuan}
             />
-          </label>
-          <p className="returns-audit-note">
-            此处只填写实际退给客户的金额，不是销售提成。确认后，系统会按本次退回商品及其原提成快照自动扣回销售提成；即使客户退款为 0 元，提成仍可能发生扣回。
-          </p>
+          </label>{yuanToFen(actualYuan) !== null && (yuanToFen(actualYuan)! > record.requestedRefundFen || yuanToFen(actualYuan)! > record.maxRefundFen) ? <p className="returns-audit-note">实际退款高于申请金额或系统参考金额，仍可完成；系统会将差异写入审计记录。</p> : null}<p className="returns-audit-note">实际退款金额由经办人按业务结果填写，不受系统参考金额限制。退货完成后，提成按退回商品的原提成快照扣回。</p></> : <p className="returns-audit-note">请确认换货已经实际完成。该操作不会产生退款，不会改变订单退款金额，也不会扣回销售提成。</p>}
           {error ? <p className="returns-form-error" role="alert">{error}</p> : null}
         </div>
         <footer>
@@ -318,7 +309,7 @@ const CompletionDialog = ({ onClose, onComplete, record }: CompletionDialogProps
             onClick={() => void submit()}
             type="button"
           >
-            {busy ? "正在确认…" : "确认完成退款"}
+            {busy ? "正在确认…" : record.serviceType === "refund" ? "确认完成退款" : "确认换货完成"}
           </button>
         </footer>
       </section>
@@ -335,6 +326,8 @@ export const ReturnManagementPage = ({
   onDecide,
   onReload,
   onStatusChange,
+  onServiceTypeChange,
+  onReturnKindChange,
   onStoreChange,
   onSellerChange,
   storeId = "",
@@ -342,12 +335,50 @@ export const ReturnManagementPage = ({
   stores = [],
   sellers = [],
   status = "",
+  serviceType = "",
+  returnKind = "",
   page = 1,
   total = items.length,
   onPageChange,
 }: ReturnManagementPageProps) => {
   const [approval, setApproval] = useState<ReturnRecordDto | null>(null);
   const [completion, setCompletion] = useState<ReturnRecordDto | null>(null);
+  const [draftStatus, setDraftStatus] = useState(status);
+  const [draftServiceType, setDraftServiceType] = useState(serviceType);
+  const [draftReturnKind, setDraftReturnKind] = useState(returnKind);
+  const [draftStoreId, setDraftStoreId] = useState(storeId);
+  const [draftSellerId, setDraftSellerId] = useState(sellerId);
+
+  useEffect(() => {
+    setDraftStatus(status);
+    setDraftServiceType(serviceType);
+    setDraftReturnKind(returnKind);
+    setDraftStoreId(storeId);
+    setDraftSellerId(sellerId);
+  }, [returnKind, sellerId, serviceType, status, storeId]);
+
+  const applyFilters = () => {
+    onStatusChange?.(draftStatus);
+    onServiceTypeChange?.(draftServiceType);
+    onReturnKindChange?.(draftReturnKind);
+    onStoreChange?.(draftStoreId);
+    onSellerChange?.(draftSellerId);
+    onReload?.();
+  };
+
+  const resetFilters = () => {
+    setDraftStatus("");
+    setDraftServiceType("");
+    setDraftReturnKind("");
+    setDraftStoreId("");
+    setDraftSellerId("");
+    onStatusChange?.("");
+    onServiceTypeChange?.("");
+    onReturnKindChange?.("");
+    onStoreChange?.("");
+    onSellerChange?.("");
+    onReload?.();
+  };
 
   useEffect(() => {
     if (!approval && !completion) return;
@@ -377,17 +408,17 @@ export const ReturnManagementPage = ({
           刷新数据
         </button>
       ) : null}
-      description={globalDataRole(actor) ? "查看全部营业厅退单；人力资源和财务仅查看，实际退单仍由业务管理人员处理。" : actor.role === "regional_manager" ? "查看所管营业厅退单，并处理退单审批与实际退款。" : "查看本营业厅退单，审批后按实际金额确认退款。"}
+      description={globalDataRole(actor) ? "查看全部营业厅售后；人力资源和财务仅查看，审批和完成仍由业务管理人员处理。" : actor.role === "regional_manager" ? "查看所管营业厅售后，并处理退货退款或换货审批。" : "查看本营业厅售后，分别处理退货退款与换货。"}
       eyebrow="订单管理"
-      title="退单管理"
+      title="售后管理"
     >
-      <section className="returns-toolbar" aria-label="退单筛选">
+      <section className="returns-toolbar" aria-label="售后筛选">
         <label>
-          <span>退单状态</span>
+          <span>售后状态</span>
           <select
             disabled={loading}
-            onChange={(event) => onStatusChange?.(event.currentTarget.value as ReturnStatus | "")}
-            value={status}
+            onChange={(event) => setDraftStatus(event.currentTarget.value as ReturnStatus | "")}
+            value={draftStatus}
           >
             <option value="">全部状态</option>
             {(Object.entries(RETURN_STATUS_LABELS) as Array<[ReturnStatus, string]>).map(
@@ -395,33 +426,36 @@ export const ReturnManagementPage = ({
             )}
           </select>
         </label>
-        {globalDataRole(actor) || actor.role === "regional_manager" ? <label><span>营业厅</span><select disabled={loading} value={storeId} onChange={(event) => onStoreChange?.(event.currentTarget.value)}><option value="">全部营业厅</option>{stores.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
-        <label><span>销售员</span><select disabled={loading} value={sellerId} onChange={(event) => onSellerChange?.(event.currentTarget.value)}><option value="">全部可见销售员</option>{sellers.filter((option) => !storeId || option.storeId === storeId).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>
-        <p><strong>{items.length}</strong> 笔退单</p>
+        <label><span>售后方式</span><select disabled={loading} value={draftServiceType} onChange={(event) => setDraftServiceType(event.currentTarget.value as AfterSalesServiceType | "")}><option value="">全部方式</option><option value="refund">退货退款</option><option value="exchange">换货</option></select></label>
+        <label><span>处理类型</span><select disabled={loading} value={draftReturnKind} onChange={(event) => setDraftReturnKind(event.currentTarget.value as ReturnKind | "")}><option value="">全部类型</option><option value="normal">普通处理</option><option value="special">特殊处理</option></select></label>
+        {globalDataRole(actor) || actor.role === "regional_manager" ? <label><span>营业厅</span><select disabled={loading} value={draftStoreId} onChange={(event) => { setDraftStoreId(event.currentTarget.value); setDraftSellerId(""); }}><option value="">全部营业厅</option>{stores.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
+        <label><span>销售员</span><select disabled={loading} value={draftSellerId} onChange={(event) => setDraftSellerId(event.currentTarget.value)}><option value="">全部可见销售员</option>{sellers.filter((option) => !draftStoreId || option.storeId === draftStoreId).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>
+        <div className="returns-toolbar__actions"><button className="returns-primary-button" disabled={loading} onClick={applyFilters} type="button">查询</button><button disabled={loading} onClick={resetFilters} type="button">重置</button></div>
+        <p><strong>{total}</strong> 笔售后</p>
       </section>
 
       {loadError ? (
         <section className="returns-state is-error" role="alert">
-          <div><strong>暂时无法读取退单</strong><span>{loadError}</span></div>
+          <div><strong>暂时无法读取售后记录</strong><span>{loadError}</span></div>
           {onReload ? <button onClick={onReload} type="button">重新加载</button> : null}
         </section>
       ) : null}
-      {loading ? <p className="returns-loading" role="status">正在读取退单…</p> : null}
+      {loading ? <p className="returns-loading" role="status">正在读取售后记录…</p> : null}
       {!loading && !loadError && items.length === 0 ? (
-        <section className="returns-state"><strong>暂无符合条件的退单</strong><span>可切换状态后重新查询。</span></section>
+        <section className="returns-state"><strong>暂无符合条件的售后记录</strong><span>可调整筛选条件后重新查询。</span></section>
       ) : null}
 
       <div className="returns-table-shell">
-        <table aria-label="退单列表" className="returns-desktop-table">
-          <thead><tr><th>退单与订单</th><th>申请信息</th><th>原因与商品</th><th>退款金额</th><th>状态</th><th><span className="returns-visually-hidden">操作</span></th></tr></thead>
+        <table aria-label="售后列表" className="returns-desktop-table">
+          <thead><tr><th>售后与订单</th><th>申请信息</th><th>原因与商品</th><th>金额信息</th><th>状态</th><th><span className="returns-visually-hidden">操作</span></th></tr></thead>
           <tbody>
             {items.map((record) => (
               <tr key={record.id}>
-                <td><strong>{record.returnNo}</strong><Link className="returns-order-link" to={`/orders/${record.orderId}`}>原订单 {record.orderNo}</Link><small>{RETURN_KIND_LABELS[record.returnKind]} · {record.returnType === "full" ? "整单退单" : "部分退单"}</small></td>
+                <td><strong>{record.returnNo}</strong><Link className="returns-order-link" to={`/orders/${record.orderId}`}>原订单 {record.orderNo}</Link><small>{afterSalesLabel(record)} · {record.returnType === "full" ? "整单" : "部分商品"}</small></td>
                 <td><strong>申请人 ID：{record.requestedBy}</strong><span>{formatDateTime(record.requestedAt)}</span></td>
                 <td><small>{RETURN_REASON_LABELS[record.reasonCategory]}</small><p>{record.reason}</p><ReturnItems record={record} /></td>
-                <td><strong>最高可退 {formatMoney(record.maxRefundFen)}</strong><small>按申请时订单计价及本计费月收费快照核算</small>{record.status === "completed" ? <span>实际已退 {formatMoney(record.refundFen)}</span> : null}</td>
-                <td><ReturnStatusBadge kind={record.returnKind} status={record.status} /></td>
+                <td>{record.serviceType === "refund" ? <><strong>申请退款 {formatMoney(record.requestedRefundFen)}</strong><small>系统参考 {formatMoney(record.maxRefundFen)}，不限制填写</small>{record.status === "completed" ? <span>实际退款 {formatMoney(record.refundFen)}</span> : null}</> : <><strong>换货不涉及退款</strong><small>不扣回提成</small></>}</td>
+                <td><ReturnStatusBadge record={record} /></td>
                 <td>{actionFor(record)}</td>
               </tr>
             ))}
@@ -429,15 +463,15 @@ export const ReturnManagementPage = ({
         </table>
       </div>
 
-      <ul aria-label="移动端退单列表" className="returns-mobile-list">
+      <ul aria-label="移动端售后列表" className="returns-mobile-list">
         {items.map((record) => (
           <li key={record.id}>
             <article className="returns-mobile-card">
-              <header><div><span>{RETURN_KIND_LABELS[record.returnKind]} · {record.returnType === "full" ? "整单退单" : "部分退单"}</span><strong>{record.returnNo}</strong></div><ReturnStatusBadge kind={record.returnKind} status={record.status} /></header>
+              <header><div><span>{afterSalesLabel(record)} · {record.returnType === "full" ? "整单" : "部分商品"}</span><strong>{record.returnNo}</strong></div><ReturnStatusBadge record={record} /></header>
               <div className="returns-mobile-meta"><Link className="returns-order-link" to={`/orders/${record.orderId}`}>原订单 {record.orderNo}</Link><span>申请人 ID：{record.requestedBy}</span><span>{formatDateTime(record.requestedAt)}</span></div>
               <p>{RETURN_REASON_LABELS[record.reasonCategory]}：{record.reason}</p>
               <ReturnItems record={record} />
-              <div className="returns-mobile-amount"><strong>最高可退 {formatMoney(record.maxRefundFen)}</strong><small>按申请时订单计价及本计费月收费快照核算</small>{record.status === "completed" ? <span>实际已退 {formatMoney(record.refundFen)}</span> : null}</div>
+              <div className="returns-mobile-amount">{record.serviceType === "refund" ? <><strong>申请退款 {formatMoney(record.requestedRefundFen)}</strong><small>系统参考 {formatMoney(record.maxRefundFen)}</small>{record.status === "completed" ? <span>实际退款 {formatMoney(record.refundFen)}</span> : null}</> : <><strong>换货不涉及退款</strong><small>不扣回提成</small></>}</div>
               <footer>{actionFor(record)}</footer>
             </article>
           </li>

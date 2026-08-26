@@ -19,6 +19,7 @@
 
 .returns-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: end;
   justify-content: flex-start;
   gap: var(--hfttr-space-4);
@@ -39,8 +40,8 @@
 }
 
 .returns-toolbar label {
-  flex: 0 1 18rem;
-  min-width: 12rem;
+  flex: 1 1 13rem;
+  min-width: 11rem;
 }
 
 .returns-toolbar select,
@@ -75,6 +76,7 @@
 }
 
 .returns-toolbar p {
+  flex: 0 0 auto;
   margin: 0 0 0 auto;
   color: var(--app-color-text-muted);
 }
@@ -82,6 +84,12 @@
 .returns-toolbar p strong {
   color: var(--app-color-primary-strong);
   font-size: var(--hfttr-font-size-xl);
+}
+
+.returns-toolbar__actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--hfttr-space-2);
 }
 
 .returns-toolbar button,
@@ -495,6 +503,14 @@
 
   .returns-toolbar label {
     width: 100%;
+  }
+
+  .returns-toolbar__actions {
+    width: 100%;
+  }
+
+  .returns-toolbar__actions button {
+    flex: 1;
   }
 }
 

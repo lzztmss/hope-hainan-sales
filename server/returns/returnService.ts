@@ -65,6 +65,7 @@ export interface ReturnRequestRecord {
   idempotencyKey: string;
   completionIdempotencyKey: string | null;
   orderId: string;
+  serviceType: "refund" | "exchange";
   returnType: "full" | "partial";
   returnKind: "normal" | "special";
   reasonCategory: "no_reason" | "quality" | "other";
@@ -78,6 +79,7 @@ export interface ReturnRequestRecord {
   decisionNote: string | null;
   completedBy: string | null;
   completedAt: Date | null;
+  requestedRefundFen: number;
   refundFen: number;
   maxRefundFen: number;
   items: ReturnItemRecord[];
@@ -87,6 +89,7 @@ export interface ReturnRequestWrite {
   returnNo: string;
   idempotencyKey: string;
   orderId: string;
+  serviceType: "refund" | "exchange";
   returnType: "full" | "partial";
   returnKind: "normal" | "special";
   reasonCategory: "no_reason" | "quality" | "other";
@@ -94,6 +97,7 @@ export interface ReturnRequestWrite {
   reason: string;
   requestedBy: string;
   requestedAt: Date;
+  requestedRefundFen: number;
   maxRefundFen: number;
   items: ReturnItemRecord[];
 }
@@ -136,7 +140,7 @@ export interface ReturnRepository {
   findRequestById(id: string): Promise<ReturnRequestRecord | null>;
   listRequests(
     scope: UserScope,
-    filters: { orderId?: string; status?: ReturnRequestStatus; storeId?: string; sellerId?: string },
+    filters: { orderId?: string; status?: ReturnRequestStatus; serviceType?: "refund" | "exchange"; returnKind?: "normal" | "special"; storeId?: string; sellerId?: string },
     paging?: { page: number; pageSize: number },
   ): Promise<{ items: ReturnRequestRecord[]; total: number }>;
   saveDecision(
@@ -165,9 +169,11 @@ export interface ReturnServiceOptions {
 }
 
 export interface RequestReturnInput {
+  serviceType?: "refund" | "exchange";
   type: "full" | "partial";
   kind?: "normal" | "special";
   reasonCategory?: "no_reason" | "quality" | "other";
+  requestedRefundFen?: number;
   reason: string;
   items: readonly { orderLineId: string; quantity: number }[];
 }
@@ -247,13 +253,13 @@ const buildItems = (
           }))
       : [...input.items];
 
-  if (selections.length === 0) throw new Error("请选择至少一项退货商品");
+  if (selections.length === 0) throw new Error("请选择至少一项售后商品");
   const seen = new Set<string>();
   return selections.map((selection) => {
-    if (seen.has(selection.orderLineId)) throw new Error("退货商品不能重复");
+    if (seen.has(selection.orderLineId)) throw new Error("售后商品不能重复");
     seen.add(selection.orderLineId);
     const line = order.lines.find((entry) => entry.id === selection.orderLineId);
-    if (!line) throw new Error("退货商品不存在");
+    if (!line) throw new Error("售后商品不存在");
     if (line.lineType !== "charge") {
       throw new Error("套装内部物理设备不能单独退");
     }
@@ -288,7 +294,7 @@ export const createReturnService = (options: ReturnServiceOptions) => {
   return {
     async listReturns(
       actor: AuthenticatedUser,
-      filters: { status?: ReturnRequestStatus; storeId?: string; sellerId?: string; page?: number; pageSize?: number } = {},
+      filters: { status?: ReturnRequestStatus; serviceType?: "refund" | "exchange"; returnKind?: "normal" | "special"; storeId?: string; sellerId?: string; page?: number; pageSize?: number } = {},
     ) {
       const page = filters.page ?? 1;
       const pageSize = filters.pageSize ?? 20;
@@ -336,15 +342,30 @@ export const createReturnService = (options: ReturnServiceOptions) => {
         );
         const requestedAt = now();
         const elapsedDays = daysAfterSigning(order.signedAt, requestedAt);
+        const serviceType = input.serviceType ?? "refund";
         const returnKind = input.kind ?? "normal";
         const reasonCategory = input.reasonCategory ?? "other";
-        if (elapsedDays > 15 && returnKind !== "special") {
-          throw new Error("订单签收已超过15日，请改为特殊退款申请");
+        const requestedRefundFen = input.requestedRefundFen ?? 0;
+        if (!Number.isSafeInteger(requestedRefundFen) || requestedRefundFen < 0) {
+          throw new Error("申请退款金额不正确");
+        }
+        if (serviceType === "exchange" && requestedRefundFen !== 0) {
+          throw new Error("换货申请不能填写退款金额");
+        }
+        if (returnKind === "normal" && serviceType === "refund" && elapsedDays > 7) {
+          throw new Error("订单签收已超过7日，请改为特殊退货退款申请");
+        }
+        if (returnKind === "normal" && serviceType === "exchange" && elapsedDays > 15) {
+          throw new Error("订单签收已超过15日，请改为特殊换货申请");
+        }
+        if (returnKind === "normal" && serviceType === "exchange" && reasonCategory !== "quality") {
+          throw new Error("普通换货仅适用于产品质量问题");
         }
         const created = await repository.createRequest({
           returnNo: `XLX-RT-${shanghaiDate(requestedAt)}-${numberSuffix()}`,
           idempotencyKey,
           orderId,
+          serviceType,
           returnType: input.type,
           returnKind,
           reasonCategory,
@@ -352,6 +373,7 @@ export const createReturnService = (options: ReturnServiceOptions) => {
           reason,
           requestedBy: actor.id,
           requestedAt,
+          requestedRefundFen,
           maxRefundFen,
           items,
         });
@@ -363,10 +385,12 @@ export const createReturnService = (options: ReturnServiceOptions) => {
           action: "return.request",
           afterSnapshot: {
             returnNo: created.returnNo,
+            serviceType: created.serviceType,
             type: created.returnType,
             kind: created.returnKind,
             reasonCategory: created.reasonCategory,
             signedElapsedDays: elapsedDays,
+            requestedRefundFen: created.requestedRefundFen,
             status: created.status,
             maxRefundFen: created.maxRefundFen,
             items: created.items,
@@ -435,7 +459,9 @@ export const createReturnService = (options: ReturnServiceOptions) => {
       const existing =
         await options.repository.findByCompletionIdempotencyKey(idempotencyKey);
       if (existing) {
-        await options.commissionReversal.reverseForCompletedReturn(existing);
+        if (existing.serviceType === "refund") {
+          await options.commissionReversal.reverseForCompletedReturn(existing);
+        }
         return existing;
       }
 
@@ -449,21 +475,22 @@ export const createReturnService = (options: ReturnServiceOptions) => {
       if (requestForValidation.status !== "approved") {
         throw new Error("只能完成已审批的退单");
       }
-      if (
-        !Number.isSafeInteger(refundFen) ||
-        refundFen < 0 ||
-        refundFen > requestForValidation.maxRefundFen
-      ) {
-        throw new Error("退款金额不能超过可退金额");
+      if (!Number.isSafeInteger(refundFen) || refundFen < 0) {
+        throw new Error("实际退款金额不正确");
+      }
+      if (requestForValidation.serviceType === "exchange" && refundFen !== 0) {
+        throw new Error("换货完成不应填写退款金额");
       }
       const completedAt = now();
-      await options.commissionReversal.validateReversalForCompletedReturn({
-        ...requestForValidation,
-        status: "completed",
-        completedBy: actor.id,
-        completedAt,
-        refundFen,
-      });
+      if (requestForValidation.serviceType === "refund") {
+        await options.commissionReversal.validateReversalForCompletedReturn({
+          ...requestForValidation,
+          status: "completed",
+          completedBy: actor.id,
+          completedAt,
+          refundFen,
+        });
+      }
 
       const completed = await options.repository.runTransaction(async (repository) => {
         const existingInside =
@@ -473,12 +500,11 @@ export const createReturnService = (options: ReturnServiceOptions) => {
         if (!request) throw new Error("退单不存在");
         await requireScopedOrder(repository, actor, request.orderId);
         if (request.status !== "approved") throw new Error("只能完成已审批的退单");
-        if (
-          !Number.isSafeInteger(refundFen) ||
-          refundFen < 0 ||
-          refundFen > request.maxRefundFen
-        ) {
-          throw new Error("退款金额不能超过可退金额");
+        if (!Number.isSafeInteger(refundFen) || refundFen < 0) {
+          throw new Error("实际退款金额不正确");
+        }
+        if (request.serviceType === "exchange" && refundFen !== 0) {
+          throw new Error("换货完成不应填写退款金额");
         }
         const completed = await repository.completeRequest(returnId, {
           completionIdempotencyKey: idempotencyKey,
@@ -493,14 +519,26 @@ export const createReturnService = (options: ReturnServiceOptions) => {
           storeId: order.storeId,
           returnId,
           orderId: request.orderId,
-          action: "return.complete",
+          action: request.serviceType === "exchange" ? "exchange.complete" : "return.complete",
           beforeSnapshot: { status: request.status },
-          afterSnapshot: { status: completed.status, refundFen },
+          afterSnapshot: {
+            status: completed.status,
+            serviceType: request.serviceType,
+            requestedRefundFen: request.requestedRefundFen,
+            systemReferenceFen: request.maxRefundFen,
+            actualRefundFen: request.serviceType === "refund" ? refundFen : 0,
+            exceedsRequestedAmount:
+              request.serviceType === "refund" && refundFen > request.requestedRefundFen,
+            exceedsSystemReference:
+              request.serviceType === "refund" && refundFen > request.maxRefundFen,
+          },
           reason: request.reason,
         });
         return completed;
       });
-      await options.commissionReversal.reverseForCompletedReturn(completed);
+      if (completed.serviceType === "refund") {
+        await options.commissionReversal.reverseForCompletedReturn(completed);
+      }
       return completed;
     },
   };

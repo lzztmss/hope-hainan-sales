@@ -55,6 +55,7 @@ const mapRequest = (
     idempotencyKey: row.idempotencyKey,
     completionIdempotencyKey: row.completionIdempotencyKey,
     orderId: row.orderId,
+    serviceType: row.serviceType,
     returnType: row.returnType,
     returnKind: row.returnKind,
     reasonCategory: row.reasonCategory,
@@ -68,6 +69,7 @@ const mapRequest = (
     decisionNote: row.decisionNote,
     completedBy: row.completedBy,
     completedAt: row.completedAt,
+    requestedRefundFen: row.requestedRefundFen,
     refundFen: row.refundFen,
     maxRefundFen: items.reduce((sum, item) => sum + item.maxRefundFen, 0),
     items,
@@ -154,7 +156,11 @@ export class DrizzleReturnRepository implements ReturnRepository {
       .select({ id: returnTable.id })
       .from(returnTable)
       .where(
-        and(eq(returnTable.orderId, orderId), eq(returnTable.status, "completed")),
+        and(
+          eq(returnTable.orderId, orderId),
+          eq(returnTable.status, "completed"),
+          eq(returnTable.serviceType, "refund"),
+        ),
       );
     const completedIds = completedReturns.map((entry) => entry.id);
     const returnedRows =
@@ -200,6 +206,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
         returnNo: input.returnNo,
         idempotencyKey: input.idempotencyKey,
         orderId: input.orderId,
+        serviceType: input.serviceType,
         returnType: input.returnType,
         returnKind: input.returnKind,
         reasonCategory: input.reasonCategory,
@@ -208,6 +215,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
         reason: input.reason,
         requestedBy: input.requestedBy,
         requestedAt: input.requestedAt,
+        requestedRefundFen: input.requestedRefundFen,
       })
       .returning();
     if (!created) throw new Error("退单创建失败");
@@ -253,7 +261,14 @@ export class DrizzleReturnRepository implements ReturnRepository {
 
   async listRequests(
     scope: UserScope,
-    filters: { orderId?: string; status?: ReturnRequestRecord["status"]; storeId?: string; sellerId?: string },
+    filters: {
+      orderId?: string;
+      status?: ReturnRequestRecord["status"];
+      serviceType?: ReturnRequestRecord["serviceType"];
+      returnKind?: ReturnRequestRecord["returnKind"];
+      storeId?: string;
+      sellerId?: string;
+    },
     paging?: { page: number; pageSize: number },
   ): Promise<{ items: ReturnRequestRecord[]; total: number }> {
     const conditions = [];
@@ -267,6 +282,8 @@ export class DrizzleReturnRepository implements ReturnRepository {
     }
     if (filters.orderId) conditions.push(eq(returnTable.orderId, filters.orderId));
     if (filters.status) conditions.push(eq(returnTable.status, filters.status));
+    if (filters.serviceType) conditions.push(eq(returnTable.serviceType, filters.serviceType));
+    if (filters.returnKind) conditions.push(eq(returnTable.returnKind, filters.returnKind));
     if (filters.storeId) conditions.push(eq(orders.storeId, filters.storeId));
     if (filters.sellerId) conditions.push(eq(orders.sellerId, filters.sellerId));
     const where = and(...conditions);
@@ -333,7 +350,8 @@ export class DrizzleReturnRepository implements ReturnRepository {
       .select()
       .from(returnItems)
       .where(eq(returnItems.returnId, id));
-    let remainingRefund = completion.refundFen;
+    const completionRefundFen = current.serviceType === "refund" ? completion.refundFen : 0;
+    let remainingRefund = completionRefundFen;
     for (let index = 0; index < itemRows.length; index += 1) {
       const item = itemRows[index]!;
       const isLast = index === itemRows.length - 1;
@@ -342,7 +360,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
         : current.maxRefundFen === 0
           ? 0
           : Math.floor(
-              (completion.refundFen * snapshotMaxRefund(item)) /
+              (completionRefundFen * snapshotMaxRefund(item)) /
                 current.maxRefundFen,
             );
       remainingRefund -= allocated;
@@ -359,7 +377,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
         completionIdempotencyKey: completion.completionIdempotencyKey,
         completedBy: completion.completedBy,
         completedAt: completion.completedAt,
-        refundFen: completion.refundFen,
+        refundFen: completionRefundFen,
         updatedAt: completion.completedAt,
         version: sql`${returnTable.version} + 1`,
       })
@@ -367,10 +385,22 @@ export class DrizzleReturnRepository implements ReturnRepository {
       .returning();
     if (!updated) throw new Error("退单已被其他操作更新");
 
+    if (current.serviceType === "exchange") {
+      await this.executor
+        .update(orders)
+        .set({
+          status: current.orderStatusBefore ?? "signed",
+          updatedAt: completion.completedAt,
+          version: sql`${orders.version} + 1`,
+        })
+        .where(eq(orders.id, current.orderId));
+      return this.loadRequest(updated);
+    }
+
     await this.executor
       .update(orders)
       .set({
-        refundedFen: sql`${orders.refundedFen} + ${completion.refundFen}`,
+        refundedFen: sql`${orders.refundedFen} + ${completionRefundFen}`,
         updatedAt: completion.completedAt,
         version: sql`${orders.version} + 1`,
       })

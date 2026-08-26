@@ -166,7 +166,7 @@ const createFixture = async (
 };
 
 describe("退单状态与提成冲销一致性", () => {
-  it("签收超过15日必须走特殊退款，并保留独立业务标识", async () => {
+  it("普通退货退款超过7日必须走特殊处理，并保留独立业务标识", async () => {
     const signedAt = new Date("2026-08-01T02:00:00.000Z");
     const current = new Date("2026-08-20T02:00:00.000Z");
     const { client, order, seller } = await createFixture("signed", signedAt);
@@ -185,7 +185,7 @@ describe("退单状态与提成冲销一致性", () => {
       order.id,
       { type: "full", kind: "normal", reasonCategory: "quality", reason: "超过十五日质量退款", items: [] },
       "return-request-too-late-normal-001",
-    )).rejects.toThrow("签收已超过15日");
+    )).rejects.toThrow("签收已超过7日");
 
     const requested = await service.requestReturn(
       seller,
@@ -194,8 +194,69 @@ describe("退单状态与提成冲销一致性", () => {
       "return-request-special-001",
     );
     expect(requested.returnKind).toBe("special");
+    expect(requested.serviceType).toBe("refund");
     expect(requested.reasonCategory).toBe("quality");
     expect(requested.orderStatusBefore).toBe("signed");
+    await client.close();
+  });
+
+  it("换货完成不累计退款、不消耗可退数量且不冲销提成", async () => {
+    const { client, order, seller, admin } = await createFixture("signed");
+    const repository = new DrizzleReturnRepository(client);
+    let reversalCount = 0;
+    const service = createReturnService({
+      repository,
+      commissionReversal: {
+        validateReversalForCompletedReturn: async () => {
+          throw new Error("换货不应执行提成冲销预检");
+        },
+        reverseForCompletedReturn: async () => {
+          reversalCount += 1;
+        },
+      },
+      numberSuffix: () => "EXCHANGE",
+    });
+    const requested = await service.requestReturn(
+      seller,
+      order.id,
+      { serviceType: "exchange", type: "full", kind: "normal", reasonCategory: "quality", requestedRefundFen: 0, reason: "设备质量问题申请换货", items: [] },
+      "after-sales-exchange-request-001",
+    );
+    await service.decideReturn(admin, requested.id, "approved", "同意换货");
+    const completed = await service.completeReturn(admin, requested.id, 0, "after-sales-exchange-complete-001");
+    const orderAfter = await repository.findOrderForReturn(order.id);
+    expect(completed.serviceType).toBe("exchange");
+    expect(completed.refundFen).toBe(0);
+    expect(orderAfter?.status).toBe("signed");
+    expect(orderAfter?.refundedFen).toBe(0);
+    expect(orderAfter?.lines[0]?.returnedQuantity).toBe(0);
+    expect(reversalCount).toBe(0);
+    await client.close();
+  });
+
+  it("实际退款可高于系统参考金额并保留实际值", async () => {
+    const { client, order, seller, admin } = await createFixture("signed");
+    const repository = new DrizzleReturnRepository(client);
+    const service = createReturnService({
+      repository,
+      commissionReversal: {
+        validateReversalForCompletedReturn: async () => undefined,
+        reverseForCompletedReturn: async () => undefined,
+      },
+      numberSuffix: () => "OVERREF",
+    });
+    const requested = await service.requestReturn(
+      seller,
+      order.id,
+      { serviceType: "refund", type: "full", kind: "normal", reasonCategory: "quality", requestedRefundFen: 50000, reason: "按实际业务金额申请退款", items: [] },
+      "after-sales-over-reference-request-001",
+    );
+    expect(requested.maxRefundFen).toBe(39900);
+    expect(requested.requestedRefundFen).toBe(50000);
+    await service.decideReturn(admin, requested.id, "approved", "同意按实际金额退款");
+    const completed = await service.completeReturn(admin, requested.id, 55000, "after-sales-over-reference-complete-001");
+    expect(completed.refundFen).toBe(55000);
+    expect((await repository.findOrderForReturn(order.id))?.refundedFen).toBe(55000);
     await client.close();
   });
 

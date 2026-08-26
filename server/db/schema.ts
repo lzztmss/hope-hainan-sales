@@ -71,6 +71,10 @@ export const orderAttributionRoleEnum = pgEnum("order_attribution_role", [
   "collaborator",
 ]);
 export const returnTypeEnum = pgEnum("return_type", ["full", "partial"]);
+export const afterSalesServiceTypeEnum = pgEnum("after_sales_service_type", [
+  "refund",
+  "exchange",
+]);
 export const returnKindEnum = pgEnum("return_kind", ["normal", "special"]);
 export const returnReasonCategoryEnum = pgEnum("return_reason_category", [
   "no_reason",
@@ -607,6 +611,7 @@ export const returns = sqliteTable(
     orderId: text("order_id")
       .notNull()
       .references(() => orders.id, { onDelete: "restrict" }),
+    serviceType: afterSalesServiceTypeEnum("service_type").default("refund").notNull(),
     returnType: returnTypeEnum("return_type").notNull(),
     returnKind: returnKindEnum("return_kind").default("normal").notNull(),
     reasonCategory: returnReasonCategoryEnum("reason_category").default("other").notNull(),
@@ -626,6 +631,7 @@ export const returns = sqliteTable(
       onDelete: "restrict",
     }),
     completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+    requestedRefundFen: integer("requested_refund_fen").default(0).notNull(),
     refundFen: integer("refund_fen").default(0).notNull(),
     version: integer("version").default(1).notNull(),
     ...timestamps,
@@ -640,6 +646,7 @@ export const returns = sqliteTable(
     index("returns_requested_at_idx").on(table.requestedAt),
     check("returns_reason_present", sql`NULLIF(TRIM(${table.reason}), '') IS NOT NULL`),
     check("returns_refund_nonnegative", sql`${table.refundFen} >= 0`),
+    check("returns_requested_refund_nonnegative", sql`${table.requestedRefundFen} >= 0`),
     check("returns_version_positive", sql`${table.version} >= 1`),
     check(
       "returns_decision_state_consistent",

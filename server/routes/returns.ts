@@ -8,10 +8,12 @@ import { SESSION_COOKIE_NAME } from "./auth.js";
 import { sendValidationError } from "./validationError.js";
 
 const returnFieldLabels = {
+  serviceType: "售后方式",
   type: "退单类型",
   kind: "申请类型",
   reasonCategory: "原因类型",
   reason: "退单原因",
+  requestedRefundFen: "申请退款金额",
   items: "退货商品",
   decision: "审批结果",
   note: "审批意见",
@@ -25,10 +27,12 @@ export interface RegisterReturnRoutesOptions {
 }
 
 const requestSchema = z.object({
+  serviceType: z.enum(["refund", "exchange"]),
   type: z.enum(["full", "partial"]),
   kind: z.enum(["normal", "special"]),
   reasonCategory: z.enum(["no_reason", "quality", "other"]),
   reason: z.string().trim().min(2).max(1_000),
+  requestedRefundFen: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
   items: z
     .array(
       z.object({
@@ -47,6 +51,8 @@ const completionSchema = z.object({
 });
 const listSchema = z.object({
   status: z.enum(["requested", "approved", "rejected", "completed"]).optional(),
+  serviceType: z.enum(["refund", "exchange"]).optional(),
+  returnKind: z.enum(["normal", "special"]).optional(),
   storeId: z.string().uuid().optional(),
   sellerId: z.string().uuid().optional(),
   page: z.coerce.number().int().min(1).default(1),

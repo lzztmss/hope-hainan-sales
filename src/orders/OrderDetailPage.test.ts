@@ -87,7 +87,7 @@ describe("订单退单入口说明", () => {
     }));
     expect(result).toEqual({
       allowed: false,
-      reason: "该订单已完成整单退单",
+      reason: "该订单已完成整单退货",
     });
   });
 

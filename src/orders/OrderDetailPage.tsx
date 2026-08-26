@@ -18,9 +18,10 @@ import {
 } from "./types";
 import "./orders.css";
 
-const RETURN_KIND_LABELS = { normal: "普通退货", special: "特殊退款" } as const;
+const afterSalesLabel = (record: Pick<ReturnRecordView, "serviceType" | "kind">): string =>
+  `${record.kind === "special" ? "特殊" : "普通"}${record.serviceType === "refund" ? "退货退款" : "换货"}`;
 const RETURN_REASON_LABELS = {
-  no_reason: "无理由退货",
+  no_reason: "无理由退货（仅限线上销售）",
   quality: "产品质量问题",
   other: "其他业务原因",
 } as const;
@@ -54,30 +55,30 @@ export const monthlyAmountAfterCompletedReturns = (order: OrderDetail): number =
 };
 
 export const describeReturnAvailability = (order: OrderDetail): ReturnAvailability => {
-  if (order.deletedAt) return { allowed: false, reason: "订单已在回收站，不能申请退单" };
+  if (order.deletedAt) return { allowed: false, reason: "订单已在回收站，不能申请售后" };
   if (order.status === "return_pending") {
-    return { allowed: false, reason: "已有退单正在审批，请先等待审批结果" };
+    return { allowed: false, reason: "已有售后申请正在审批，请先等待审批结果" };
   }
   if (order.status === "returned") {
-    return { allowed: false, reason: "该订单已完成整单退单" };
+    return { allowed: false, reason: "该订单已完成整单退货" };
   }
   if (order.status === "cancelled") {
-    return { allowed: false, reason: "订单已取消，无需申请退单" };
+    return { allowed: false, reason: "订单已取消，无需申请售后" };
   }
   if (order.status === "voided") {
-    return { allowed: false, reason: "订单已作废，不能申请退单" };
+    return { allowed: false, reason: "订单已作废，不能申请售后" };
   }
   if (order.status === "pending" || order.status === "accepted") {
     return { allowed: false, reason: "订单尚未生效，请使用“取消订单”" };
   }
   if (!order.permissions.canRequestReturn) {
-    return { allowed: false, reason: "当前账号没有申请该订单退单的权限" };
+    return { allowed: false, reason: "当前账号没有申请该订单售后的权限" };
   }
   const chargeLines = order.lines.filter((line) => line.lineType === "charge");
   if (chargeLines.some((line) => line.refundableQuantity > 0)) {
     return { allowed: true, reason: null };
   }
-  return { allowed: false, reason: "该订单已没有剩余可退的独立计价商品" };
+  return { allowed: false, reason: "该订单已没有剩余可处理的计价商品" };
 };
 
 interface ReturnApprovalProps {
@@ -106,7 +107,7 @@ const ReturnApproval = ({
 
   if (record.status !== "requested") return null;
   if (isApplicant && viewer.role !== "admin") {
-    return <p className="return-self-review-note">申请人不可审批自己提交的退单，请由其他有权限人员处理</p>;
+    return <p className="return-self-review-note">申请人不可审批自己提交的售后申请，请由其他有权限人员处理</p>;
   }
   if (!mayReview) return null;
 
@@ -127,7 +128,7 @@ const ReturnApproval = ({
       setError(
         decisionError instanceof Error
           ? decisionError.message
-          : "退单审批失败，请重试",
+          : "售后审批失败，请重试",
       );
     } finally {
       setBusy(false);
@@ -136,7 +137,7 @@ const ReturnApproval = ({
 
   return (
     <section
-      aria-label={`退单 ${record.returnNo} 审批`}
+      aria-label={`售后 ${record.returnNo} 审批`}
       className="return-approval"
       role="region"
     >
@@ -160,7 +161,7 @@ const ReturnApproval = ({
       {error ? <p className="order-form-error" role="alert">{error}</p> : null}
       <div>
         <button disabled={busy} onClick={() => void decide("reject")} type="button">
-          驳回退单
+          驳回申请
         </button>
         <button
           className="order-primary-action"
@@ -168,7 +169,7 @@ const ReturnApproval = ({
           onClick={() => void decide("approve")}
           type="button"
         >
-          同意退单
+          同意申请
         </button>
       </div>
     </section>
@@ -214,19 +215,15 @@ const ReturnCompletion = ({
         onClick={() => setOpen(true)}
         type="button"
       >
-        完成退款
+        {record.serviceType === "refund" ? "完成退款" : "完成换货"}
       </button>
     );
   }
 
   const complete = async (): Promise<void> => {
-    const refundFen = yuanToFen(actualYuan);
+    const refundFen = record.serviceType === "exchange" ? 0 : yuanToFen(actualYuan);
     if (refundFen === null) {
       setError("请输入正确的实际退款金额，最多保留两位小数");
-      return;
-    }
-    if (refundFen > record.maxRefundFen) {
-      setError("实际退款金额不能超过最高可退金额");
       return;
     }
     setBusy(true);
@@ -237,7 +234,7 @@ const ReturnCompletion = ({
       setError(
         completionError instanceof Error
           ? completionError.message
-          : "完成退款失败，请重试",
+          : `${record.serviceType === "refund" ? "完成退款" : "完成换货"}失败，请重试`,
       );
     } finally {
       setBusy(false);
@@ -245,9 +242,8 @@ const ReturnCompletion = ({
   };
 
   return (
-    <section className="return-completion" aria-label={`退单 ${record.returnNo} 完成退款`}>
-      <p>最高可退 {formatOrderMoney(record.maxRefundFen)}</p>
-      <label>
+    <section className="return-completion" aria-label={`售后 ${record.returnNo} ${record.serviceType === "refund" ? "完成退款" : "完成换货"}`}>
+      {record.serviceType === "refund" ? <><p>申请退款 {formatOrderMoney(record.requestedRefundFen)} · 系统参考 {formatOrderMoney(record.maxRefundFen)}</p><label>
         <span>实际退款金额（元）</span>
         <input
           disabled={busy}
@@ -259,10 +255,7 @@ const ReturnCompletion = ({
           placeholder="例如 599.00"
           value={actualYuan}
         />
-      </label>
-      <p className="return-completion__note">
-        此金额是实际退给客户的钱，不是销售提成。销售提成会按退回商品的原提成快照自动扣回，与这里填写的退款金额分别核算。
-      </p>
+      </label>{yuanToFen(actualYuan) !== null && (yuanToFen(actualYuan)! > record.requestedRefundFen || yuanToFen(actualYuan)! > record.maxRefundFen) ? <p className="return-completion__note">实际金额高于申请金额或系统参考金额，仍可完成，差异会写入审计记录。</p> : null}<p className="return-completion__note">系统参考金额不构成限制。提成按退回商品的原提成快照扣回，与实际退款金额分别核算。</p></> : <p className="return-completion__note">请确认商品已经完成更换。换货不产生退款，不改变订单退款金额，也不扣回提成。</p>}
       {error ? <p className="order-form-error" role="alert">{error}</p> : null}
       <div>
         <button disabled={busy} onClick={() => setOpen(false)} type="button">取消</button>
@@ -272,7 +265,7 @@ const ReturnCompletion = ({
           onClick={() => void complete()}
           type="button"
         >
-          确认完成退款
+          {record.serviceType === "refund" ? "确认完成退款" : "确认换货完成"}
         </button>
       </div>
     </section>
@@ -535,41 +528,43 @@ export const OrderDetailPage = ({
 
       {order.returns.length > 0 ? (
         <section className="order-detail-section" aria-labelledby="order-returns-title">
-          <h3 id="order-returns-title">退单记录</h3>
+          <h3 id="order-returns-title">售后记录</h3>
           <div className="order-return-records">
             {order.returns.map((record) => (
               <article key={record.id}>
                 <header>
                   <div>
-                    <strong>{record.returnNo} · {RETURN_KIND_LABELS[record.kind]} · {record.type === "full" ? "整单退单" : "部分退单"}</strong>
+                    <strong>{record.returnNo} · {afterSalesLabel(record)} · {record.type === "full" ? "整单" : "部分商品"}</strong>
                     <span>{record.requestedAt}·{record.requestedByName}</span>
                   </div>
                   <span className={`return-status is-${record.status}`}>
-                    {record.kind === "special" ? `特殊退款${RETURN_STATUS_LABELS[record.status]}` : RETURN_STATUS_LABELS[record.status]}
+                    {record.kind === "special" ? `${afterSalesLabel(record)}${RETURN_STATUS_LABELS[record.status]}` : record.serviceType === "exchange" && record.status === "completed" ? "换货已完成" : RETURN_STATUS_LABELS[record.status]}
                   </span>
                 </header>
                 <p>{RETURN_REASON_LABELS[record.reasonCategory]}：{record.reason}</p>
                 <div className="order-return-items">
                   <span>
                     {record.status === "completed"
-                      ? "已退回商品"
+                      ? record.serviceType === "refund" ? "已退回商品" : "已换货商品"
                       : record.status === "rejected"
-                        ? "申请退回商品（已驳回）"
-                        : "申请退回商品"}
+                        ? "申请商品（已驳回）"
+                        : record.serviceType === "refund" ? "申请退回商品" : "申请换货商品"}
                   </span>
                   <ul>
                     {record.items.map((item) => (
                       <li key={item.orderLineId}>
                         <strong>{item.label} × {item.quantity}</strong>
-                        <small>可退上限 {formatOrderMoney(item.refundFen)}</small>
+                        <small>{record.serviceType === "refund" ? `系统参考 ${formatOrderMoney(item.refundFen)}` : "换货"}</small>
                       </li>
                     ))}
                   </ul>
                 </div>
                 <strong>
-                  {record.status === "completed"
-                    ? `实际退款 ${formatOrderMoney(record.refundFen)}`
-                    : `最高可退 ${formatOrderMoney(record.maxRefundFen)}`}
+                  {record.serviceType === "exchange"
+                    ? "换货不涉及退款和提成扣回"
+                    : record.status === "completed"
+                      ? `实际退款 ${formatOrderMoney(record.refundFen)}`
+                      : `申请退款 ${formatOrderMoney(record.requestedRefundFen)} · 系统参考 ${formatOrderMoney(record.maxRefundFen)}`}
                 </strong>
                 <ReturnApproval
                   onDecideReturn={onDecideReturn}
@@ -642,7 +637,7 @@ export const OrderDetailPage = ({
               onClick={returnAllowed ? onOpenReturn : undefined}
               type="button"
             >
-              申请退单
+              申请售后
             </button>
             {!returnAllowed ? (
               <small id="order-return-unavailable-reason">{returnAvailability.reason}</small>

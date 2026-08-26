@@ -22,6 +22,7 @@ export type OrderStatus =
 
 export type OrderPaymentMode = "one_time" | "contract_36";
 export type ReturnType = "full" | "partial";
+export type AfterSalesServiceType = "refund" | "exchange";
 export type ReturnKind = "normal" | "special";
 export type ReturnReasonCategory = "no_reason" | "quality" | "other";
 export type ReturnStatus = "requested" | "approved" | "rejected" | "completed";
@@ -86,6 +87,7 @@ export interface ReturnItemView {
 export interface ReturnRecordView {
   id: string;
   returnNo: string;
+  serviceType: AfterSalesServiceType;
   type: ReturnType;
   kind: ReturnKind;
   reasonCategory: ReturnReasonCategory;
@@ -94,6 +96,7 @@ export interface ReturnRecordView {
   requestedById: string;
   requestedByName: string;
   requestedAt: string;
+  requestedRefundFen: number;
   refundFen: number;
   maxRefundFen: number;
   canApprove: boolean;
@@ -129,9 +132,11 @@ export interface OrderListResult {
 export interface RequestReturnInput {
   orderId: string;
   orderVersion: number;
+  serviceType: AfterSalesServiceType;
   type: ReturnType;
   kind: ReturnKind;
   reasonCategory: ReturnReasonCategory;
+  requestedRefundFen: number;
   items: Array<{ orderLineId: string; quantity: number }>;
   reason: string;
 }
@@ -196,5 +201,5 @@ export const RETURN_STATUS_LABELS: Readonly<Record<ReturnStatus, string>> = {
   requested: "待审批",
   approved: "已同意",
   rejected: "已驳回",
-  completed: "已完成退款",
+  completed: "已完成",
 };

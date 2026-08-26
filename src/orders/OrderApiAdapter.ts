@@ -163,6 +163,7 @@ const mapReturn = (
   return {
     id: record.id,
     returnNo: record.returnNo,
+    serviceType: record.serviceType,
     type: record.returnType,
     kind: record.returnKind,
     reasonCategory: record.reasonCategory,
@@ -172,6 +173,7 @@ const mapReturn = (
     requestedByName:
       record.requestedByName?.trim() || `申请人 ${record.requestedBy}`,
     requestedAt: formatDateTime(record.requestedAt),
+    requestedRefundFen: record.requestedRefundFen,
     refundFen: record.refundFen,
     maxRefundFen: record.maxRefundFen,
     canApprove:
@@ -193,7 +195,7 @@ const completedQuantityByLine = (
 ): ReadonlyMap<string, number> => {
   const quantities = new Map<string, number>();
   for (const record of returns) {
-    if (record.status !== "completed") continue;
+    if (record.status !== "completed" || record.serviceType !== "refund") continue;
     for (const item of record.items) {
       quantities.set(
         item.orderLineId,
@@ -330,9 +332,11 @@ export const createOrderManagementAdapter = (
     },
     async requestReturn(input) {
       const body = {
+        serviceType: input.serviceType,
         type: input.type,
         kind: input.kind,
         reasonCategory: input.reasonCategory,
+        requestedRefundFen: input.requestedRefundFen,
         items: input.items,
         reason: input.reason,
       };

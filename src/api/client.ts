@@ -318,6 +318,7 @@ export interface ReturnRecordDto {
   returnNo: string;
   orderNo: string;
   orderId: string;
+  serviceType: "refund" | "exchange";
   returnType: ReturnType;
   returnKind: "normal" | "special";
   reasonCategory: "no_reason" | "quality" | "other";
@@ -331,15 +332,18 @@ export interface ReturnRecordDto {
   decisionNote: string | null;
   completedBy: string | null;
   completedAt: string | null;
+  requestedRefundFen: number;
   refundFen: number;
   maxRefundFen: number;
   items: readonly ReturnItemDto[];
 }
 
 export interface RequestOrderReturnApiInput {
+  serviceType: "refund" | "exchange";
   type: ReturnType;
   kind: "normal" | "special";
   reasonCategory: "no_reason" | "quality" | "other";
+  requestedRefundFen: number;
   reason: string;
   items: readonly { orderLineId: string; quantity: number }[];
 }
