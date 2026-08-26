@@ -70,6 +70,9 @@ export const describeReturnAvailability = (order: OrderDetail): ReturnAvailabili
   if (order.status === "voided") {
     return { allowed: false, reason: "订单已作废，不能申请售后" };
   }
+  if (order.signedAt === null && ["activated", "signed", "reconciled", "paid", "partially_returned"].includes(order.status)) {
+    return { allowed: false, reason: "订单尚未签收，请先确认签收后再申请退货退款" };
+  }
   if (order.status === "pending" || order.status === "accepted") {
     return { allowed: false, reason: "订单尚未生效，请使用“取消订单”" };
   }

@@ -328,10 +328,10 @@ export const createReturnService = (options: ReturnServiceOptions) => {
           await repository.findByRequestIdempotencyKey(idempotencyKey);
         if (existingInside) return existingInside;
         const order = await requireScopedOrder(repository, actor, orderId);
+        if (!order.signedAt) throw new Error("订单尚未签收，请先确认签收后再申请退货退款");
         if (!RETURNABLE_STATUSES.includes(order.status)) {
           throw new Error("当前订单状态不可退单");
         }
-        if (!order.signedAt) throw new Error("订单尚未签收，不能申请退单");
         const reason = input.reason.trim();
         if (reason.length < 2 || reason.length > 1_000) {
           throw new Error("请填写完整退单原因");

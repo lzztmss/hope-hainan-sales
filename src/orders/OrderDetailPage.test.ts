@@ -77,6 +77,11 @@ describe("订单退单入口说明", () => {
     expect(result.reason).not.toContain("没有申请");
   });
 
+  it("订单未签收时明确提示先确认签收", () => {
+    const result = describeReturnAvailability(order({ status: "activated", signedAt: null }));
+    expect(result).toEqual({ allowed: false, reason: "订单尚未签收，请先确认签收后再申请退货退款" });
+  });
+
   it("全部计价商品退完后提示已完成整单退单", () => {
     const result = describeReturnAvailability(order({
       status: "returned",
