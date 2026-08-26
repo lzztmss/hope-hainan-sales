@@ -78,7 +78,9 @@ export interface MissingCommissionOrder {
   customerNameEncrypted: string | null;
   customerPhoneTail: string | null;
   customerSnapshot: Record<string, unknown>;
-  activatedAt: Date;
+  activatedAt: Date | null;
+  referenceAt: Date;
+  issue: "missing_activation" | "missing_policy";
 }
 
 export interface CommissionDashboardRepositoryFilters {
@@ -648,13 +650,15 @@ const presentMissingAccrualOrders = (
       order.customerSnapshot,
       decryptPii,
     ),
-    activatedAt: formatShanghaiDateTime(order.activatedAt),
+    activatedAt: order.activatedAt ? formatShanghaiDateTime(order.activatedAt) : "未记录",
     status: "exception",
-    statusLabel: "提成异常 · 激活时无有效规则 · 待管理员处理",
+    statusLabel: order.issue === "missing_activation"
+      ? "提成异常 · 缺少激活时间 · 待管理员处理"
+      : "提成异常 · 激活时无有效规则 · 待管理员处理",
     amountFen: 0,
     lines: [],
     ledgerEntries: [],
-    sortAt: order.activatedAt,
+    sortAt: order.referenceAt,
   }));
 
 const summarizeLedger = (

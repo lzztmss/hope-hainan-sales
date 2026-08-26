@@ -382,16 +382,24 @@ export class DrizzleCommissionDashboardRepository
         customerPhoneTail: customers.phoneTail,
         customerSnapshot: orders.customerSnapshot,
         activatedAt: orders.activatedAt,
+        signedAt: orders.signedAt,
+        createdAt: orders.createdAt,
       })
       .from(orders)
       .innerJoin(customers, eq(customers.id, orders.customerId))
       .where(and(...conditions))
       .orderBy(desc(orders.activatedAt), desc(orders.id));
 
-    return rows.map((row) => {
-      if (!row.activatedAt) throw new Error("提成异常订单缺少激活时间");
-      return { ...row, activatedAt: row.activatedAt };
-    });
+    return rows.map((row) => ({
+      id: row.id,
+      orderNo: row.orderNo,
+      customerNameEncrypted: row.customerNameEncrypted,
+      customerPhoneTail: row.customerPhoneTail,
+      customerSnapshot: row.customerSnapshot,
+      activatedAt: row.activatedAt,
+      referenceAt: row.activatedAt ?? row.signedAt ?? row.createdAt,
+      issue: row.activatedAt ? "missing_policy" as const : "missing_activation" as const,
+    }));
   }
 
   async findEffectivePolicy(

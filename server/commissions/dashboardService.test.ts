@@ -75,4 +75,34 @@ describe("提成按订单资金阶段汇总", () => {
     expect(dashboard.orders.find((order) => order.orderId === "order-SIGNED")?.statusLabel).toBe("已签收 · 待结算");
     expect(dashboard.orders.find((order) => order.orderId === "order-PAID")?.statusLabel).toBe("已收款 · 待发放");
   });
+
+  it("单笔订单缺少激活时间时标记异常而不是导致整页失败", async () => {
+    const referenceAt = new Date("2026-08-20T02:00:00.000Z");
+    const service = createCommissionDashboardService({
+      now: () => new Date("2026-08-26T02:00:00.000Z"),
+      repository: {
+        listLedger: async () => [],
+        listEstimatedOrders: async () => [],
+        listMissingAccrualOrders: async () => [{
+          id: "order-missing-activation",
+          orderNo: "XLXDD-MISSING-ACTIVATION",
+          customerNameEncrypted: null,
+          customerPhoneTail: "8000",
+          customerSnapshot: { name: "测试客户" },
+          activatedAt: null,
+          referenceAt,
+          issue: "missing_activation",
+        }],
+        findEffectivePolicy: async () => null,
+      },
+    });
+
+    const dashboard = await service.getDashboard(sales, { month: "2026-08" });
+    expect(dashboard.orders[0]).toMatchObject({
+      orderNo: "XLXDD-MISSING-ACTIVATION",
+      activatedAt: "未记录",
+      status: "exception",
+      statusLabel: "提成异常 · 缺少激活时间 · 待管理员处理",
+    });
+  });
 });
