@@ -894,6 +894,64 @@
   text-align: center;
 }
 
+.return-component-list {
+  display: grid;
+  gap: var(--hfttr-space-2);
+  padding: var(--hfttr-space-3);
+  border: var(--app-border-width) solid var(--hfttr-color-blue-100);
+  border-radius: var(--app-radius-control);
+  background: var(--app-color-surface-subtle);
+}
+
+.return-component-list > header,
+.return-component-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hfttr-space-3);
+}
+
+.return-component-list > header {
+  padding-bottom: var(--hfttr-space-2);
+  border-bottom: var(--app-border-width) solid var(--hfttr-color-blue-100);
+}
+
+.return-component-list > header > div,
+.return-component-line > div {
+  display: grid;
+  gap: var(--hfttr-space-1);
+}
+
+.return-component-list > header > span {
+  padding: var(--hfttr-space-1) var(--hfttr-space-2);
+  border-radius: var(--hfttr-radius-pill);
+  background: var(--hfttr-color-blue-100);
+  color: var(--app-color-primary-strong);
+  font-size: var(--hfttr-font-size-xs);
+  font-weight: var(--app-font-weight-bold);
+  white-space: nowrap;
+}
+
+.return-component-list small,
+.return-component-line span {
+  color: var(--app-color-text-muted);
+  font-size: var(--hfttr-font-size-xs);
+}
+
+.return-component-line {
+  padding: var(--hfttr-space-3);
+  border: var(--app-border-width) solid var(--hfttr-color-blue-100);
+  border-left: 4px solid var(--app-color-primary);
+  border-radius: var(--app-radius-control);
+  background: var(--app-color-surface);
+}
+
+.return-component-line > strong {
+  color: var(--app-color-primary-strong);
+  font-size: var(--hfttr-font-size-sm);
+  text-align: right;
+}
+
 .return-component-note {
   margin: 0;
   padding: var(--hfttr-space-3);
@@ -1068,6 +1126,16 @@
 
   .return-type-picker {
     grid-template-columns: 1fr;
+  }
+
+  .return-component-list > header,
+  .return-component-line {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .return-component-line > strong {
+    text-align: left;
   }
 
   .order-detail-facts {

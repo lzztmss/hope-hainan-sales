@@ -112,9 +112,9 @@ export const ReturnDialog = ({
       ),
     [order.lines],
   );
-  const componentCount = order.lines.filter(
+  const componentLines = order.lines.filter(
     (line) => line.lineType === "component",
-  ).length;
+  );
   const packageLines = order.lines.filter(
     (line) =>
       line.lineType === "charge" &&
@@ -353,18 +353,34 @@ export const ReturnDialog = ({
             })}
           </section>
 
+          {componentLines.length > 0 ? (
+            <section className="return-component-list" aria-label="套餐内设备">
+              <header>
+                <div>
+                  <strong>套餐内设备</strong>
+                  <small>蓝色设备由套餐包含，不单独计价</small>
+                </div>
+                <span>{type === "full" ? `随整套一并${serviceType === "refund" ? "退回" : "换货"}` : "不可单独选择"}</span>
+              </header>
+              {componentLines.map((line) => (
+                <article className="return-component-line" key={line.id}>
+                  <div>
+                    <span>套餐内设备</span>
+                    <strong>{line.label} × {line.quantity}{line.unit}</strong>
+                    {line.locations.length > 0 ? <small>{line.locations.join("、")}</small> : null}
+                  </div>
+                  <strong>套餐内含 · 不另收费</strong>
+                </article>
+              ))}
+            </section>
+          ) : null}
+
           {packageLines.length > 0 ? (
             <section className="return-package-note" aria-label="不可退套餐">
               <strong>{type === "full" ? `以下套餐随整单一并${serviceType === "refund" ? "退回" : "换货"}` : `以下套餐仅支持整单${serviceType === "refund" ? "退回" : "换货"}`}</strong>
               <span>{packageLines.map((line) => line.label).join("、")}</span>
               <small>套餐及套餐内设备按完整方案交付，不支持部分处理套餐或拆分处理套餐内设备。</small>
             </section>
-          ) : null}
-
-          {componentCount > 0 ? (
-            <p className="return-component-note">
-              套装内物理设备不可单独申请售后
-            </p>
           ) : null}
 
           {serviceType === "refund" ? (

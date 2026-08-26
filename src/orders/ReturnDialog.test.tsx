@@ -62,6 +62,21 @@ const order: OrderDetail = {
       monthlySubtotalFen: 0,
       locations: [],
     },
+    {
+      id: "gateway-component",
+      lineType: "component",
+      sku: "gateway",
+      label: "迷你网关",
+      unit: "个",
+      quantity: 1,
+      returnedQuantity: 0,
+      refundableQuantity: 0,
+      refundableUnitFen: 0,
+      monthlyUnitFen: 0,
+      oneTimeSubtotalFen: 0,
+      monthlySubtotalFen: 0,
+      locations: ["客厅路由器附近"],
+    },
   ],
 };
 
@@ -79,6 +94,10 @@ describe("整单退单商品明细", () => {
     const list = screen.getByRole("region", { name: "整单退回商品" });
     expect(within(list).getByText("心连心·居家双护（套餐整套退回）")).toBeInTheDocument();
     expect(within(list).getByText("人体传感器")).toBeInTheDocument();
+    const components = screen.getByRole("region", { name: "套餐内设备" });
+    expect(within(components).getByText("迷你网关 × 1个")).toBeInTheDocument();
+    expect(within(components).getByText("套餐内含 · 不另收费")).toBeInTheDocument();
+    expect(within(components).getByText("随整套一并退回")).toBeInTheDocument();
     expect(screen.getByRole("spinbutton", { name: "申请退款金额（元）" })).not.toHaveAttribute("placeholder");
     expect(screen.queryByText(/系统参考/)).not.toBeInTheDocument();
   });
