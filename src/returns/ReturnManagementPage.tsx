@@ -406,7 +406,7 @@ export const ReturnManagementPage = ({
           刷新数据
         </button>
       ) : null}
-      description={globalDataRole(actor) ? "查看全部营业厅售后；人力资源和财务仅查看，审批和完成仍由业务管理人员处理。" : actor.role === "regional_manager" ? "查看所管营业厅售后，并处理退货退款或换货审批。" : "查看本营业厅售后，分别处理退货退款与换货。"}
+      description={globalDataRole(actor) ? "查看全部营业厅退货退款；人力资源和财务仅查看，审批和完成仍由业务管理人员处理。" : actor.role === "regional_manager" ? "查看所管营业厅退货退款，并处理审批。" : "查看本营业厅退货退款并处理审批。"}
       eyebrow="订单管理"
       title="售后管理"
     >
@@ -424,7 +424,6 @@ export const ReturnManagementPage = ({
             )}
           </select>
         </label>
-        <label><span>售后方式</span><select disabled={loading} value={draftServiceType} onChange={(event) => setDraftServiceType(event.currentTarget.value as AfterSalesServiceType | "")}><option value="">全部方式</option><option value="refund">退货退款</option><option value="exchange">换货</option></select></label>
         <label><span>处理类型</span><select disabled={loading} value={draftReturnKind} onChange={(event) => setDraftReturnKind(event.currentTarget.value as ReturnKind | "")}><option value="">全部类型</option><option value="normal">普通处理</option><option value="special">特殊处理</option></select></label>
         {globalDataRole(actor) || actor.role === "regional_manager" ? <label><span>营业厅</span><select disabled={loading} value={draftStoreId} onChange={(event) => { setDraftStoreId(event.currentTarget.value); setDraftSellerId(""); }}><option value="">全部营业厅</option>{stores.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
         <label><span>销售员</span><select disabled={loading} value={draftSellerId} onChange={(event) => setDraftSellerId(event.currentTarget.value)}><option value="">全部可见销售员</option>{sellers.filter((option) => !draftStoreId || option.storeId === draftStoreId).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>

@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { isNonReturnablePackageSku } from "../../shared/pricing/returnPolicy";
 import { formatOrderMoney } from "./formatters";
 import type {
-  AfterSalesServiceType,
   OrderDetail,
   RequestReturnInput,
   ReturnKind,
@@ -69,7 +68,6 @@ export const ReturnDialog = ({
   order,
 }: ReturnDialogProps) => {
   const elapsedDays = signedElapsedDays(order.signedAt);
-  const [serviceType, setServiceType] = useState<AfterSalesServiceType>("refund");
   const [type, setType] = useState<ReturnType>("full");
   const [kind, setKind] = useState<ReturnKind>("normal");
   const [reasonCategory, setReasonCategory] = useState<ReturnReasonCategory>("other");
@@ -81,7 +79,6 @@ export const ReturnDialog = ({
 
   useEffect(() => {
     if (!open) return;
-    setServiceType("refund");
     setType("full");
     setKind(elapsedDays !== null && elapsedDays > 7 ? "special" : "normal");
     setReasonCategory("other");
@@ -92,7 +89,7 @@ export const ReturnDialog = ({
     setSubmitting(false);
   }, [elapsedDays, open, order.id, order.version]);
 
-  const normalDeadlineDays = serviceType === "refund" ? 7 : 15;
+  const normalDeadlineDays = 7;
   const normalUnavailable = elapsedDays !== null && elapsedDays > normalDeadlineDays;
 
   const returnableLines = useMemo(
@@ -168,17 +165,10 @@ export const ReturnDialog = ({
       }
     }
     if (kind === "normal" && normalUnavailable) {
-      setError(`已超过普通${serviceType === "refund" ? "退货退款" : "换货"}的 ${normalDeadlineDays} 日期限，请选择特殊处理`);
+      setError(`已超过普通退货退款的 ${normalDeadlineDays} 日期限，请选择特殊处理`);
       return;
     }
-    if (serviceType === "exchange" && kind === "normal" && reasonCategory !== "quality") {
-      setError("普通换货仅适用于产品质量问题");
-      return;
-    }
-    if (
-      serviceType === "refund" &&
-      requestedRefundFen === null
-    ) {
+    if (requestedRefundFen === null) {
       setError("请填写正确的申请退款金额");
       return;
     }
@@ -188,11 +178,11 @@ export const ReturnDialog = ({
       await onSubmit({
         orderId: order.id,
         orderVersion: order.version,
-        serviceType,
+        serviceType: "refund",
         type,
         kind,
         reasonCategory,
-        requestedRefundFen: serviceType === "refund" ? requestedRefundFen! : 0,
+        requestedRefundFen,
         items: selectedItems,
         reason: reason.trim(),
       });
@@ -217,7 +207,7 @@ export const ReturnDialog = ({
         <header className="return-dialog__header">
           <div>
             <p>{order.orderNo}</p>
-            <h2 id="return-dialog-title">申请售后</h2>
+            <h2 id="return-dialog-title">申请退货退款</h2>
           </div>
           <button disabled={submitting} onClick={onClose} type="button">
             关闭
@@ -230,18 +220,13 @@ export const ReturnDialog = ({
           onSubmit={(event) => void submit(event)}
         >
           <fieldset className="return-type-picker">
-            <legend>1. 选择售后方式</legend>
-            <label><input checked={serviceType === "refund"} name="service-type" onChange={() => { setServiceType("refund"); setKind(elapsedDays !== null && elapsedDays > 7 ? "special" : "normal"); setError(null); }} type="radio" /><span><strong>退货退款</strong><small>退回商品，并填写申请退款金额</small></span></label>
-            <label><input checked={serviceType === "exchange"} name="service-type" onChange={() => { setServiceType("exchange"); setKind(elapsedDays !== null && elapsedDays > 15 ? "special" : "normal"); setReasonCategory("quality"); setError(null); }} type="radio" /><span><strong>换货</strong><small>更换商品，不产生退款，也不扣回提成</small></span></label>
-          </fieldset>
-          <fieldset className="return-type-picker">
-            <legend>2. 选择处理类型</legend>
-            <label><input checked={kind === "normal"} disabled={normalUnavailable} name="return-kind" onChange={() => setKind("normal")} type="radio" /><span><strong>普通处理</strong><small>{normalUnavailable ? `已签收 ${elapsedDays} 天，超过 ${normalDeadlineDays} 日普通处理期限` : serviceType === "refund" ? "签收后 7 日内可申请普通退货退款" : "签收后 15 日内，因质量问题可申请普通换货"}</small></span></label>
+            <legend>1. 选择处理类型</legend>
+            <label><input checked={kind === "normal"} disabled={normalUnavailable} name="return-kind" onChange={() => setKind("normal")} type="radio" /><span><strong>普通处理</strong><small>{normalUnavailable ? `已签收 ${elapsedDays} 天，超过 ${normalDeadlineDays} 日普通处理期限` : "签收后 7 日内可申请普通退货退款"}</small></span></label>
             <label><input checked={kind === "special"} name="return-kind" onChange={() => setKind("special")} type="radio" /><span><strong>特殊处理</strong><small>期限内外均可申请，需详细说明具体情况</small></span></label>
           </fieldset>
           {kind === "special" ? (
             <p className="return-component-note" role="status">
-              本申请会以“特殊{serviceType === "refund" ? "退货退款" : "换货"}”单独标识；审批人不变，仍由营业厅经理、大区经理或管理员处理。
+              本申请会以“特殊退货退款”单独标识；审批人不变，仍由营业厅经理、大区经理或管理员处理。
             </p>
           ) : null}
           <label className="return-reason-field">
@@ -253,10 +238,10 @@ export const ReturnDialog = ({
             </select>
           </label>
           <fieldset className="return-type-picker">
-            <legend>3. 选择商品范围</legend>
+            <legend>2. 选择商品范围</legend>
             <label>
               <input
-                aria-label={`整单${serviceType === "refund" ? "退货" : "换货"}`}
+                aria-label="整单退货"
                 checked={type === "full"}
                 name="return-type"
                 onChange={() => {
@@ -266,13 +251,13 @@ export const ReturnDialog = ({
                 type="radio"
               />
               <span>
-                <strong>整单{serviceType === "refund" ? "退货" : "换货"}</strong>
+                <strong>整单退货</strong>
                 <small>套餐与自购商品一起处理</small>
               </span>
             </label>
             <label>
               <input
-                aria-label={`部分${serviceType === "refund" ? "退货" : "换货"}`}
+                aria-label="部分退货"
                 checked={type === "partial"}
                 name="return-type"
                 onChange={() => {
@@ -282,13 +267,13 @@ export const ReturnDialog = ({
                 type="radio"
               />
               <span>
-                <strong>部分{serviceType === "refund" ? "退货" : "换货"}</strong>
+                <strong>部分退货</strong>
                 <small>选择原订单中的商品和数量</small>
               </span>
             </label>
           </fieldset>
 
-          <section className="return-line-list" aria-label={type === "full" ? `整单${serviceType === "refund" ? "退回" : "换货"}商品` : `可${serviceType === "refund" ? "退" : "换"}计价商品`}>
+          <section className="return-line-list" aria-label={type === "full" ? "整单退回商品" : "可退计价商品"}>
             {displayedLines.map((line) => {
               const state = partial[line.id];
               const packageLine = isNonReturnablePackageSku(line.sku);
@@ -296,7 +281,7 @@ export const ReturnDialog = ({
                 <div className="return-line" key={line.id}>
                   {type === "partial" ? (
                     <input
-                      aria-label={`${line.label}，剩余可${serviceType === "refund" ? "退" : "换"} ${line.refundableQuantity} ${line.unit}`}
+                      aria-label={`${line.label}，剩余可退 ${line.refundableQuantity} ${line.unit}`}
                       checked={state?.selected ?? false}
                       onChange={(event) => {
                         const selected = event.currentTarget.checked;
@@ -315,10 +300,10 @@ export const ReturnDialog = ({
                   <div>
                     <strong>
                       {line.label}
-                      {packageLine ? `（套餐整套${serviceType === "refund" ? "退回" : "换货"}）` : ""}
+                      {packageLine ? "（套餐整套退回）" : ""}
                     </strong>
                     <span>
-                      剩余可{serviceType === "refund" ? "退" : "换"} {line.refundableQuantity} {line.unit}·
+                      剩余可退 {line.refundableQuantity} {line.unit}·
                       {formatOrderMoney(line.refundableUnitFen)}/{line.unit}
                     </span>
                   </div>
@@ -360,7 +345,7 @@ export const ReturnDialog = ({
                   <strong>套餐内设备</strong>
                   <small>蓝色设备由套餐包含，不单独计价</small>
                 </div>
-                <span>{type === "full" ? `随整套一并${serviceType === "refund" ? "退回" : "换货"}` : "不可单独选择"}</span>
+                <span>{type === "full" ? "随整套一并退回" : "不可单独选择"}</span>
               </header>
               {componentLines.map((line) => (
                 <article className="return-component-line" key={line.id}>
@@ -377,23 +362,19 @@ export const ReturnDialog = ({
 
           {packageLines.length > 0 ? (
             <section className="return-package-note" aria-label="不可退套餐">
-              <strong>{type === "full" ? `以下套餐随整单一并${serviceType === "refund" ? "退回" : "换货"}` : `以下套餐仅支持整单${serviceType === "refund" ? "退回" : "换货"}`}</strong>
+              <strong>{type === "full" ? "以下套餐随整单一并退回" : "以下套餐仅支持整单退回"}</strong>
               <span>{packageLines.map((line) => line.label).join("、")}</span>
               <small>套餐及套餐内设备按完整方案交付，不支持部分处理套餐或拆分处理套餐内设备。</small>
             </section>
           ) : null}
 
-          {serviceType === "refund" ? (
-            <div className="return-refund-summary">
-              <label className="return-reason-field">
-                <span>申请退款金额（元）</span>
-                <input inputMode="decimal" min="0" onChange={(event) => { setRequestedRefundYuan(event.currentTarget.value); setError(null); }} step="0.01" type="number" value={requestedRefundYuan} />
-              </label>
-              <small>请按本次售后实际申请的退款金额填写，审批和最终退款都会保留记录。</small>
-            </div>
-          ) : (
-            <div className="return-refund-summary"><strong>本申请不涉及退款</strong><small>换货完成后不会增加订单退款金额，也不会扣回销售提成。</small></div>
-          )}
+          <div className="return-refund-summary">
+            <label className="return-reason-field">
+              <span>申请退款金额（元）</span>
+              <input inputMode="decimal" min="0" onChange={(event) => { setRequestedRefundYuan(event.currentTarget.value); setError(null); }} step="0.01" type="number" value={requestedRefundYuan} />
+            </label>
+            <small>请按本次售后实际申请的退款金额填写，审批和最终退款都会保留记录。</small>
+          </div>
 
           <label className="return-reason-field">
             <span>{kind === "special" ? "特殊处理说明" : "售后说明"}（至少 2 个字符）</span>
@@ -416,7 +397,7 @@ export const ReturnDialog = ({
               取消
             </button>
             <button className="order-primary-action" disabled={submitting} type="submit">
-              {submitting ? "正在提交…" : `提交${serviceType === "refund" ? "退货退款" : "换货"}申请`}
+              {submitting ? "正在提交…" : "提交退货退款申请"}
             </button>
           </footer>
         </form>

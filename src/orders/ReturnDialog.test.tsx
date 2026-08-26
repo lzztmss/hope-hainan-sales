@@ -145,11 +145,10 @@ describe("整单退单商品明细", () => {
     expect(within(dialog).getByText(/特殊.*退货退款.*单独标识/)).toBeInTheDocument();
   });
 
-  it("换货明确不涉及退款和提成扣回", async () => {
+  it("只提供退货退款，不显示换货入口", () => {
     render(<ReturnDialog open order={{ ...order, signedAt: new Date().toISOString() }} onClose={vi.fn()} onSubmit={vi.fn()} />);
-    const exchange = screen.getByRole("radio", { name: /换货/ });
-    exchange.click();
-    expect(await screen.findByText("本申请不涉及退款")).toBeInTheDocument();
-    expect(screen.queryByRole("spinbutton", { name: "申请退款金额（元）" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "申请退货退款" })).toBeInTheDocument();
+    expect(screen.queryByText("换货")).not.toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "申请退款金额（元）" })).toBeInTheDocument();
   });
 });

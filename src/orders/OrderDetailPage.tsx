@@ -636,7 +636,7 @@ export const OrderDetailPage = ({
               onClick={returnAllowed ? onOpenReturn : undefined}
               type="button"
             >
-              申请售后
+              申请退货退款
             </button>
             {!returnAllowed ? (
               <small id="order-return-unavailable-reason">{returnAvailability.reason}</small>

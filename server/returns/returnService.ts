@@ -343,23 +343,17 @@ export const createReturnService = (options: ReturnServiceOptions) => {
         const requestedAt = now();
         const elapsedDays = daysAfterSigning(order.signedAt, requestedAt);
         const serviceType = input.serviceType ?? "refund";
+        if (serviceType !== "refund") {
+          throw new Error("系统仅支持退货退款申请");
+        }
         const returnKind = input.kind ?? "normal";
         const reasonCategory = input.reasonCategory ?? "other";
         const requestedRefundFen = input.requestedRefundFen ?? 0;
         if (!Number.isSafeInteger(requestedRefundFen) || requestedRefundFen < 0) {
           throw new Error("申请退款金额不正确");
         }
-        if (serviceType === "exchange" && requestedRefundFen !== 0) {
-          throw new Error("换货申请不能填写退款金额");
-        }
-        if (returnKind === "normal" && serviceType === "refund" && elapsedDays > 7) {
+        if (returnKind === "normal" && elapsedDays > 7) {
           throw new Error("订单签收已超过7日，请改为特殊退货退款申请");
-        }
-        if (returnKind === "normal" && serviceType === "exchange" && elapsedDays > 15) {
-          throw new Error("订单签收已超过15日，请改为特殊换货申请");
-        }
-        if (returnKind === "normal" && serviceType === "exchange" && reasonCategory !== "quality") {
-          throw new Error("普通换货仅适用于产品质量问题");
         }
         const created = await repository.createRequest({
           returnNo: `XLX-RT-${shanghaiDate(requestedAt)}-${numberSuffix()}`,

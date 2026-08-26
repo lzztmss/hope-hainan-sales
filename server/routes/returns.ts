@@ -27,7 +27,7 @@ export interface RegisterReturnRoutesOptions {
 }
 
 const requestSchema = z.object({
-  serviceType: z.enum(["refund", "exchange"]),
+  serviceType: z.literal("refund"),
   type: z.enum(["full", "partial"]),
   kind: z.enum(["normal", "special"]),
   reasonCategory: z.enum(["no_reason", "quality", "other"]),
@@ -51,7 +51,7 @@ const completionSchema = z.object({
 });
 const listSchema = z.object({
   status: z.enum(["requested", "approved", "rejected", "completed"]).optional(),
-  serviceType: z.enum(["refund", "exchange"]).optional(),
+  serviceType: z.literal("refund").optional(),
   returnKind: z.enum(["normal", "special"]).optional(),
   storeId: z.string().uuid().optional(),
   sellerId: z.string().uuid().optional(),

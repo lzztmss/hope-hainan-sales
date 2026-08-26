@@ -200,37 +200,19 @@ describe("退单状态与提成冲销一致性", () => {
     await client.close();
   });
 
-  it("换货完成不累计退款、不消耗可退数量且不冲销提成", async () => {
-    const { client, order, seller, admin } = await createFixture("signed");
+  it("拒绝通过服务层直接创建换货申请", async () => {
+    const { client, order, seller } = await createFixture("signed");
     const repository = new DrizzleReturnRepository(client);
-    let reversalCount = 0;
     const service = createReturnService({
       repository,
-      commissionReversal: {
-        validateReversalForCompletedReturn: async () => {
-          throw new Error("换货不应执行提成冲销预检");
-        },
-        reverseForCompletedReturn: async () => {
-          reversalCount += 1;
-        },
-      },
       numberSuffix: () => "EXCHANGE",
     });
-    const requested = await service.requestReturn(
+    await expect(service.requestReturn(
       seller,
       order.id,
-      { serviceType: "exchange", type: "full", kind: "normal", reasonCategory: "quality", requestedRefundFen: 0, reason: "设备质量问题申请换货", items: [] },
+      { serviceType: "exchange", type: "full", kind: "normal", reasonCategory: "quality", requestedRefundFen: 0, reason: "尝试申请换货", items: [] },
       "after-sales-exchange-request-001",
-    );
-    await service.decideReturn(admin, requested.id, "approved", "同意换货");
-    const completed = await service.completeReturn(admin, requested.id, 0, "after-sales-exchange-complete-001");
-    const orderAfter = await repository.findOrderForReturn(order.id);
-    expect(completed.serviceType).toBe("exchange");
-    expect(completed.refundFen).toBe(0);
-    expect(orderAfter?.status).toBe("signed");
-    expect(orderAfter?.refundedFen).toBe(0);
-    expect(orderAfter?.lines[0]?.returnedQuantity).toBe(0);
-    expect(reversalCount).toBe(0);
+    )).rejects.toThrow("系统仅支持退货退款申请");
     await client.close();
   });
 
