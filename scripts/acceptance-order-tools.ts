@@ -10,7 +10,8 @@ if (!/^(?:acceptance|order-v2)(?:[.-]|$)/i.test(basename(absolutePath))) {
   throw new Error(`为避免误删正式数据，此脚本只允许操作 acceptance.sqlite 或 order-v2.sqlite：${absolutePath}`);
 }
 
-const [command, orderNo, dateValue] = process.argv.slice(2);
+const args = process.argv.slice(2).filter((argument) => argument !== "--");
+const [command, orderNo, dateValue] = args;
 if (!command || !orderNo || (command === "set-signed" && !dateValue)) {
   console.error(`用法：
   pnpm db:acceptance:order -- delete <订单号>
