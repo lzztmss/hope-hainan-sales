@@ -111,9 +111,9 @@ export const TeamReportPage = ({
                   <div><dt>成交率</dt><dd>{formatReportRate(row.conversionRateBps)}</dd></div>
                   <div><dt>一次性原额</dt><dd>{formatReportFen(row.oneTimeOriginalFen)}</dd></div>
                   <div><dt>退单额</dt><dd>{formatReportFen(row.returnedFen)}</dd></div>
-                  <div><dt>净额</dt><dd>{formatReportFen(row.oneTimeNetFen)}</dd></div>
+                  <div><dt>一次性设备净额</dt><dd>{formatReportFen(row.oneTimeNetFen)}</dd></div>
                   <div><dt>FTTR / 心连心月费</dt><dd>{formatReportFen(row.fttrMonthlyFen)} / {formatReportFen(row.heartMonthlyFen)}</dd></div>
-                  <div><dt>36 月名义额</dt><dd>{formatReportFen(row.contract36Fen)}</dd></div>
+                  <div><dt>36个月合约月费合计</dt><dd>{formatReportFen(row.contract36Fen)}</dd></div>
                   <div><dt>期间提成净额</dt><dd>{formatReportFen(row.commissionNetFen)}</dd></div>
                 </dl>
               </article>

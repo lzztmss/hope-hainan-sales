@@ -59,13 +59,13 @@ const summaryDefinitions: ReadonlyArray<{
   tone: "primary" | "normal" | "warning" | "success";
 }> = [
   { key: "estimatedFen", label: "预计提成", tone: "normal" },
-  { key: "accruedNetFen", label: "已计提净额", tone: "primary" },
+  { key: "accruedNetFen", label: "本月提成净额", tone: "primary" },
   { key: "pendingSettlementFen", label: "待结算", tone: "warning" },
   { key: "pendingPaymentFen", label: "待发放", tone: "warning" },
   { key: "paidThisMonthFen", label: "本月已发放", tone: "success" },
   { key: "paidLifetimeFen", label: "累计已发放", tone: "success" },
   { key: "reversedLifetimeFen", label: "历史累计扣回", tone: "normal" },
-  { key: "netLifetimeFen", label: "累计净提成", tone: "primary" },
+  { key: "netLifetimeFen", label: "历史提成净额", tone: "primary" },
 ];
 
 export const MyCommissionPage = ({ dashboard, onPageChange }: MyCommissionPageProps) => {
@@ -111,7 +111,7 @@ export const MyCommissionPage = ({ dashboard, onPageChange }: MyCommissionPagePr
       <div className="commission-order-section__heading">
         <div>
           <h2 id="commission-orders-title">按订单查看</h2>
-          <p>每笔提成都保留商品、数量、适用规则和退单冲回。</p>
+          <p>每笔提成都保留商品、数量、适用规则和退单扣回。</p>
         </div>
       </div>
 

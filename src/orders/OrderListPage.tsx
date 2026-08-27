@@ -112,7 +112,8 @@ export const OrderListPage = ({
   const [detailError, setDetailError] = useState<string | null>(null);
   const [returnOpen, setReturnOpen] = useState(false);
   const [batchMode, setBatchMode] = useState<"reconcile" | "receive" | "payout" | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedOrders, setSelectedOrders] = useState<Map<string, OrderSummary>>(new Map());
+  const selectedIds = useMemo(() => new Set(selectedOrders.keys()), [selectedOrders]);
   const [batchBusy, setBatchBusy] = useState(false);
   const openedInitialOrderId = useRef<string | null>(null);
 
@@ -196,6 +197,7 @@ export const OrderListPage = ({
     if (store) next.storeQuery = store.id;
     if (seller) next.sellerQuery = seller.id;
     setPage(1);
+    setSelectedOrders(new Map());
     setAppliedFilters(next);
     setFilterOpen(false);
   };
@@ -274,9 +276,10 @@ export const OrderListPage = ({
   };
 
   const toggleSelection = (orderId: string, checked: boolean): void => {
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (checked) next.add(orderId); else next.delete(orderId);
+    setSelectedOrders((current) => {
+      const next = new Map(current);
+      const order = items.find((entry) => entry.id === orderId);
+      if (checked && order) next.set(orderId, order); else next.delete(orderId);
       return next;
     });
   };
@@ -287,20 +290,31 @@ export const OrderListPage = ({
   const allEligibleSelected = eligiblePageIds.length > 0 && eligiblePageIds.every((id) => selectedIds.has(id));
 
   const toggleAllEligible = (checked: boolean): void => {
-    setSelectedIds(checked ? new Set(eligiblePageIds) : new Set());
+    setSelectedOrders((current) => {
+      const next = new Map(current);
+      for (const order of items) {
+        if (!batchEligibility(order).eligible) continue;
+        if (checked) next.set(order.id, order); else next.delete(order.id);
+      }
+      return next;
+    });
   };
 
   const runBatchAction = async (): Promise<void> => {
     if (!batchMode || selectedIds.size === 0) return;
-    const selectedOrders = items.filter((order) => selectedIds.has(order.id));
+    const selected = [...selectedOrders.values()];
+    if (selected.length > 100) {
+      setListError("每次最多批量处理100笔订单");
+      return;
+    }
     setBatchBusy(true);
     setListError(null);
     try {
       if (batchMode === "payout") {
-        await adapter.batchPayCommissions(selectedOrders.map((order) => order.id));
+        await adapter.batchPayCommissions(selected.map((order) => order.id));
       } else {
         await adapter.batchTransitionOrders(
-          selectedOrders.map((order) => ({
+          selected.map((order) => ({
             orderId: order.id,
             expectedVersion: order.version,
             command: batchMode === "reconcile" ? "RECONCILE" : "MARK_PAID",
@@ -308,7 +322,7 @@ export const OrderListPage = ({
           batchMode === "reconcile" ? "RECONCILE" : "MARK_PAID",
         );
       }
-      setSelectedIds(new Set());
+      setSelectedOrders(new Map());
       setBatchMode(null);
       await loadOrders(false, page);
     } catch (error) {
@@ -547,7 +561,7 @@ export const OrderListPage = ({
                 key={mode.id}
                 onClick={() => {
                   setBatchMode((current) => current === mode.id ? null : mode.id);
-                  setSelectedIds(new Set());
+                  setSelectedOrders(new Map());
                 }}
                 type="button"
               >

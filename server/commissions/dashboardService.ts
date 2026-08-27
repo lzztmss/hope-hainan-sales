@@ -462,7 +462,7 @@ const ledgerLineLabel = (
   row: DashboardLedgerRecord,
   baseLabel: string,
 ): string => {
-  if (row.entryType === "return_reversal") return `${baseLabel}（退单冲回）`;
+  if (row.entryType === "return_reversal") return `${baseLabel}（退单扣回）`;
   if (row.entryType === "manual_positive") return `${baseLabel}（人工增加）`;
   if (row.entryType === "manual_negative") return `${baseLabel}（人工扣减）`;
   return baseLabel;
@@ -509,7 +509,7 @@ const ledgerOrderStatus = (
   rows: readonly DashboardLedgerRecord[],
 ): Pick<CommissionDashboardOrder, "status" | "statusLabel"> => {
   if (rows.some((row) => row.entryType === "return_reversal")) {
-    return { status: "reversed", statusLabel: "含退单冲回 · 当前净额" };
+    return { status: "reversed", statusLabel: "含退单扣回 · 当前净额" };
   }
   if (rows.some((row) => row.settlementStatus === "paid")) {
     return { status: "paid", statusLabel: "已发放" };
