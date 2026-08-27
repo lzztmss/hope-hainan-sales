@@ -45,6 +45,7 @@
 }
 
 .returns-toolbar select,
+.returns-toolbar input,
 .returns-dialog input,
 .returns-dialog textarea,
 .returns-toolbar button,
@@ -63,6 +64,7 @@
 }
 
 .returns-toolbar select,
+.returns-toolbar input,
 .returns-dialog input,
 .returns-dialog textarea {
   width: 100%;
@@ -73,6 +75,10 @@
   height: var(--app-control-min-size);
   padding-block: 0;
   line-height: 1.2;
+}
+
+.returns-toolbar input {
+  height: var(--app-control-min-size);
 }
 
 .returns-toolbar p {
@@ -110,6 +116,7 @@
 .returns-dialog button:focus-visible,
 .returns-refresh-button:focus-visible,
 .returns-toolbar select:focus-visible,
+.returns-toolbar input:focus-visible,
 .returns-dialog input:focus-visible,
 .returns-dialog textarea:focus-visible {
   outline: 3px solid var(--app-color-focus);

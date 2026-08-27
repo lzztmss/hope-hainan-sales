@@ -1,4 +1,4 @@
-import { and, count, eq, inArray, sql } from "drizzle-orm";
+import { and, count, eq, inArray, or, sql } from "drizzle-orm";
 
 import type { AppDatabase, DbClient, DbTransaction } from "../db/client.js";
 import type { UserScope } from "../auth/authorization.js";
@@ -272,6 +272,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
     scope: UserScope,
     filters: {
       orderId?: string;
+      query?: string;
       status?: ReturnRequestRecord["status"];
       serviceType?: ReturnRequestRecord["serviceType"];
       returnKind?: ReturnRequestRecord["returnKind"];
@@ -290,6 +291,14 @@ export class DrizzleReturnRepository implements ReturnRepository {
       );
     }
     if (filters.orderId) conditions.push(eq(returnTable.orderId, filters.orderId));
+    const queryText = filters.query?.trim();
+    if (queryText) {
+      const queryCondition = or(
+        sql`instr(lower(${orders.orderNo}), lower(${queryText})) > 0`,
+        sql`instr(lower(${returnTable.returnNo}), lower(${queryText})) > 0`,
+      );
+      if (queryCondition) conditions.push(queryCondition);
+    }
     if (filters.status) conditions.push(eq(returnTable.status, filters.status));
     if (filters.serviceType) conditions.push(eq(returnTable.serviceType, filters.serviceType));
     if (filters.returnKind) conditions.push(eq(returnTable.returnKind, filters.returnKind));

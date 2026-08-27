@@ -30,6 +30,7 @@ export const ReturnManagementRoute = ({
   const [items, setItems] = useState<readonly ReturnRecordDto[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [query, setQuery] = useState("");
   const [status, setStatus] = useState<ReturnStatus | "">("");
   const [serviceType, setServiceType] = useState<AfterSalesServiceType | "">("");
   const [returnKind, setReturnKind] = useState<ReturnKind | "">("");
@@ -46,7 +47,7 @@ export const ReturnManagementRoute = ({
       setLoadError(null);
     }
     try {
-      const result = await api.listReturns({ status: status || undefined, serviceType: serviceType || undefined, returnKind: returnKind || undefined, storeId: storeId || undefined, sellerId: sellerId || undefined, page: requestedPage, pageSize: 20 });
+      const result = await api.listReturns({ query: query || undefined, status: status || undefined, serviceType: serviceType || undefined, returnKind: returnKind || undefined, storeId: storeId || undefined, sellerId: sellerId || undefined, page: requestedPage, pageSize: 20 });
       setItems(result.items);
       setTotal(result.total);
       setPage(result.page);
@@ -59,7 +60,7 @@ export const ReturnManagementRoute = ({
     } finally {
       if (!background) setLoading(false);
     }
-  }, [api, returnKind, sellerId, serviceType, status, storeId]);
+  }, [api, query, returnKind, sellerId, serviceType, status, storeId]);
 
   useEffect(() => {
     void client.listOrderFilterOptions().then(setFilterOptions).catch(() => setFilterOptions({ stores: [], sellers: [] }));
@@ -97,6 +98,7 @@ export const ReturnManagementRoute = ({
         replaceRecord(await api.decideReturn(input));
       }}
       onReload={() => setReloadVersion((version) => version + 1)}
+      onQueryChange={setQuery}
       onStatusChange={setStatus}
       onServiceTypeChange={setServiceType}
       onReturnKindChange={setReturnKind}
@@ -106,6 +108,7 @@ export const ReturnManagementRoute = ({
       sellerId={sellerId}
       stores={filterOptions.stores}
       sellers={filterOptions.sellers}
+      query={query}
       status={status}
       serviceType={serviceType}
       returnKind={returnKind}

@@ -50,6 +50,7 @@ const completionSchema = z.object({
   refundFen: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
 });
 const listSchema = z.object({
+  query: z.string().trim().max(100).optional(),
   status: z.enum(["requested", "approved", "rejected", "completed"]).optional(),
   serviceType: z.literal("refund").optional(),
   returnKind: z.enum(["normal", "special"]).optional(),

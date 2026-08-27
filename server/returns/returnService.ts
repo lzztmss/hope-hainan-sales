@@ -142,7 +142,7 @@ export interface ReturnRepository {
   findRequestById(id: string): Promise<ReturnRequestRecord | null>;
   listRequests(
     scope: UserScope,
-    filters: { orderId?: string; status?: ReturnRequestStatus; serviceType?: "refund" | "exchange"; returnKind?: "normal" | "special"; storeId?: string; sellerId?: string },
+    filters: { orderId?: string; query?: string; status?: ReturnRequestStatus; serviceType?: "refund" | "exchange"; returnKind?: "normal" | "special"; storeId?: string; sellerId?: string },
     paging?: { page: number; pageSize: number },
   ): Promise<{ items: ReturnRequestRecord[]; total: number }>;
   saveDecision(
@@ -296,7 +296,7 @@ export const createReturnService = (options: ReturnServiceOptions) => {
   return {
     async listReturns(
       actor: AuthenticatedUser,
-      filters: { status?: ReturnRequestStatus; serviceType?: "refund" | "exchange"; returnKind?: "normal" | "special"; storeId?: string; sellerId?: string; page?: number; pageSize?: number } = {},
+      filters: { query?: string; status?: ReturnRequestStatus; serviceType?: "refund" | "exchange"; returnKind?: "normal" | "special"; storeId?: string; sellerId?: string; page?: number; pageSize?: number } = {},
     ) {
       const page = filters.page ?? 1;
       const pageSize = filters.pageSize ?? 20;

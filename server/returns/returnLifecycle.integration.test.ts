@@ -572,4 +572,43 @@ describe("退单状态与提成冲销一致性", () => {
     expect(reversalCount).toBe(1);
     await client.close();
   });
+
+  it("售后列表可按订单号或售后单号查询并返回申请人姓名", async () => {
+    const { client, order, seller, admin } = await createFixture("signed");
+    const service = createReturnService({
+      repository: new DrizzleReturnRepository(client),
+      numberSuffix: () => "SEARCHABLE",
+    });
+    const requested = await service.requestReturn(
+      seller,
+      order.id,
+      { type: "full", reason: "测试售后单查询", items: [] },
+      "return-request-search-001",
+    );
+
+    const byOrderNo = await service.listReturns(admin, {
+      query: "TEST-RETURN",
+      page: 1,
+      pageSize: 20,
+    });
+    expect(byOrderNo.total).toBe(1);
+    expect(byOrderNo.items[0]?.id).toBe(requested.id);
+    expect(byOrderNo.items[0]?.requestedByName).toBe("退单申请人");
+
+    const byReturnNo = await service.listReturns(admin, {
+      query: "SEARCHABLE",
+      page: 1,
+      pageSize: 20,
+    });
+    expect(byReturnNo.total).toBe(1);
+    expect(byReturnNo.items[0]?.returnNo).toBe(requested.returnNo);
+
+    const noMatch = await service.listReturns(admin, {
+      query: "NOT-FOUND",
+      page: 1,
+      pageSize: 20,
+    });
+    expect(noMatch.total).toBe(0);
+    await client.close();
+  });
 });

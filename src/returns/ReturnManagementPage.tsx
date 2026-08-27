@@ -20,12 +20,14 @@ export interface ReturnManagementPageProps {
   page?: number;
   total?: number;
   onPageChange?(page: number): void;
+  query?: string;
   status?: ReturnStatus | "";
   serviceType?: AfterSalesServiceType | "";
   returnKind?: ReturnKind | "";
   loading?: boolean;
   loadError?: string | null;
   onStatusChange?(status: ReturnStatus | ""): void;
+  onQueryChange?(query: string): void;
   onServiceTypeChange?(serviceType: AfterSalesServiceType | ""): void;
   onReturnKindChange?(returnKind: ReturnKind | ""): void;
   onStoreChange?(storeId: string): void;
@@ -328,6 +330,7 @@ export const ReturnManagementPage = ({
   onComplete,
   onDecide,
   onReload,
+  onQueryChange,
   onStatusChange,
   onServiceTypeChange,
   onReturnKindChange,
@@ -337,6 +340,7 @@ export const ReturnManagementPage = ({
   sellerId = "",
   stores = [],
   sellers = [],
+  query = "",
   status = "",
   serviceType = "",
   returnKind = "",
@@ -346,6 +350,7 @@ export const ReturnManagementPage = ({
 }: ReturnManagementPageProps) => {
   const [approval, setApproval] = useState<ReturnRecordDto | null>(null);
   const [completion, setCompletion] = useState<ReturnRecordDto | null>(null);
+  const [draftQuery, setDraftQuery] = useState(query);
   const [draftStatus, setDraftStatus] = useState(status);
   const [draftServiceType, setDraftServiceType] = useState(serviceType);
   const [draftReturnKind, setDraftReturnKind] = useState(returnKind);
@@ -353,14 +358,16 @@ export const ReturnManagementPage = ({
   const [draftSellerId, setDraftSellerId] = useState(sellerId);
 
   useEffect(() => {
+    setDraftQuery(query);
     setDraftStatus(status);
     setDraftServiceType(serviceType);
     setDraftReturnKind(returnKind);
     setDraftStoreId(storeId);
     setDraftSellerId(sellerId);
-  }, [returnKind, sellerId, serviceType, status, storeId]);
+  }, [query, returnKind, sellerId, serviceType, status, storeId]);
 
   const applyFilters = () => {
+    onQueryChange?.(draftQuery.trim());
     onStatusChange?.(draftStatus);
     onServiceTypeChange?.(draftServiceType);
     onReturnKindChange?.(draftReturnKind);
@@ -370,11 +377,13 @@ export const ReturnManagementPage = ({
   };
 
   const resetFilters = () => {
+    setDraftQuery("");
     setDraftStatus("");
     setDraftServiceType("");
     setDraftReturnKind("");
     setDraftStoreId("");
     setDraftSellerId("");
+    onQueryChange?.("");
     onStatusChange?.("");
     onServiceTypeChange?.("");
     onReturnKindChange?.("");
@@ -416,6 +425,17 @@ export const ReturnManagementPage = ({
       title="售后管理"
     >
       <section className="returns-toolbar" aria-label="售后筛选">
+        <label>
+          <span>搜索售后</span>
+          <input
+            disabled={loading}
+            onChange={(event) => setDraftQuery(event.currentTarget.value)}
+            onKeyDown={(event) => { if (event.key === "Enter") applyFilters(); }}
+            placeholder="订单号或售后单号"
+            type="search"
+            value={draftQuery}
+          />
+        </label>
         <label>
           <span>售后状态</span>
           <select
