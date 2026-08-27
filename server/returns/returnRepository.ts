@@ -9,6 +9,7 @@ import {
   orders,
   returnItems,
   returns as returnTable,
+  users,
 } from "../db/schema.js";
 import type {
   ReturnCompletionWrite,
@@ -46,6 +47,7 @@ const mapRequest = (
   row: ReturnRow,
   itemRows: readonly ReturnItemRow[],
   orderNo: string,
+  requestedByName: string | null,
 ): ReturnRequestRecord => {
   const items = itemRows.map(mapItem);
   return {
@@ -63,6 +65,7 @@ const mapRequest = (
     status: row.status,
     reason: row.reason,
     requestedBy: row.requestedBy,
+    requestedByName,
     requestedAt: row.requestedAt,
     decidedBy: row.decidedBy,
     decidedAt: row.decidedAt,
@@ -93,7 +96,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
   }
 
   private async loadRequest(row: ReturnRow): Promise<ReturnRequestRecord> {
-    const [items, orderRows] = await Promise.all([
+    const [items, orderRows, userRows] = await Promise.all([
       this.executor
         .select()
         .from(returnItems)
@@ -103,10 +106,15 @@ export class DrizzleReturnRepository implements ReturnRepository {
         .from(orders)
         .where(eq(orders.id, row.orderId))
         .limit(1),
+      this.executor
+        .select({ displayName: users.displayName })
+        .from(users)
+        .where(eq(users.id, row.requestedBy))
+        .limit(1),
     ]);
     const orderNo = orderRows[0]?.orderNo;
     if (!orderNo) throw new Error("退单关联订单不存在");
-    return mapRequest(row, items, orderNo);
+    return mapRequest(row, items, orderNo, userRows[0]?.displayName ?? null);
   }
 
   async findByRequestIdempotencyKey(

@@ -74,6 +74,7 @@ export interface ReturnRequestRecord {
   status: ReturnRequestStatus;
   reason: string;
   requestedBy: string;
+  requestedByName: string | null;
   requestedAt: Date;
   decidedBy: string | null;
   decidedAt: Date | null;

@@ -86,6 +86,9 @@ const globalDataRole = (actor: AuthenticatedUser): boolean =>
 const afterSalesLabel = (record: Pick<ReturnRecordDto, "serviceType" | "returnKind">): string =>
   `${record.returnKind === "special" ? "特殊" : "普通"}${record.serviceType === "refund" ? "退货退款" : "换货"}`;
 
+const applicantLabel = (record: Pick<ReturnRecordDto, "requestedBy" | "requestedByName">): string =>
+  record.requestedByName?.trim() || `申请人 ${record.requestedBy}`;
+
 const RETURN_REASON_LABELS = {
   no_reason: "7天无理由退货（仅限线上订单）",
   quality: "产品质量问题",
@@ -451,7 +454,7 @@ export const ReturnManagementPage = ({
             {items.map((record) => (
               <tr key={record.id}>
                 <td><strong>{record.returnNo}</strong><Link className="returns-order-link" to={`/orders/${record.orderId}`}>原订单 {record.orderNo}</Link><small>{afterSalesLabel(record)} · {record.returnType === "full" ? "整单" : "部分商品"}</small></td>
-                <td><strong>申请人 ID：{record.requestedBy}</strong><span>{formatDateTime(record.requestedAt)}</span></td>
+                <td><strong>申请人：{applicantLabel(record)}</strong><span>{formatDateTime(record.requestedAt)}</span></td>
                 <td><small>{RETURN_REASON_LABELS[record.reasonCategory]}</small><p>{record.reason}</p><ReturnItems record={record} /></td>
                 <td>{record.serviceType === "refund" ? <><strong>申请退款 {formatMoney(record.requestedRefundFen)}</strong>{record.status === "completed" ? <span>实际退款 {formatMoney(record.refundFen)}</span> : null}</> : <><strong>换货不涉及退款</strong><small>不扣回提成</small></>}</td>
                 <td><ReturnStatusBadge record={record} /></td>
@@ -467,7 +470,7 @@ export const ReturnManagementPage = ({
           <li key={record.id}>
             <article className="returns-mobile-card">
               <header><div><span>{afterSalesLabel(record)} · {record.returnType === "full" ? "整单" : "部分商品"}</span><strong>{record.returnNo}</strong></div><ReturnStatusBadge record={record} /></header>
-              <div className="returns-mobile-meta"><Link className="returns-order-link" to={`/orders/${record.orderId}`}>原订单 {record.orderNo}</Link><span>申请人 ID：{record.requestedBy}</span><span>{formatDateTime(record.requestedAt)}</span></div>
+              <div className="returns-mobile-meta"><Link className="returns-order-link" to={`/orders/${record.orderId}`}>原订单 {record.orderNo}</Link><span>申请人：{applicantLabel(record)}</span><span>{formatDateTime(record.requestedAt)}</span></div>
               <p>{RETURN_REASON_LABELS[record.reasonCategory]}：{record.reason}</p>
               <ReturnItems record={record} />
               <div className="returns-mobile-amount">{record.serviceType === "refund" ? <><strong>申请退款 {formatMoney(record.requestedRefundFen)}</strong>{record.status === "completed" ? <span>实际退款 {formatMoney(record.refundFen)}</span> : null}</> : <><strong>换货不涉及退款</strong><small>不扣回提成</small></>}</div>
