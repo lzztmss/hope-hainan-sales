@@ -310,6 +310,36 @@
   background: var(--hfttr-color-danger-100);
 }
 
+.order-batch-toolbar {
+  display: grid;
+  gap: var(--hfttr-space-3);
+  padding: var(--hfttr-space-4);
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-surface);
+  background: var(--app-color-surface);
+}
+
+.order-batch-toolbar > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--hfttr-space-2);
+}
+
+.order-batch-toolbar .is-active {
+  border-color: var(--app-color-primary);
+  background: var(--app-color-primary);
+  color: var(--app-color-text-inverse);
+}
+
+.order-batch-toolbar__action {
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--hfttr-space-3);
+  border-top: var(--app-border-width) solid var(--app-color-border);
+  color: var(--app-color-text-muted);
+  font-size: var(--hfttr-font-size-sm);
+}
+
 /* The table remains in the accessibility tree on small screens while it is visually clipped. */
 .order-table-shell {
   position: absolute;
@@ -343,6 +373,19 @@
   font-size: var(--hfttr-font-size-sm);
 }
 
+.order-desktop-table .order-select-column {
+  width: 3rem;
+  padding-inline: var(--hfttr-space-3);
+  text-align: center;
+}
+
+.order-select-column input,
+.order-mobile-list > li > input {
+  width: 1.25rem;
+  height: 1.25rem;
+  min-height: 0;
+}
+
 .order-desktop-table td > strong,
 .order-desktop-table td > span,
 .order-desktop-table td > small {
@@ -362,6 +405,13 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.order-mobile-list > li.is-batch-mode {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--hfttr-space-2);
 }
 
 .order-page .order-mobile-card {
@@ -433,6 +483,42 @@
   font-size: var(--hfttr-font-size-xs);
   font-weight: var(--app-font-weight-bold);
   white-space: nowrap;
+}
+
+.order-status-stack {
+  display: inline-flex !important;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: var(--hfttr-space-1);
+  margin: 0 !important;
+}
+
+.order-status-stack small {
+  color: var(--app-color-text-muted);
+  font-size: var(--hfttr-font-size-xs);
+  white-space: nowrap;
+}
+
+.order-commission-status {
+  display: inline-flex;
+  padding: 0.15rem var(--hfttr-space-2);
+  border-radius: var(--hfttr-radius-pill);
+  background: var(--hfttr-color-neutral-100);
+}
+
+.order-commission-status.is-pending {
+  background: var(--app-color-accent-subtle);
+  color: var(--app-color-accent-strong);
+}
+
+.order-commission-status.is-paid {
+  background: var(--hfttr-color-success-100);
+  color: var(--hfttr-color-success-700);
+}
+
+.order-finance-status {
+  color: var(--hfttr-color-success-700) !important;
+  font-weight: var(--app-font-weight-medium);
 }
 
 .order-status.is-accepted,

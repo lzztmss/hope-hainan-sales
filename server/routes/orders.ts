@@ -54,6 +54,18 @@ const transitionSchema = z.object({
   expectedVersion: z.number().int().min(1),
 });
 
+const batchTransitionSchema = z.object({
+  command: z.enum(["RECONCILE", "MARK_PAID"]),
+  items: z.array(z.object({
+    orderId: z.string().uuid(),
+    expectedVersion: z.number().int().min(1),
+  })).min(1).max(100),
+});
+
+const batchCommissionPayoutSchema = z.object({
+  orderIds: z.array(z.string().uuid()).min(1).max(100),
+});
+
 const dateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -89,6 +101,11 @@ const listQuerySchema = z.object({
   productSku: z.string().trim().regex(/^[A-Z0-9_]{1,64}$/).optional(),
   dateFrom: dateSchema.optional(),
   dateTo: dateSchema.optional(),
+  signedDateFrom: dateSchema.optional(),
+  signedDateTo: dateSchema.optional(),
+  commissionPayoutStatus: z.enum(["ineligible", "pending", "paid"]).optional(),
+  reconciliationStatus: z.enum(["pending", "reconciled"]).optional(),
+  collectionStatus: z.enum(["unpaid", "paid"]).optional(),
   cursor: z.string().max(500).optional(),
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -159,7 +176,14 @@ const parseListFilters = (
           24 * 60 * 60 * 1000,
       )
     : undefined;
+  const signedDateFrom = parsed.data.signedDateFrom
+    ? new Date(`${parsed.data.signedDateFrom}T00:00:00+08:00`)
+    : undefined;
+  const signedDateTo = parsed.data.signedDateTo
+    ? new Date(new Date(`${parsed.data.signedDateTo}T00:00:00+08:00`).getTime() + 86_400_000)
+    : undefined;
   if (dateFrom && dateTo && dateFrom >= dateTo) return { success: false };
+  if (signedDateFrom && signedDateTo && signedDateFrom >= signedDateTo) return { success: false };
   return {
     success: true,
     filters: {
@@ -176,6 +200,11 @@ const parseListFilters = (
       productSku: parsed.data.productSku,
       dateFrom,
       dateTo,
+      signedDateFrom,
+      signedDateTo,
+      commissionPayoutStatus: parsed.data.commissionPayoutStatus,
+      reconciliationStatus: parsed.data.reconciliationStatus,
+      collectionStatus: parsed.data.collectionStatus,
       cursor: parsed.data.cursor,
       page: parsed.data.page ?? (parsed.data.cursor ? undefined : 1),
       limit: parsed.data.limit,
@@ -289,6 +318,35 @@ export const registerOrderRoutes = async (
       }
     },
   );
+
+  app.post("/api/orders/batch-transitions", async (request, reply) => {
+    if (!ensureTrustedOrigin(request, reply, options.appOrigin)) return;
+    const user = await resolveUser(request, reply, options.authService);
+    if (!user) return;
+    const parsed = batchTransitionSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: "批量订单参数不正确" });
+    try {
+      return await options.orderService.batchTransitionOrders(user, parsed.data.items, parsed.data.command);
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
+
+  app.post("/api/orders/batch-commission-payout", async (request, reply) => {
+    if (!ensureTrustedOrigin(request, reply, options.appOrigin)) return;
+    const user = await resolveUser(request, reply, options.authService);
+    if (!user) return;
+    const parsed = batchCommissionPayoutSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: "批量发放参数不正确" });
+    const keyHeader = request.headers["idempotency-key"];
+    const idempotencyKey = Array.isArray(keyHeader) ? keyHeader[0] : keyHeader;
+    if (!idempotencyKey) return reply.status(400).send({ error: "缺少幂等键" });
+    try {
+      return await options.orderService.batchPayCommissions(user, parsed.data.orderIds, idempotencyKey);
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
 
   app.delete<{ Params: { id: string } }>(
     "/api/orders/:id",

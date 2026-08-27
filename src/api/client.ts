@@ -243,6 +243,10 @@ export interface OrderDto {
   monthlyTotalFen: number;
   contract36Fen: number;
   refundedFen: number;
+  commissionPayoutStatus: "ineligible" | "pending" | "paid";
+  commissionNetFen: number;
+  commissionPaidFen: number;
+  commissionReversedFen: number;
   customer: OrderCustomerDto;
   storeSnapshot?: Readonly<Record<string, unknown>> | null;
   sellerSnapshot?: Readonly<Record<string, unknown>> | null;
@@ -272,6 +276,11 @@ export interface OrderListApiQuery {
   sellerQuery?: string;
   status?: OrderStatus;
   paymentMode?: OrderPaymentMode;
+  signedDateFrom?: string;
+  signedDateTo?: string;
+  commissionPayoutStatus?: "ineligible" | "pending" | "paid";
+  reconciliationStatus?: "pending" | "reconciled";
+  collectionStatus?: "unpaid" | "paid";
   cursor?: string;
   page?: number;
   limit?: number;
@@ -443,6 +452,11 @@ export interface ApiClient {
     command: OrderTransitionCommand,
     expectedVersion: number,
   ): Promise<OrderMutationDto>;
+  batchTransitionOrders(
+    items: readonly { orderId: string; expectedVersion: number }[],
+    command: "RECONCILE" | "MARK_PAID",
+  ): Promise<{ updated: number }>;
+  batchPayOrderCommissions(orderIds: readonly string[], idempotencyKey: string): Promise<{ paidOrders: number; totalFen: number }>;
   updateCommissionRule(
     policyId: string,
     ruleId: string,
@@ -763,6 +777,11 @@ export const createApiClient = ({
       if (query.sellerQuery) parameters.set("sellerQuery", query.sellerQuery);
       if (query.status) parameters.set("status", query.status);
       if (query.paymentMode) parameters.set("paymentMode", query.paymentMode);
+      if (query.signedDateFrom) parameters.set("signedDateFrom", query.signedDateFrom);
+      if (query.signedDateTo) parameters.set("signedDateTo", query.signedDateTo);
+      if (query.commissionPayoutStatus) parameters.set("commissionPayoutStatus", query.commissionPayoutStatus);
+      if (query.reconciliationStatus) parameters.set("reconciliationStatus", query.reconciliationStatus);
+      if (query.collectionStatus) parameters.set("collectionStatus", query.collectionStatus);
       if (query.cursor) parameters.set("cursor", query.cursor);
       if (query.page) parameters.set("page", String(query.page));
       parameters.set("limit", String(query.limit ?? 100));
@@ -787,6 +806,19 @@ export const createApiClient = ({
           body: JSON.stringify({ command, expectedVersion }),
         },
       )) as OrderMutationDto;
+    },
+    async batchTransitionOrders(items, command) {
+      return (await request("/api/orders/batch-transitions", {
+        method: "POST",
+        body: JSON.stringify({ items, command }),
+      })) as { updated: number };
+    },
+    async batchPayOrderCommissions(orderIds, idempotencyKey) {
+      return (await request("/api/orders/batch-commission-payout", {
+        method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify({ orderIds }),
+      })) as { paidOrders: number; totalFen: number };
     },
     async deleteOrder(orderId) {
       return (await request(`/api/orders/${encodeURIComponent(orderId)}`, {

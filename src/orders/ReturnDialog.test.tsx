@@ -8,6 +8,12 @@ afterEach(cleanup);
 
 const order: OrderDetail = {
   signedAt: new Date().toISOString(),
+  reconciledAt: null,
+  paidAt: null,
+  commissionPayoutStatus: "ineligible",
+  commissionNetFen: 0,
+  commissionPaidFen: 0,
+  commissionReversedFen: 0,
   id: "order-1",
   orderNo: "XLXDD-001",
   customerMasked: "测*",

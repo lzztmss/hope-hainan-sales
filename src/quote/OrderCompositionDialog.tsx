@@ -34,11 +34,11 @@ export const OrderCompositionDialog = ({
         <legend>选择订单渠道</legend>
         <label>
           <input checked={channel === "online"} name="sales-channel" onChange={() => setChannel("online")} type="radio" />
-          <span><strong>线上订单</strong><small>签收后7日内可选择无理由退货</small></span>
+          <span><strong>线上订单</strong></span>
         </label>
         <label>
           <input checked={channel === "offline"} name="sales-channel" onChange={() => setChannel("offline")} type="radio" />
-          <span><strong>线下订单</strong><small>不适用线上7天无理由退货</small></span>
+          <span><strong>线下订单</strong></span>
         </label>
       </fieldset>
       <ul>

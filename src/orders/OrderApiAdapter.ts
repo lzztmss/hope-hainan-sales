@@ -31,6 +31,8 @@ export type OrderApiClient = Pick<
   | "requestOrderReturn"
   | "restoreOrder"
   | "transitionOrder"
+  | "batchTransitionOrders"
+  | "batchPayOrderCommissions"
 >;
 
 const operationKey = (): string => createClientKey("order-operation");
@@ -106,6 +108,13 @@ const mapSummary = (order: OrderDto, viewer: OrderViewer): OrderSummary => ({
   oneTimeFen: order.oneTimeFen,
   monthlyTotalFen: order.monthlyTotalFen,
   refundedFen: order.refundedFen,
+  signedAt: order.signedAt,
+  reconciledAt: order.reconciledAt,
+  paidAt: order.paidAt,
+  commissionPayoutStatus: order.commissionPayoutStatus,
+  commissionNetFen: order.commissionNetFen,
+  commissionPaidFen: order.commissionPaidFen,
+  commissionReversedFen: order.commissionReversedFen,
   createdAt: formatDateTime(order.createdAt),
   deletedAt: order.deletedAt ? formatDateTime(order.deletedAt) : null,
   version: order.version,
@@ -282,6 +291,11 @@ const listQueryFor = (filters: OrderListFilters, page = 1, pageSize = 20) => {
     ...(filters.paymentMode ? { paymentMode: filters.paymentMode } : {}),
     ...(filters.storeQuery ? { storeQuery: filters.storeQuery.trim() } : {}),
     ...(filters.sellerQuery ? { sellerQuery: filters.sellerQuery.trim() } : {}),
+    ...(filters.signedDateFrom ? { signedDateFrom: filters.signedDateFrom } : {}),
+    ...(filters.signedDateTo ? { signedDateTo: filters.signedDateTo } : {}),
+    ...(filters.commissionPayoutStatus ? { commissionPayoutStatus: filters.commissionPayoutStatus } : {}),
+    ...(filters.reconciliationStatus ? { reconciliationStatus: filters.reconciliationStatus } : {}),
+    ...(filters.collectionStatus ? { collectionStatus: filters.collectionStatus } : {}),
     page,
     limit: pageSize,
   };
@@ -294,6 +308,7 @@ export const createOrderManagementAdapter = (
 ): OrderManagementAdapter => {
   const returnRequestKeys = new Map<string, string>();
   const returnCompletionKeys = new Map<string, string>();
+  const commissionPayoutKeys = new Map<string, string>();
   const stableKey = (
     keys: Map<string, string>,
     fingerprint: string,
@@ -323,6 +338,19 @@ export const createOrderManagementAdapter = (
         input.orderId,
         input.command,
         input.expectedVersion,
+      );
+    },
+    async batchTransitionOrders(inputs, command) {
+      await client.batchTransitionOrders(
+        inputs.map((input) => ({ orderId: input.orderId, expectedVersion: input.expectedVersion })),
+        command,
+      );
+    },
+    async batchPayCommissions(orderIds) {
+      const fingerprint = [...orderIds].sort().join("|");
+      await client.batchPayOrderCommissions(
+        orderIds,
+        stableKey(commissionPayoutKeys, fingerprint),
       );
     },
     async softDeleteOrder(orderId) {

@@ -22,6 +22,7 @@ export type OrderStatus =
 
 export type OrderPaymentMode = "one_time" | "contract_36";
 export type OrderSalesChannel = "online" | "offline";
+export type CommissionPayoutStatus = "ineligible" | "pending" | "paid";
 export type ReturnType = "full" | "partial";
 export type AfterSalesServiceType = "refund" | "exchange";
 export type ReturnKind = "normal" | "special";
@@ -49,6 +50,13 @@ export interface OrderSummary {
   oneTimeFen: number;
   monthlyTotalFen: number;
   refundedFen: number;
+  signedAt: string | null;
+  reconciledAt: string | null;
+  paidAt: string | null;
+  commissionPayoutStatus: CommissionPayoutStatus;
+  commissionNetFen: number;
+  commissionPaidFen: number;
+  commissionReversedFen: number;
   createdAt: string;
   deletedAt: string | null;
   version: number;
@@ -107,7 +115,6 @@ export interface ReturnRecordView {
 }
 
 export interface OrderDetail extends OrderSummary {
-  signedAt: string | null;
   customerAddress: string;
   fttrLabel: string;
   heartMonthlyFen: number;
@@ -123,6 +130,11 @@ export interface OrderListFilters {
   paymentMode: OrderPaymentMode | "";
   storeQuery?: string;
   sellerQuery?: string;
+  signedDateFrom?: string;
+  signedDateTo?: string;
+  commissionPayoutStatus?: CommissionPayoutStatus | "";
+  reconciliationStatus?: "pending" | "reconciled" | "";
+  collectionStatus?: "unpaid" | "paid" | "";
   recycleBin: boolean;
 }
 
@@ -172,6 +184,8 @@ export interface OrderManagementAdapter {
   listOrders(filters: OrderListFilters, page?: number, pageSize?: number): Promise<OrderListResult>;
   getOrder(orderId: string): Promise<OrderDetail>;
   transitionOrder(input: TransitionOrderInput): Promise<void>;
+  batchTransitionOrders(inputs: readonly TransitionOrderInput[], command: "RECONCILE" | "MARK_PAID"): Promise<void>;
+  batchPayCommissions(orderIds: readonly string[]): Promise<void>;
   softDeleteOrder(orderId: string): Promise<void>;
   restoreOrder(orderId: string): Promise<void>;
   requestReturn(input: RequestReturnInput): Promise<ReturnRecordView>;

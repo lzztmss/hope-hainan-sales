@@ -126,6 +126,10 @@ export interface OrderRecord extends OrderWriteRecord {
   lines: OrderLineRecord[];
   attributions: OrderAttributionRecord[];
   returnNos?: string[];
+  commissionPayoutStatus?: "ineligible" | "pending" | "paid";
+  commissionNetFen?: number;
+  commissionPaidFen?: number;
+  commissionReversedFen?: number;
 }
 
 export interface OrderListFilters {
@@ -142,6 +146,11 @@ export interface OrderListFilters {
   productSku?: string;
   dateFrom?: Date;
   dateTo?: Date;
+  signedDateFrom?: Date;
+  signedDateTo?: Date;
+  commissionPayoutStatus?: "ineligible" | "pending" | "paid";
+  reconciliationStatus?: "pending" | "reconciled";
+  collectionStatus?: "unpaid" | "paid";
   cursor?: string;
   limit: number;
   page?: number;
@@ -202,6 +211,12 @@ export interface OrderRepository {
   hasCommissionLedger(orderId: string): Promise<boolean>;
   list(scope: UserScope, filters: OrderListFilters): Promise<OrderListResult>;
   listFilterOptions(scope: UserScope): Promise<OrderFilterOptions>;
+  payCommissionsForOrders(
+    orderIds: readonly string[],
+    actorUserId: string,
+    at: Date,
+    idempotencyKey: string,
+  ): Promise<{ paidOrders: number; totalFen: number }>;
   writeAudit(input: OrderAuditInput): Promise<void>;
 }
 
@@ -305,6 +320,10 @@ const presentOrder = (
     monthlyTotalFen: order.monthlyTotalFen,
     contract36Fen: order.contract36Fen,
     refundedFen: order.refundedFen,
+    commissionPayoutStatus: order.commissionPayoutStatus ?? "ineligible",
+    commissionNetFen: order.commissionNetFen ?? 0,
+    commissionPaidFen: order.commissionPaidFen ?? 0,
+    commissionReversedFen: order.commissionReversedFen ?? 0,
     customer: {
       name: customerName,
       phoneMasked:
@@ -638,6 +657,68 @@ export const createOrderService = (options: OrderServiceOptions) => {
         );
       }
       return updated;
+    },
+
+    async batchTransitionOrders(
+      user: AuthenticatedUser,
+      inputs: readonly { orderId: string; expectedVersion: number }[],
+      command: "RECONCILE" | "MARK_PAID",
+    ): Promise<{ updated: number }> {
+      if (inputs.length < 1 || inputs.length > 100) {
+        throw new OrderServiceError("每次请选择1至100笔订单", 400);
+      }
+      if (new Set(inputs.map((item) => item.orderId)).size !== inputs.length) {
+        throw new OrderServiceError("批量订单不能重复", 400);
+      }
+      const scope = scopeForUser(user);
+      await options.repository.runTransaction(async (repository) => {
+        for (const input of inputs) {
+          const order = await repository.findById(input.orderId, scope);
+          if (!order || order.deletedAt) throw new OrderServiceError("订单不存在或无权操作", 404);
+          if (order.version !== input.expectedVersion) {
+            throw new OrderServiceError(`${order.orderNo} 已被更新，请刷新后重试`, 409);
+          }
+          let nextStatus: OrderStatus;
+          try {
+            nextStatus = nextStatusForCommand(order.status, command, user.role);
+          } catch {
+            throw new OrderServiceError(`${order.orderNo} 当前状态不能执行此操作`, 400);
+          }
+          const changedAt = now();
+          const updated = await repository.transition(order.id, order.version, nextStatus, changedAt, user.id);
+          if (!updated) throw new OrderServiceError(`${order.orderNo} 已被更新，请刷新后重试`, 409);
+          await repository.writeAudit({
+            actorUserId: user.id,
+            storeId: order.storeId,
+            orderId: order.id,
+            action: `order.batch.${command.toLowerCase()}`,
+            beforeSnapshot: { status: order.status, version: order.version },
+            afterSnapshot: { status: updated.status, version: updated.version },
+          });
+        }
+      });
+      return { updated: inputs.length };
+    },
+
+    async batchPayCommissions(
+      user: AuthenticatedUser,
+      orderIds: readonly string[],
+      idempotencyKey: string,
+    ): Promise<{ paidOrders: number; totalFen: number }> {
+      if (user.role !== "hr" && user.role !== "admin") {
+        throw new OrderServiceError("只有人力资源或管理员可以发放提成", 403);
+      }
+      validateIdempotencyKey(idempotencyKey);
+      if (orderIds.length < 1 || orderIds.length > 100 || new Set(orderIds).size !== orderIds.length) {
+        throw new OrderServiceError("每次请选择1至100笔不重复的订单", 400);
+      }
+      for (const orderId of orderIds) {
+        const order = await requireVisibleOrder(user, orderId);
+        if (!order.paidAt) throw new OrderServiceError(`${order.orderNo} 尚未收款，不能发放提成`, 400);
+      }
+      return options.repository.runTransaction((repository) =>
+        repository.payCommissionsForOrders(orderIds, user.id, now(), idempotencyKey),
+      );
     },
 
     async softDeleteOrder(
