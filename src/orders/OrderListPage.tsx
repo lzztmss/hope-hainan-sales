@@ -76,6 +76,8 @@ const normaliseFilters = (filters: OrderListFilters): OrderListFilters => {
   if (filters.sellerQuery?.trim()) normalised.sellerQuery = filters.sellerQuery.trim();
   if (filters.signedDateFrom) normalised.signedDateFrom = filters.signedDateFrom;
   if (filters.signedDateTo) normalised.signedDateTo = filters.signedDateTo;
+  if (filters.reconciledDateFrom) normalised.reconciledDateFrom = filters.reconciledDateFrom;
+  if (filters.reconciledDateTo) normalised.reconciledDateTo = filters.reconciledDateTo;
   if (filters.commissionPayoutStatus) normalised.commissionPayoutStatus = filters.commissionPayoutStatus;
   if (filters.reconciliationStatus) normalised.reconciliationStatus = filters.reconciliationStatus;
   if (filters.collectionStatus) normalised.collectionStatus = filters.collectionStatus;
@@ -317,7 +319,7 @@ export const OrderListPage = ({
   };
 
   const payoutLabel = (status: CommissionPayoutStatus): string => ({
-    ineligible: "提成：暂无可发放",
+    ineligible: "提成：未到发放条件",
     pending: "提成：待发放",
     paid: "提成：已发放",
   })[status];
@@ -412,7 +414,7 @@ export const OrderListPage = ({
             />
           </label>
           {viewer.role === "hr" || viewer.role === "finance" || viewer.role === "admin" ? (
-            <label>
+            <label className="order-filter-reconciliation-status">
               <span>对账状态</span>
               <select
                 onChange={(event) => setFilter("reconciliationStatus", event.currentTarget.value as "pending" | "reconciled" | "")}
@@ -426,6 +428,26 @@ export const OrderListPage = ({
           ) : null}
           {viewer.role === "hr" || viewer.role === "finance" || viewer.role === "admin" ? (
             <label>
+              <span>对账日期从</span>
+              <input
+                onChange={(event) => setFilter("reconciledDateFrom", event.currentTarget.value || undefined)}
+                type="date"
+                value={draftFilters.reconciledDateFrom ?? ""}
+              />
+            </label>
+          ) : null}
+          {viewer.role === "hr" || viewer.role === "finance" || viewer.role === "admin" ? (
+            <label>
+              <span>对账日期至</span>
+              <input
+                onChange={(event) => setFilter("reconciledDateTo", event.currentTarget.value || undefined)}
+                type="date"
+                value={draftFilters.reconciledDateTo ?? ""}
+              />
+            </label>
+          ) : null}
+          {viewer.role === "hr" || viewer.role === "finance" || viewer.role === "admin" ? (
+            <label className="order-filter-collection-status">
               <span>收款状态</span>
               <select
                 onChange={(event) => setFilter("collectionStatus", event.currentTarget.value as "unpaid" | "paid" | "")}
@@ -445,7 +467,7 @@ export const OrderListPage = ({
                 value={draftFilters.commissionPayoutStatus ?? ""}
               >
                 <option value="">全部发放状态</option>
-                <option value="ineligible">暂无可发放</option>
+                <option value="ineligible">未到发放条件</option>
                 <option value="pending">待发放</option>
                 <option value="paid">已发放</option>
               </select>

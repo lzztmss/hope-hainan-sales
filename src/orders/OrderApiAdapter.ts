@@ -293,6 +293,8 @@ const listQueryFor = (filters: OrderListFilters, page = 1, pageSize = 20) => {
     ...(filters.sellerQuery ? { sellerQuery: filters.sellerQuery.trim() } : {}),
     ...(filters.signedDateFrom ? { signedDateFrom: filters.signedDateFrom } : {}),
     ...(filters.signedDateTo ? { signedDateTo: filters.signedDateTo } : {}),
+    ...(filters.reconciledDateFrom ? { reconciledDateFrom: filters.reconciledDateFrom } : {}),
+    ...(filters.reconciledDateTo ? { reconciledDateTo: filters.reconciledDateTo } : {}),
     ...(filters.commissionPayoutStatus ? { commissionPayoutStatus: filters.commissionPayoutStatus } : {}),
     ...(filters.reconciliationStatus ? { reconciliationStatus: filters.reconciliationStatus } : {}),
     ...(filters.collectionStatus ? { collectionStatus: filters.collectionStatus } : {}),

@@ -29,9 +29,9 @@ const salesMetrics: ReadonlyArray<{
 const commissionMetrics: ReadonlyArray<{ key: keyof SalesReportMetrics; label: string }> = [
   { key: "commissionEstimatedFen", label: "预计提成" },
   { key: "commissionPendingSettlementFen", label: "待结算" },
-  { key: "commissionPaidFen", label: "已发提成" },
-  { key: "commissionReversedFen", label: "退单冲销" },
-  { key: "commissionNetFen", label: "净提成" },
+  { key: "commissionPaidFen", label: "期间已发提成" },
+  { key: "commissionReversedFen", label: "期间退单冲销" },
+  { key: "commissionNetFen", label: "期间提成净额" },
 ];
 
 export const ReportSummary = ({ metrics }: { metrics: SalesReportMetrics }) => (

@@ -1172,6 +1172,11 @@
     grid-column: span 2;
   }
 
+  .order-filter-reconciliation-status,
+  .order-filter-collection-status {
+    grid-column: span 2;
+  }
+
   .order-table-shell {
     position: static;
     width: auto;

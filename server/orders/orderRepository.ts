@@ -582,6 +582,8 @@ export class DrizzleOrderRepository implements OrderRepository {
     if (filters.dateTo) conditions.push(lt(orders.createdAt, filters.dateTo));
     if (filters.signedDateFrom) conditions.push(gte(orders.signedAt, filters.signedDateFrom));
     if (filters.signedDateTo) conditions.push(lt(orders.signedAt, filters.signedDateTo));
+    if (filters.reconciledDateFrom) conditions.push(gte(orders.reconciledAt, filters.reconciledDateFrom));
+    if (filters.reconciledDateTo) conditions.push(lt(orders.reconciledAt, filters.reconciledDateTo));
     if (filters.reconciliationStatus === "pending") {
       conditions.push(isNotNull(orders.signedAt), isNull(orders.reconciledAt));
     } else if (filters.reconciliationStatus === "reconciled") {

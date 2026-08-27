@@ -148,6 +148,8 @@ export interface OrderListFilters {
   dateTo?: Date;
   signedDateFrom?: Date;
   signedDateTo?: Date;
+  reconciledDateFrom?: Date;
+  reconciledDateTo?: Date;
   commissionPayoutStatus?: "ineligible" | "pending" | "paid";
   reconciliationStatus?: "pending" | "reconciled";
   collectionStatus?: "unpaid" | "paid";

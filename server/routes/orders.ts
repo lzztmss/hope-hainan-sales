@@ -103,6 +103,8 @@ const listQuerySchema = z.object({
   dateTo: dateSchema.optional(),
   signedDateFrom: dateSchema.optional(),
   signedDateTo: dateSchema.optional(),
+  reconciledDateFrom: dateSchema.optional(),
+  reconciledDateTo: dateSchema.optional(),
   commissionPayoutStatus: z.enum(["ineligible", "pending", "paid"]).optional(),
   reconciliationStatus: z.enum(["pending", "reconciled"]).optional(),
   collectionStatus: z.enum(["unpaid", "paid"]).optional(),
@@ -182,8 +184,15 @@ const parseListFilters = (
   const signedDateTo = parsed.data.signedDateTo
     ? new Date(new Date(`${parsed.data.signedDateTo}T00:00:00+08:00`).getTime() + 86_400_000)
     : undefined;
+  const reconciledDateFrom = parsed.data.reconciledDateFrom
+    ? new Date(`${parsed.data.reconciledDateFrom}T00:00:00+08:00`)
+    : undefined;
+  const reconciledDateTo = parsed.data.reconciledDateTo
+    ? new Date(new Date(`${parsed.data.reconciledDateTo}T00:00:00+08:00`).getTime() + 86_400_000)
+    : undefined;
   if (dateFrom && dateTo && dateFrom >= dateTo) return { success: false };
   if (signedDateFrom && signedDateTo && signedDateFrom >= signedDateTo) return { success: false };
+  if (reconciledDateFrom && reconciledDateTo && reconciledDateFrom >= reconciledDateTo) return { success: false };
   return {
     success: true,
     filters: {
@@ -202,6 +211,8 @@ const parseListFilters = (
       dateTo,
       signedDateFrom,
       signedDateTo,
+      reconciledDateFrom,
+      reconciledDateTo,
       commissionPayoutStatus: parsed.data.commissionPayoutStatus,
       reconciliationStatus: parsed.data.reconciliationStatus,
       collectionStatus: parsed.data.collectionStatus,

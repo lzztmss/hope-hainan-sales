@@ -114,7 +114,7 @@ export const TeamReportPage = ({
                   <div><dt>净额</dt><dd>{formatReportFen(row.oneTimeNetFen)}</dd></div>
                   <div><dt>FTTR / 心连心月费</dt><dd>{formatReportFen(row.fttrMonthlyFen)} / {formatReportFen(row.heartMonthlyFen)}</dd></div>
                   <div><dt>36 月名义额</dt><dd>{formatReportFen(row.contract36Fen)}</dd></div>
-                  <div><dt>提成净额</dt><dd>{formatReportFen(row.commissionNetFen)}</dd></div>
+                  <div><dt>期间提成净额</dt><dd>{formatReportFen(row.commissionNetFen)}</dd></div>
                 </dl>
               </article>
             ))}

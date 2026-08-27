@@ -64,7 +64,7 @@ const summaryDefinitions: ReadonlyArray<{
   { key: "pendingPaymentFen", label: "待发放", tone: "warning" },
   { key: "paidThisMonthFen", label: "本月已发放", tone: "success" },
   { key: "paidLifetimeFen", label: "累计已发放", tone: "success" },
-  { key: "reversedLifetimeFen", label: "累计退单扣回", tone: "normal" },
+  { key: "reversedLifetimeFen", label: "历史累计扣回", tone: "normal" },
   { key: "netLifetimeFen", label: "累计净提成", tone: "primary" },
 ];
 
@@ -94,7 +94,7 @@ export const MyCommissionPage = ({ dashboard, onPageChange }: MyCommissionPagePr
       ))}
     </section>
     <p className="commission-summary-note">
-      待结算是订单已签收或已对账、仍在等待联通向公司付款的提成；待发放是公司已经收款、尚未向提成人员实际发放的提成。已计提净额为本月计提减本月退单扣回，客户退款与提成扣回分别核算。
+      待结算是订单已签收或已对账、仍在等待联通向公司付款的提成；待发放是公司已经收款、尚未向提成人员实际发放的提成。历史累计扣回是一共扣回过的提成，不是当前尚待扣回余额；客户退款与提成扣回分别核算。
     </p>
 
     {dashboard.unconfiguredOrders > 0 ? (

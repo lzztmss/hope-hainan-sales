@@ -132,6 +132,8 @@ export interface OrderListFilters {
   sellerQuery?: string;
   signedDateFrom?: string;
   signedDateTo?: string;
+  reconciledDateFrom?: string;
+  reconciledDateTo?: string;
   commissionPayoutStatus?: CommissionPayoutStatus | "";
   reconciliationStatus?: "pending" | "reconciled" | "";
   collectionStatus?: "unpaid" | "paid" | "";

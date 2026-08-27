@@ -278,6 +278,8 @@ export interface OrderListApiQuery {
   paymentMode?: OrderPaymentMode;
   signedDateFrom?: string;
   signedDateTo?: string;
+  reconciledDateFrom?: string;
+  reconciledDateTo?: string;
   commissionPayoutStatus?: "ineligible" | "pending" | "paid";
   reconciliationStatus?: "pending" | "reconciled";
   collectionStatus?: "unpaid" | "paid";
@@ -779,6 +781,8 @@ export const createApiClient = ({
       if (query.paymentMode) parameters.set("paymentMode", query.paymentMode);
       if (query.signedDateFrom) parameters.set("signedDateFrom", query.signedDateFrom);
       if (query.signedDateTo) parameters.set("signedDateTo", query.signedDateTo);
+      if (query.reconciledDateFrom) parameters.set("reconciledDateFrom", query.reconciledDateFrom);
+      if (query.reconciledDateTo) parameters.set("reconciledDateTo", query.reconciledDateTo);
       if (query.commissionPayoutStatus) parameters.set("commissionPayoutStatus", query.commissionPayoutStatus);
       if (query.reconciliationStatus) parameters.set("reconciliationStatus", query.reconciliationStatus);
       if (query.collectionStatus) parameters.set("collectionStatus", query.collectionStatus);
