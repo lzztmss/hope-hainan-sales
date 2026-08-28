@@ -72,6 +72,7 @@ describe("提成按订单资金阶段汇总", () => {
     expect(dashboard.summary.estimatedFen).toBe(10_000);
     expect(dashboard.summary.pendingSettlementFen).toBe(20_000);
     expect(dashboard.summary.pendingPaymentFen).toBe(30_000);
+    expect(dashboard.summary.pendingDeductionFen).toBe(0);
     expect(dashboard.orders.find((order) => order.orderId === "order-SIGNED")?.statusLabel).toBe("已签收 · 待结算");
     expect(dashboard.orders.find((order) => order.orderId === "order-PAID")?.statusLabel).toBe("已收款 · 待发放");
   });

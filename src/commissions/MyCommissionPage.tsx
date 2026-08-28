@@ -7,6 +7,7 @@ export interface MyCommissionSummary {
   accruedNetFen: number;
   pendingSettlementFen: number;
   pendingPaymentFen: number;
+  pendingDeductionFen: number;
   paidThisMonthFen: number;
   paidLifetimeFen: number;
   reversedLifetimeFen: number;
@@ -90,6 +91,11 @@ export const MyCommissionPage = ({ dashboard, onPageChange }: MyCommissionPagePr
           <strong>
             {displayMoney(dashboard.summary[definition.key], false)}
           </strong>
+          {definition.key === "pendingPaymentFen" && dashboard.summary.pendingDeductionFen > 0 ? (
+            <em className="commission-summary-card__deduction">
+              待扣回 {displayMoney(dashboard.summary.pendingDeductionFen)}
+            </em>
+          ) : null}
         </article>
       ))}
     </section>

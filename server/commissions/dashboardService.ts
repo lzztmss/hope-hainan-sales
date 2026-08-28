@@ -119,6 +119,7 @@ export interface CommissionDashboardSummary {
   accruedNetFen: number;
   pendingSettlementFen: number;
   pendingPaymentFen: number;
+  pendingDeductionFen: number;
   paidThisMonthFen: number;
   paidLifetimeFen: number;
   reversedLifetimeFen: number;
@@ -668,6 +669,7 @@ const summarizeLedger = (
   let accruedNetFen = 0;
   let pendingSettlementFen = 0;
   let pendingPaymentFen = 0;
+  let pendingDeductionFen = 0;
   let paidThisMonthFen = 0;
   let paidLifetimeFen = 0;
   let reversedLifetimeFen = 0;
@@ -693,11 +695,16 @@ const summarizeLedger = (
         paidThisMonthFen = addFen(paidThisMonthFen, settledFen, "本月已发提成");
       }
     } else if (row.orderPaidAt) {
-      pendingPaymentFen = addFen(
-        pendingPaymentFen,
-        row.settlementAmountFen ?? row.amountFen,
-        "待发放提成",
-      );
+      const amountFen = row.settlementAmountFen ?? row.amountFen;
+      if (amountFen >= 0) {
+        pendingPaymentFen = addFen(pendingPaymentFen, amountFen, "待发放提成");
+      } else {
+        pendingDeductionFen = addFen(
+          pendingDeductionFen,
+          Math.abs(amountFen),
+          "待扣回提成",
+        );
+      }
     } else if (row.signedAt) {
       pendingSettlementFen = addFen(
         pendingSettlementFen,
@@ -710,6 +717,7 @@ const summarizeLedger = (
     accruedNetFen,
     pendingSettlementFen,
     pendingPaymentFen,
+    pendingDeductionFen,
     paidThisMonthFen,
     paidLifetimeFen,
     reversedLifetimeFen,

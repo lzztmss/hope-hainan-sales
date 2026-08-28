@@ -309,7 +309,8 @@ describe("订单、售后、收款与提成全流程", () => {
     expect(dashboard.summary).toMatchObject({
       accruedNetFen: 4_000,
       pendingSettlementFen: 0,
-      pendingPaymentFen: -1_000,
+      pendingPaymentFen: 0,
+      pendingDeductionFen: 1_000,
       paidThisMonthFen: 5_000,
       paidLifetimeFen: 5_000,
       reversedLifetimeFen: 2_000,
