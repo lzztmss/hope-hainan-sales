@@ -15,9 +15,10 @@ export interface RegisterAdminRoutesOptions {
 }
 
 const reasonSchema = z.string().trim().min(2).max(500);
-const roleSchema = z.enum(["sales", "store_manager", "admin"]);
+const roleSchema = z.enum(["sales", "store_manager", "regional_manager", "hr", "finance", "admin"]);
 const personnelTypeSchema = z.enum(["unicom", "auxiliary", "admin"]);
 const storeIdSchema = z.string().uuid();
+const employmentDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 const createStoreSchema = z.object({
   code: z.string().trim().min(2).max(64),
@@ -46,6 +47,9 @@ const createUserSchema = z.object({
   role: roleSchema,
   personnelType: personnelTypeSchema,
   storeId: storeIdSchema.nullable(),
+  managedStoreIds: z.array(storeIdSchema).max(100).optional(),
+  employmentStartDate: employmentDateSchema.nullable().optional(),
+  employmentEndDate: employmentDateSchema.nullable().optional(),
   active: z.boolean().optional(),
   initialPassword: z.string().min(8).max(128),
   reason: reasonSchema,
@@ -59,6 +63,9 @@ const updateUserSchema = z
     role: roleSchema.optional(),
     personnelType: personnelTypeSchema.optional(),
     storeId: storeIdSchema.nullable().optional(),
+    managedStoreIds: z.array(storeIdSchema).max(100).optional(),
+    employmentStartDate: employmentDateSchema.nullable().optional(),
+    employmentEndDate: employmentDateSchema.nullable().optional(),
     active: z.boolean().optional(),
     reason: reasonSchema,
   })
@@ -109,7 +116,7 @@ const resolveAdmin = async (
     void reply.status(401).send({ error: "请先登录" });
     return null;
   }
-  if (user.role !== "admin") {
+  if (user.role !== "admin" && user.role !== "regional_manager") {
     void reply.status(403).send({ error: "仅管理员可管理营业厅与账号" });
     return null;
   }

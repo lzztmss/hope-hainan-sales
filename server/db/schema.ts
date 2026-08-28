@@ -19,6 +19,9 @@ const pgEnum = <const Values extends readonly [string, ...string[]]>(
 export const userRoleEnum = pgEnum("user_role", [
   "sales",
   "store_manager",
+  "regional_manager",
+  "hr",
+  "finance",
   "admin",
 ]);
 export const personnelTypeEnum = pgEnum("personnel_type", [
@@ -37,6 +40,7 @@ export const paymentModeEnum = pgEnum("payment_mode", [
   "one_time",
   "contract_36",
 ]);
+export const salesChannelEnum = pgEnum("sales_channel", ["online", "offline"]);
 export const fttrKindEnum = pgEnum("fttr_kind", [
   "none",
   "standard",
@@ -54,7 +58,9 @@ export const orderStatusEnum = pgEnum("order_status", [
   "pending",
   "accepted",
   "activated",
-  "completed",
+  "signed",
+  "reconciled",
+  "paid",
   "cancelled",
   "return_pending",
   "partially_returned",
@@ -66,6 +72,18 @@ export const orderAttributionRoleEnum = pgEnum("order_attribution_role", [
   "collaborator",
 ]);
 export const returnTypeEnum = pgEnum("return_type", ["full", "partial"]);
+export const afterSalesServiceTypeEnum = pgEnum("after_sales_service_type", [
+  "refund",
+  "exchange",
+]);
+export const returnKindEnum = pgEnum("return_kind", ["normal", "special"]);
+export const returnReasonCategoryEnum = pgEnum("return_reason_category", [
+  "no_reason",
+  "quality",
+  "order_mismatch",
+  "service_issue",
+  "other",
+]);
 export const returnStatusEnum = pgEnum("return_status", [
   "requested",
   "approved",
@@ -167,6 +185,8 @@ export const users = sqliteTable(
       .default(false)
       .notNull(),
     lastLoginAt: integer("last_login_at", { mode: "timestamp_ms" }),
+    employmentStartDate: text("employment_start_date"),
+    employmentEndDate: text("employment_end_date"),
     ...timestamps,
   },
   (table) => [
@@ -178,6 +198,27 @@ export const users = sqliteTable(
     uniqueIndex("users_primary_store_manager_unique")
       .on(table.storeId)
       .where(sql`${table.isPrimaryStoreManager} = 1`),
+  ],
+);
+
+export const regionalManagerStores = sqliteTable(
+  "regional_manager_stores",
+  {
+    regionalManagerId: text("regional_manager_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    storeId: text("store_id")
+      .notNull()
+      .references(() => stores.id, { onDelete: "restrict" }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("regional_manager_stores_store_unique").on(table.storeId),
+    uniqueIndex("regional_manager_stores_manager_store_unique").on(
+      table.regionalManagerId,
+      table.storeId,
+    ),
+    index("regional_manager_stores_manager_idx").on(table.regionalManagerId),
   ],
 );
 
@@ -407,6 +448,7 @@ export const orders = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
     status: orderStatusEnum("status").notNull(),
+    salesChannel: salesChannelEnum("sales_channel").default("offline").notNull(),
     paymentMode: paymentModeEnum("payment_mode").notNull(),
     fttrKind: fttrKindEnum("fttr_kind").notNull(),
     fttrPlan: integer("fttr_plan"),
@@ -438,6 +480,13 @@ export const orders = sqliteTable(
       .references(() => users.id, { onDelete: "restrict" }),
     acceptedAt: integer("accepted_at", { mode: "timestamp_ms" }),
     activatedAt: integer("activated_at", { mode: "timestamp_ms" }),
+    signedAt: integer("signed_at", { mode: "timestamp_ms" }),
+    signedBy: text("signed_by").references(() => users.id, { onDelete: "restrict" }),
+    reconciledAt: integer("reconciled_at", { mode: "timestamp_ms" }),
+    reconciledBy: text("reconciled_by").references(() => users.id, { onDelete: "restrict" }),
+    paidAt: integer("paid_at", { mode: "timestamp_ms" }),
+    paidBy: text("paid_by").references(() => users.id, { onDelete: "restrict" }),
+    // 兼容历史迁移；新流程不再写入 completed_at。
     completedAt: integer("completed_at", { mode: "timestamp_ms" }),
     cancelledAt: integer("cancelled_at", { mode: "timestamp_ms" }),
     deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
@@ -568,7 +617,11 @@ export const returns = sqliteTable(
     orderId: text("order_id")
       .notNull()
       .references(() => orders.id, { onDelete: "restrict" }),
+    serviceType: afterSalesServiceTypeEnum("service_type").default("refund").notNull(),
     returnType: returnTypeEnum("return_type").notNull(),
+    returnKind: returnKindEnum("return_kind").default("normal").notNull(),
+    reasonCategory: returnReasonCategoryEnum("reason_category").default("other").notNull(),
+    orderStatusBefore: orderStatusEnum("order_status_before"),
     status: returnStatusEnum("status").notNull(),
     reason: text("reason").notNull(),
     requestedBy: text("requested_by")
@@ -584,6 +637,7 @@ export const returns = sqliteTable(
       onDelete: "restrict",
     }),
     completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+    requestedRefundFen: integer("requested_refund_fen").default(0).notNull(),
     refundFen: integer("refund_fen").default(0).notNull(),
     version: integer("version").default(1).notNull(),
     ...timestamps,
@@ -598,6 +652,7 @@ export const returns = sqliteTable(
     index("returns_requested_at_idx").on(table.requestedAt),
     check("returns_reason_present", sql`NULLIF(TRIM(${table.reason}), '') IS NOT NULL`),
     check("returns_refund_nonnegative", sql`${table.refundFen} >= 0`),
+    check("returns_requested_refund_nonnegative", sql`${table.requestedRefundFen} >= 0`),
     check("returns_version_positive", sql`${table.version} >= 1`),
     check(
       "returns_decision_state_consistent",

@@ -27,10 +27,13 @@ export type OrderApiClient = Pick<
   | "getOrder"
   | "listOrderReturns"
   | "listOrders"
+  | "exportOrders"
   | "listOrderFilterOptions"
   | "requestOrderReturn"
   | "restoreOrder"
   | "transitionOrder"
+  | "batchTransitionOrders"
+  | "batchPayOrderCommissions"
 >;
 
 const operationKey = (): string => createClientKey("order-operation");
@@ -67,19 +70,22 @@ const permissionsFor = (
   viewer: OrderViewer,
 ): OrderPermissions => {
   const reversibleStatus = order.status === "pending" || order.status === "accepted";
-  const reviewer = viewer.role === "store_manager" || viewer.role === "admin";
+  const reviewer = viewer.role === "store_manager" || viewer.role === "regional_manager" || viewer.role === "admin";
   const canAccessOrder =
-    viewer.role === "admin" ||
+    viewer.role === "admin" || viewer.role === "hr" || viewer.role === "finance" || viewer.role === "regional_manager" ||
     (viewer.role === "store_manager" && viewer.storeId === order.storeId) ||
     (viewer.role === "sales" &&
       viewer.storeId === order.storeId &&
       viewer.id === order.sellerId);
   return {
-    canDelete: order.deletedAt === null && reversibleStatus,
+    canDelete:
+      order.deletedAt === null &&
+      reversibleStatus &&
+      (viewer.role === "sales" || viewer.role === "store_manager" || viewer.role === "admin"),
     canRestore: order.deletedAt !== null && reviewer && reversibleStatus,
     // 权限只描述账号是否可操作该归属订单；审批中、已退完等业务状态
     // 由 OrderDetailPage 单独解释，避免把状态限制误报成“没有权限”。
-    canRequestReturn: canAccessOrder,
+    canRequestReturn: canAccessOrder && viewer.role !== "hr" && viewer.role !== "finance",
   };
 };
 
@@ -98,10 +104,18 @@ const mapSummary = (order: OrderDto, viewer: OrderViewer): OrderSummary => ({
     readSnapshotString(order.storeSnapshot, "name", "storeName") ??
     `营业厅名称未提供（${order.storeId}）`,
   status: order.status,
+  salesChannel: order.salesChannel,
   paymentMode: order.paymentMode,
   oneTimeFen: order.oneTimeFen,
   monthlyTotalFen: order.monthlyTotalFen,
   refundedFen: order.refundedFen,
+  signedAt: order.signedAt,
+  reconciledAt: order.reconciledAt,
+  paidAt: order.paidAt,
+  commissionPayoutStatus: order.commissionPayoutStatus,
+  commissionNetFen: order.commissionNetFen,
+  commissionPaidFen: order.commissionPaidFen,
+  commissionReversedFen: order.commissionReversedFen,
   createdAt: formatDateTime(order.createdAt),
   deletedAt: order.deletedAt ? formatDateTime(order.deletedAt) : null,
   version: order.version,
@@ -145,7 +159,9 @@ const timelineFor = (order: OrderDto): OrderTimelineEvent[] => {
   };
   append(order.acceptedAt, "accepted", "订单已受理");
   append(order.activatedAt, "activated", "订单已生效");
-  append(order.completedAt, "completed", "订单已完成");
+  append(order.signedAt, "signed", "订单已签收");
+  append(order.reconciledAt, "reconciled", "订单已对账");
+  append(order.paidAt, "paid", "订单已收款");
   append(order.cancelledAt, "cancelled", "订单已取消");
   return events;
 };
@@ -154,17 +170,21 @@ const mapReturn = (
   record: ReturnRecordDto,
   viewer: OrderViewer,
 ): ReturnRecordView => {
-  const reviewer = viewer.role === "store_manager" || viewer.role === "admin";
+  const reviewer = viewer.role === "store_manager" || viewer.role === "regional_manager" || viewer.role === "admin";
   return {
     id: record.id,
     returnNo: record.returnNo,
+    serviceType: record.serviceType,
     type: record.returnType,
+    kind: record.returnKind,
+    reasonCategory: record.reasonCategory,
     status: record.status,
     reason: record.reason,
     requestedById: record.requestedBy,
     requestedByName:
       record.requestedByName?.trim() || `申请人 ${record.requestedBy}`,
     requestedAt: formatDateTime(record.requestedAt),
+    requestedRefundFen: record.requestedRefundFen,
     refundFen: record.refundFen,
     maxRefundFen: record.maxRefundFen,
     canApprove:
@@ -186,7 +206,7 @@ const completedQuantityByLine = (
 ): ReadonlyMap<string, number> => {
   const quantities = new Map<string, number>();
   for (const record of returns) {
-    if (record.status !== "completed") continue;
+    if (record.status !== "completed" || record.serviceType !== "refund") continue;
     for (const item of record.items) {
       quantities.set(
         item.orderLineId,
@@ -244,6 +264,7 @@ const mapDetail = (
   const returned = completedQuantityByLine(returns);
   return {
     ...mapSummary(order, viewer),
+    signedAt: order.signedAt,
     customerAddress: order.customer.address?.trim() || "客户地址未提供",
     fttrLabel: fttrLabel(order),
     heartMonthlyFen: order.heartMonthlyFen,
@@ -271,6 +292,13 @@ const listQueryFor = (filters: OrderListFilters, page = 1, pageSize = 20) => {
     ...(filters.paymentMode ? { paymentMode: filters.paymentMode } : {}),
     ...(filters.storeQuery ? { storeQuery: filters.storeQuery.trim() } : {}),
     ...(filters.sellerQuery ? { sellerQuery: filters.sellerQuery.trim() } : {}),
+    ...(filters.signedDateFrom ? { signedDateFrom: filters.signedDateFrom } : {}),
+    ...(filters.signedDateTo ? { signedDateTo: filters.signedDateTo } : {}),
+    ...(filters.reconciledDateFrom ? { reconciledDateFrom: filters.reconciledDateFrom } : {}),
+    ...(filters.reconciledDateTo ? { reconciledDateTo: filters.reconciledDateTo } : {}),
+    ...(filters.commissionPayoutStatus ? { commissionPayoutStatus: filters.commissionPayoutStatus } : {}),
+    ...(filters.reconciliationStatus ? { reconciliationStatus: filters.reconciliationStatus } : {}),
+    ...(filters.collectionStatus ? { collectionStatus: filters.collectionStatus } : {}),
     page,
     limit: pageSize,
   };
@@ -283,6 +311,7 @@ export const createOrderManagementAdapter = (
 ): OrderManagementAdapter => {
   const returnRequestKeys = new Map<string, string>();
   const returnCompletionKeys = new Map<string, string>();
+  const commissionPayoutKeys = new Map<string, string>();
   const stableKey = (
     keys: Map<string, string>,
     fingerprint: string,
@@ -300,6 +329,9 @@ export const createOrderManagementAdapter = (
       const items = response.items.map((order) => mapSummary(order, viewer));
       return { items, total: response.total };
     },
+    async exportOrders(filters) {
+      return client.exportOrders(listQueryFor(filters, 1, 100));
+    },
     async getOrder(orderId) {
       const [order, returns] = await Promise.all([
         client.getOrder(orderId),
@@ -314,6 +346,19 @@ export const createOrderManagementAdapter = (
         input.expectedVersion,
       );
     },
+    async batchTransitionOrders(inputs, command) {
+      await client.batchTransitionOrders(
+        inputs.map((input) => ({ orderId: input.orderId, expectedVersion: input.expectedVersion })),
+        command,
+      );
+    },
+    async batchPayCommissions(orderIds) {
+      const fingerprint = [...orderIds].sort().join("|");
+      await client.batchPayOrderCommissions(
+        orderIds,
+        stableKey(commissionPayoutKeys, fingerprint),
+      );
+    },
     async softDeleteOrder(orderId) {
       await client.deleteOrder(orderId);
     },
@@ -322,7 +367,11 @@ export const createOrderManagementAdapter = (
     },
     async requestReturn(input) {
       const body = {
+        serviceType: input.serviceType,
         type: input.type,
+        kind: input.kind,
+        reasonCategory: input.reasonCategory,
+        requestedRefundFen: input.requestedRefundFen,
         items: input.items,
         reason: input.reason,
       };

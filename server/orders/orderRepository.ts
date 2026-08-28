@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
   and,
   count,
@@ -31,6 +33,8 @@ import {
   quoteLines,
   quotes,
   returns,
+  settlementBatches,
+  settlementItems,
   stores,
   users,
 } from "../db/schema.js";
@@ -55,6 +59,7 @@ type OrderRow = typeof orders.$inferSelect;
 const scopeCondition = (scope: UserScope): SQL | undefined => {
   if (scope.kind === "global") return undefined;
   if (scope.kind === "store") return eq(orders.storeId, scope.storeId);
+  if (scope.kind === "region") return inArray(orders.storeId, [...scope.storeIds]);
   return and(
     eq(orders.storeId, scope.storeId),
     eq(orders.sellerId, scope.sellerId),
@@ -90,6 +95,7 @@ const baseOrder = (row: OrderRow): Omit<OrderRecord, "lines" | "attributions"> =
   storeId: row.storeId,
   sellerId: row.sellerId,
   status: row.status,
+  salesChannel: row.salesChannel,
   paymentMode: row.paymentMode,
   fttrKind: row.fttrKind,
   fttrPlan: row.fttrPlan,
@@ -109,6 +115,12 @@ const baseOrder = (row: OrderRow): Omit<OrderRecord, "lines" | "attributions"> =
   createdBy: row.createdBy,
   acceptedAt: row.acceptedAt,
   activatedAt: row.activatedAt,
+  signedAt: row.signedAt,
+  signedBy: row.signedBy,
+  reconciledAt: row.reconciledAt,
+  reconciledBy: row.reconciledBy,
+  paidAt: row.paidAt,
+  paidBy: row.paidBy,
   completedAt: row.completedAt,
   cancelledAt: row.cancelledAt,
   deletedAt: row.deletedAt,
@@ -134,7 +146,7 @@ export class DrizzleOrderRepository implements OrderRepository {
   }
 
   private async hydrate(row: OrderRow): Promise<OrderRecord> {
-    const [lineRows, attributionRows, returnRows] = await Promise.all([
+    const [lineRows, attributionRows, returnRows, commissionRows] = await Promise.all([
       this.executor
         .select()
         .from(orderLines)
@@ -150,7 +162,32 @@ export class DrizzleOrderRepository implements OrderRepository {
         .from(returns)
         .where(eq(returns.orderId, row.id))
         .orderBy(returns.requestedAt, returns.id),
+      this.executor
+        .select({
+          amountFen: commissionLedger.amountFen,
+          entryType: commissionLedger.entryType,
+          settlementStatus: settlementBatches.status,
+          settledFen: settlementItems.amountFen,
+        })
+        .from(commissionLedger)
+        .leftJoin(settlementItems, eq(settlementItems.ledgerEntryId, commissionLedger.id))
+        .leftJoin(settlementBatches, eq(settlementBatches.id, settlementItems.batchId))
+        .where(eq(commissionLedger.orderId, row.id)),
     ]);
+    const commissionNetFen = commissionRows.reduce((total, entry) => total + entry.amountFen, 0);
+    const commissionPaidFen = commissionRows.reduce(
+      (total, entry) => total + (entry.settlementStatus === "paid" ? (entry.settledFen ?? 0) : 0),
+      0,
+    );
+    const commissionReversedFen = Math.abs(commissionRows.reduce(
+      (total, entry) => total + (entry.entryType === "return_reversal" ? entry.amountFen : 0),
+      0,
+    ));
+    const commissionPayoutStatus = commissionRows.some((entry) => entry.settlementStatus === "paid")
+      ? "paid" as const
+      : row.paidAt && commissionNetFen > 0
+        ? "pending" as const
+        : "ineligible" as const;
     return {
       ...baseOrder(row),
       lines: lineRows.map((line): OrderLineRecord => ({
@@ -178,6 +215,10 @@ export class DrizzleOrderRepository implements OrderRepository {
         }),
       ),
       returnNos: returnRows.map((entry) => entry.returnNo),
+      commissionPayoutStatus,
+      commissionNetFen,
+      commissionPaidFen,
+      commissionReversedFen,
     };
   }
 
@@ -211,6 +252,8 @@ export class DrizzleOrderRepository implements OrderRepository {
         ? undefined
         : scope.kind === "store"
           ? eq(quotes.storeId, scope.storeId)
+          : scope.kind === "region"
+            ? inArray(quotes.storeId, [...scope.storeIds])
           : and(
               eq(quotes.storeId, scope.storeId),
               eq(quotes.sellerId, scope.sellerId),
@@ -374,11 +417,23 @@ export class DrizzleOrderRepository implements OrderRepository {
     expectedVersion: number,
     status: OrderStatus,
     at: Date,
+    actorUserId: string,
   ): Promise<OrderRecord | null> {
     const lifecycle: Partial<typeof orders.$inferInsert> = {};
     if (status === "accepted") lifecycle.acceptedAt = at;
     if (status === "activated") lifecycle.activatedAt = at;
-    if (status === "completed") lifecycle.completedAt = at;
+    if (status === "signed") {
+      lifecycle.signedAt = at;
+      lifecycle.signedBy = actorUserId;
+    }
+    if (status === "reconciled") {
+      lifecycle.reconciledAt = at;
+      lifecycle.reconciledBy = actorUserId;
+    }
+    if (status === "paid") {
+      lifecycle.paidAt = at;
+      lifecycle.paidBy = actorUserId;
+    }
     if (status === "cancelled" || status === "voided") {
       lifecycle.cancelledAt = at;
     }
@@ -433,6 +488,8 @@ export class DrizzleOrderRepository implements OrderRepository {
       );
     } else if (scope.kind === "store") {
       conditions.push(eq(orders.storeId, scope.storeId));
+    } else if (scope.kind === "region") {
+      conditions.push(inArray(orders.storeId, [...scope.storeIds]));
     }
     conditions.push(filters.deletedOnly ? isNotNull(orders.deletedAt) : isNull(orders.deletedAt));
     if (filters.orderNo) {
@@ -523,6 +580,44 @@ export class DrizzleOrderRepository implements OrderRepository {
     }
     if (filters.dateFrom) conditions.push(gte(orders.createdAt, filters.dateFrom));
     if (filters.dateTo) conditions.push(lt(orders.createdAt, filters.dateTo));
+    if (filters.signedDateFrom) conditions.push(gte(orders.signedAt, filters.signedDateFrom));
+    if (filters.signedDateTo) conditions.push(lt(orders.signedAt, filters.signedDateTo));
+    if (filters.reconciledDateFrom) conditions.push(gte(orders.reconciledAt, filters.reconciledDateFrom));
+    if (filters.reconciledDateTo) conditions.push(lt(orders.reconciledAt, filters.reconciledDateTo));
+    if (filters.reconciliationStatus === "pending") {
+      conditions.push(isNotNull(orders.signedAt), isNull(orders.reconciledAt));
+    } else if (filters.reconciliationStatus === "reconciled") {
+      conditions.push(isNotNull(orders.reconciledAt));
+    }
+    if (filters.collectionStatus === "unpaid") conditions.push(isNull(orders.paidAt));
+    if (filters.collectionStatus === "paid") conditions.push(isNotNull(orders.paidAt));
+    if (filters.commissionPayoutStatus === "paid") {
+      conditions.push(sql`EXISTS (
+        SELECT 1 FROM settlement_items si
+        JOIN commission_ledger cl ON cl.id = si.ledger_entry_id
+        JOIN settlement_batches sb ON sb.id = si.batch_id
+        WHERE cl.order_id = ${orders.id} AND sb.status = 'paid'
+      )`);
+    } else if (filters.commissionPayoutStatus === "pending") {
+      conditions.push(
+        isNotNull(orders.paidAt),
+        sql`NOT EXISTS (
+          SELECT 1 FROM settlement_items si
+          JOIN commission_ledger cl ON cl.id = si.ledger_entry_id
+          JOIN settlement_batches sb ON sb.id = si.batch_id
+          WHERE cl.order_id = ${orders.id} AND sb.status = 'paid'
+        )`,
+        sql`(SELECT COALESCE(SUM(cl.amount_fen), 0) FROM commission_ledger cl WHERE cl.order_id = ${orders.id}) > 0`,
+      );
+    } else if (filters.commissionPayoutStatus === "ineligible") {
+      conditions.push(sql`NOT EXISTS (
+        SELECT 1 FROM settlement_items si
+        JOIN commission_ledger cl ON cl.id = si.ledger_entry_id
+        JOIN settlement_batches sb ON sb.id = si.batch_id
+        WHERE cl.order_id = ${orders.id} AND sb.status = 'paid'
+      )`);
+      conditions.push(sql`(${orders.paidAt} IS NULL OR (SELECT COALESCE(SUM(cl.amount_fen), 0) FROM commission_ledger cl WHERE cl.order_id = ${orders.id}) <= 0)`);
+    }
     const countConditions = [...conditions];
     if (filters.cursor) {
       const cursor = decodeCursor(filters.cursor);
@@ -570,12 +665,137 @@ export class DrizzleOrderRepository implements OrderRepository {
     };
   }
 
+  async payCommissionsForOrders(
+    orderIds: readonly string[],
+    actorUserId: string,
+    at: Date,
+    idempotencyKey: string,
+  ): Promise<{ paidOrders: number; totalFen: number }> {
+    const [existing] = await this.executor
+      .select({ totalFen: settlementBatches.totalFen, filters: settlementBatches.filtersSnapshot })
+      .from(settlementBatches)
+      .where(eq(settlementBatches.idempotencyKey, idempotencyKey))
+      .limit(1);
+    if (existing) {
+      const ids = Array.isArray(existing.filters.orderIds) ? existing.filters.orderIds : [];
+      return { paidOrders: ids.length, totalFen: existing.totalFen };
+    }
+    const orderRows = await this.executor
+      .select({ id: orders.id, orderNo: orders.orderNo, storeId: orders.storeId, paidAt: orders.paidAt })
+      .from(orders)
+      .where(inArray(orders.id, [...orderIds]));
+    if (orderRows.length !== orderIds.length) throw new Error("部分订单不存在");
+    const unpaidEntries = await this.executor
+      .select({
+        id: commissionLedger.id,
+        orderId: commissionLedger.orderId,
+        beneficiaryId: commissionLedger.beneficiaryId,
+        amountFen: commissionLedger.amountFen,
+        entryType: commissionLedger.entryType,
+        eventKey: commissionLedger.eventKey,
+      })
+      .from(commissionLedger)
+      .leftJoin(settlementItems, eq(settlementItems.ledgerEntryId, commissionLedger.id))
+      .where(and(inArray(commissionLedger.orderId, [...orderIds]), isNull(settlementItems.id)));
+    const netByOrder = new Map<string, number>();
+    for (const entry of unpaidEntries) {
+      if (entry.orderId) netByOrder.set(entry.orderId, (netByOrder.get(entry.orderId) ?? 0) + entry.amountFen);
+    }
+    for (const order of orderRows) {
+      if (!order.paidAt) throw new Error(`${order.orderNo} 尚未收款，不能发放提成`);
+      if ((netByOrder.get(order.id) ?? 0) <= 0) throw new Error(`${order.orderNo} 没有可发放的净提成`);
+    }
+    const selectedEntries = unpaidEntries.filter((entry) => entry.orderId && (netByOrder.get(entry.orderId) ?? 0) > 0);
+    const selectedEntryIds = new Set(selectedEntries.map((entry) => entry.id));
+    const beneficiaryIds = [...new Set(selectedEntries.map((entry) => entry.beneficiaryId))];
+    const outstandingDebtEntries = beneficiaryIds.length === 0
+      ? []
+      : (await this.executor
+          .select({
+            id: commissionLedger.id,
+            orderId: commissionLedger.orderId,
+            beneficiaryId: commissionLedger.beneficiaryId,
+            amountFen: commissionLedger.amountFen,
+            entryType: commissionLedger.entryType,
+            eventKey: commissionLedger.eventKey,
+          })
+          .from(commissionLedger)
+          .leftJoin(settlementItems, eq(settlementItems.ledgerEntryId, commissionLedger.id))
+          .where(and(
+            inArray(commissionLedger.beneficiaryId, beneficiaryIds),
+            lt(commissionLedger.amountFen, 0),
+            isNull(settlementItems.id),
+          )))
+        .filter((entry) => !selectedEntryIds.has(entry.id));
+    const entriesByBeneficiary = new Map<string, number>();
+    for (const entry of selectedEntries) {
+      entriesByBeneficiary.set(entry.beneficiaryId, (entriesByBeneficiary.get(entry.beneficiaryId) ?? 0) + entry.amountFen);
+    }
+    for (const entry of outstandingDebtEntries) {
+      entriesByBeneficiary.set(entry.beneficiaryId, (entriesByBeneficiary.get(entry.beneficiaryId) ?? 0) + entry.amountFen);
+    }
+    for (const [beneficiaryId, amountFen] of entriesByBeneficiary) {
+      if (amountFen <= 0) throw new Error(`提成人员 ${beneficiaryId} 的待扣回金额大于本次可发放金额`);
+    }
+    const entriesToSettle = [...selectedEntries, ...outstandingDebtEntries];
+    const totalFen = entriesToSettle.reduce((total, entry) => total + entry.amountFen, 0);
+    const batchId = randomUUID();
+    await this.executor.insert(settlementBatches).values({
+      id: batchId,
+      batchNo: `TCFF-${at.toISOString().slice(0, 10).replaceAll("-", "")}-${randomUUID().slice(0, 6).toUpperCase()}`,
+      idempotencyKey,
+      status: "paid",
+      periodStart: new Date(at.getTime() - 1),
+      periodEnd: new Date(at.getTime() + 1),
+      totalFen,
+      entryCount: entriesToSettle.length,
+      filtersSnapshot: {
+        orderIds: [...orderIds],
+        offsetLedgerEntryIds: outstandingDebtEntries.map((entry) => entry.id),
+        source: "order_batch_payout",
+      },
+      createdBy: actorUserId,
+      approvedBy: actorUserId,
+      approvedAt: at,
+      paidBy: actorUserId,
+      paidAt: at,
+    });
+    await this.executor.insert(settlementItems).values(entriesToSettle.map((entry) => ({
+      batchId,
+      ledgerEntryId: entry.id,
+      beneficiaryId: entry.beneficiaryId,
+      amountFen: entry.amountFen,
+      ledgerSnapshot: {
+        orderId: entry.orderId,
+        entryType: entry.entryType,
+        eventKey: entry.eventKey,
+        amountFen: entry.amountFen,
+      },
+    })));
+    for (const order of orderRows) {
+      await this.writeAudit({
+        actorUserId,
+        storeId: order.storeId,
+        orderId: order.id,
+        action: "commission.batch.paid",
+        afterSnapshot: { batchId, amountFen: netByOrder.get(order.id) ?? 0 },
+      });
+    }
+    return { paidOrders: orderRows.length, totalFen };
+  }
+
   async listFilterOptions(scope: Parameters<OrderRepository["listFilterOptions"]>[0]): Promise<OrderFilterOptions> {
     if (scope.kind === "seller") return { stores: [], sellers: [] };
-    const storeCondition = scope.kind === "store" ? eq(stores.id, scope.storeId) : eq(stores.active, true);
+    const storeCondition = scope.kind === "store"
+      ? eq(stores.id, scope.storeId)
+      : scope.kind === "region"
+        ? inArray(stores.id, [...scope.storeIds])
+        : eq(stores.active, true);
     const sellerCondition =
       scope.kind === "store"
         ? and(eq(users.storeId, scope.storeId), eq(users.active, true), inArray(users.role, ["sales", "store_manager"]))
+        : scope.kind === "region"
+          ? and(inArray(users.storeId, [...scope.storeIds]), eq(users.active, true), inArray(users.role, ["sales", "store_manager"]))
         : and(eq(users.active, true), isNotNull(users.storeId), inArray(users.role, ["sales", "store_manager"]));
     const [storeRows, sellerRows] = await Promise.all([
       this.executor

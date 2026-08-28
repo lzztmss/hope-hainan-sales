@@ -4,6 +4,7 @@ import {
   UserStoreManagementPage,
   createUserStoreManagementApi,
   type ManagedStoreView,
+  type ManagedUserFilters,
   type ManagedUserView,
   type UserStoreManagementApi,
 } from "./UserStoreManagementPage";
@@ -12,6 +13,7 @@ export interface UserStoreManagementRouteProps {
   api?: UserStoreManagementApi;
   currentUserId?: string;
   onCurrentUserPasswordReset?(): Promise<void> | void;
+  regionalOnly?: boolean;
 }
 
 const messageFor = (error: unknown): string =>
@@ -21,6 +23,7 @@ export const UserStoreManagementRoute = ({
   api: providedApi,
   currentUserId,
   onCurrentUserPasswordReset,
+  regionalOnly = false,
 }: UserStoreManagementRouteProps) => {
   const api = useMemo(
     () => providedApi ?? createUserStoreManagementApi(),
@@ -30,7 +33,7 @@ export const UserStoreManagementRoute = ({
   const [users, setUsers] = useState<readonly ManagedUserView[]>([]);
   const [managerCandidates, setManagerCandidates] = useState<readonly ManagedUserView[]>([]);
   const [page, setPage] = useState(1);
-  const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<ManagedUserFilters>({});
   const [userStats, setUserStats] = useState({ total: 0, activeTotal: 0, mustChangePasswordTotal: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,11 +44,11 @@ export const UserStoreManagementRoute = ({
     setUserStats({ total: nextUsers.total, activeTotal: nextUsers.activeTotal, mustChangePasswordTotal: nextUsers.mustChangePasswordTotal });
   }, []);
 
-  const loadUsers = useCallback(async (showLoading = false, requestedPage = 1, requestedQuery = "") => {
+  const loadUsers = useCallback(async (showLoading = false, requestedPage = 1, requestedFilters: ManagedUserFilters = {}) => {
     if (showLoading) setLoading(true);
     setError(null);
     try {
-      applyUserPage(await api.listUsers({ query: requestedQuery || undefined, page: requestedPage, pageSize: 20 }));
+      applyUserPage(await api.listUsers({ ...requestedFilters, page: requestedPage, pageSize: 20 }));
     } catch (loadError) {
       setError(messageFor(loadError));
       throw loadError;
@@ -54,13 +57,13 @@ export const UserStoreManagementRoute = ({
     }
   }, [api, applyUserPage]);
 
-  const load = useCallback(async (showLoading = true, requestedPage = 1, requestedQuery = "") => {
+  const load = useCallback(async (showLoading = true, requestedPage = 1, requestedFilters: ManagedUserFilters = {}) => {
     if (showLoading) setLoading(true);
     setError(null);
     try {
       const [nextStores, nextUsers, managers] = await Promise.all([
         api.listStores(),
-        api.listUsers({ query: requestedQuery || undefined, page: requestedPage, pageSize: 20 }),
+        api.listUsers({ ...requestedFilters, page: requestedPage, pageSize: 20 }),
         api.listUsers({ role: "store_manager", active: true, page: 1, pageSize: 100 }),
       ]);
       setStores(nextStores);
@@ -80,13 +83,13 @@ export const UserStoreManagementRoute = ({
 
   const refreshAfter = async (operation: () => Promise<unknown>) => {
     await operation();
-    await load(false, page, query);
+    await load(false, page, filters);
   };
 
-  const changeQuery = useCallback((nextQuery: string) => {
-    setQuery(nextQuery);
+  const changeFilters = useCallback((nextFilters: ManagedUserFilters) => {
+    setFilters(nextFilters);
     setPage(1);
-    void loadUsers(false, 1, nextQuery).catch(() => undefined);
+    void loadUsers(false, 1, nextFilters).catch(() => undefined);
   }, [loadUsers]);
 
   if (loading) {
@@ -111,6 +114,7 @@ export const UserStoreManagementRoute = ({
   return (
     <UserStoreManagementPage
       currentUserId={currentUserId}
+      regionalOnly={regionalOnly}
       stores={stores}
       users={users}
       managerCandidates={managerCandidates}
@@ -118,17 +122,17 @@ export const UserStoreManagementRoute = ({
       userTotal={userStats.total}
       activeUserTotal={userStats.activeTotal}
       mustChangePasswordTotal={userStats.mustChangePasswordTotal}
-      onUserPageChange={(nextPage) => void loadUsers(false, nextPage, query).catch(() => undefined)}
-      onUserQueryChange={changeQuery}
-      onCreateStore={(input) => refreshAfter(() => api.createStore(input))}
-      onUpdateStore={(id, input) =>
+      onUserPageChange={(nextPage) => void loadUsers(false, nextPage, filters).catch(() => undefined)}
+      onUserFiltersChange={changeFilters}
+      onCreateStore={regionalOnly ? undefined : (input) => refreshAfter(() => api.createStore(input))}
+      onUpdateStore={regionalOnly ? undefined : (id, input) =>
         refreshAfter(() => api.updateStore(id, input))
       }
-      onCreateUser={(input) => refreshAfter(() => api.createUser(input))}
-      onUpdateUser={(id, input) =>
+      onCreateUser={regionalOnly ? undefined : (input) => refreshAfter(() => api.createUser(input))}
+      onUpdateUser={regionalOnly ? undefined : (id, input) =>
         refreshAfter(() => api.updateUser(id, input))
       }
-      onResetPassword={(id, input) =>
+      onResetPassword={regionalOnly ? undefined : (id, input) =>
         id === currentUserId
           ? api.resetPassword(id, input).then(async () => {
               await onCurrentUserPasswordReset?.();

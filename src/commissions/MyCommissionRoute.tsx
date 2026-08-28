@@ -34,7 +34,7 @@ const errorMessage = (error: unknown): string =>
 
 export const MyCommissionRoute = ({
   client,
-  month = currentShanghaiMonth(),
+  month,
 }: MyCommissionRouteProps) => {
   const [dashboard, setDashboard] =
     useState<MyCommissionDashboardResponse | null>(null);
@@ -48,7 +48,8 @@ export const MyCommissionRoute = ({
       setError(null);
     }
     try {
-      const nextDashboard = await client.getMyCommissionDashboard({ month, limit: 20, page: requestedPage });
+      const currentMonth = month ?? currentShanghaiMonth();
+      const nextDashboard = await client.getMyCommissionDashboard({ month: currentMonth, limit: 20, page: requestedPage });
       setDashboard(nextDashboard);
       setPage(nextDashboard.page);
       setError(null);

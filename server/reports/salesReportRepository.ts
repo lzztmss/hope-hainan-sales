@@ -65,6 +65,7 @@ const key = (storeId: string, sellerId: string): string => `${storeId}:${sellerI
 const toUserScope = (scope: SalesReportScope): UserScope => {
   if (scope.kind === "seller") return scope;
   if (scope.kind === "store") return { kind: "store", storeId: scope.storeId };
+  if (scope.kind === "region") return { kind: "region", storeIds: scope.storeIds };
   return { kind: "global" };
 };
 
@@ -120,6 +121,15 @@ export const allocateEstimatedCommission = (
 export class DrizzleSalesReportRepository implements SalesReportRepository {
   constructor(private readonly client: DbClient) {}
 
+  async listActiveStores(storeId?: string): Promise<readonly { id: string; name: string }[]> {
+    return this.client.raw.prepare(`
+      SELECT id, name
+      FROM stores
+      WHERE active = 1 ${storeId ? "AND id = ?" : ""}
+      ORDER BY code ASC
+    `).all(...(storeId ? [storeId] : [])) as Array<{ id: string; name: string }>;
+  }
+
   async loadFacts(
     scope: SalesReportScope,
     period: ReportPeriod,
@@ -132,6 +142,13 @@ export class DrizzleSalesReportRepository implements SalesReportRepository {
     ): { clause: string; params: string[] } => {
       const clauses: string[] = [];
       const params: string[] = [];
+      if (scope.kind === "region" && !scope.storeId) {
+        if (scope.storeIds.length === 0) clauses.push("AND 1 = 0");
+        else {
+          clauses.push(`AND ${tableAlias}.store_id IN (${scope.storeIds.map(() => "?").join(", ")})`);
+          params.push(...scope.storeIds);
+        }
+      }
       if (scope.storeId) {
         clauses.push(`AND ${tableAlias}.store_id = ?`);
         params.push(scope.storeId);
@@ -177,12 +194,21 @@ export class DrizzleSalesReportRepository implements SalesReportRepository {
           SELECT o.store_id, s.name AS store_name, o.seller_id,
                  u.display_name AS seller_name,
                  COALESCE(SUM(o.one_time_fen), 0) AS one_time_fen,
-                 COALESCE(SUM(o.fttr_monthly_fen), 0) AS fttr_monthly_fen,
-                 COALESCE(SUM(o.heart_monthly_fen), 0) AS heart_monthly_fen,
-                 COALESCE(SUM(o.contract_36_fen), 0) AS contract_36_fen
+                 COALESCE(SUM(CASE WHEN o.status = 'returned' THEN 0 ELSE o.fttr_monthly_fen END), 0) AS fttr_monthly_fen,
+                 COALESCE(SUM(CASE WHEN o.status = 'returned' THEN 0 ELSE MAX(o.heart_monthly_fen - COALESCE(rr.returned_monthly_fen, 0), 0) END), 0) AS heart_monthly_fen,
+                 COALESCE(SUM(CASE WHEN o.status = 'returned' THEN 0 ELSE MAX(o.contract_36_fen - COALESCE(rr.returned_monthly_fen, 0) * 36, 0) END), 0) AS contract_36_fen
           FROM orders o
           JOIN stores s ON s.id = o.store_id
           JOIN users u ON u.id = o.seller_id
+          LEFT JOIN (
+            SELECT r.order_id,
+                   COALESCE(SUM(ri.quantity * ol.monthly_unit_fen), 0) AS returned_monthly_fen
+            FROM returns r
+            JOIN return_items ri ON ri.return_id = r.id
+            JOIN order_lines ol ON ol.id = ri.order_line_id
+            WHERE r.status = 'completed' AND r.service_type = 'refund'
+            GROUP BY r.order_id
+          ) rr ON rr.order_id = o.id
           WHERE o.activated_at >= ? AND o.activated_at < ?
             AND o.deleted_at IS NULL
             ${orderScope.clause}
@@ -204,7 +230,9 @@ export class DrizzleSalesReportRepository implements SalesReportRepository {
         all<LedgerRow>(`
           SELECT cl.store_id, s.name AS store_name,
                  cl.beneficiary_id AS seller_id, u.display_name AS seller_name,
-                 COALESCE(SUM(CASE WHEN sb.id IS NULL OR sb.status = 'draft'
+                 COALESCE(SUM(CASE WHEN co.signed_at IS NOT NULL
+                                      AND co.paid_at IS NULL
+                                      AND (sb.id IS NULL OR sb.status != 'paid')
                    THEN cl.amount_fen ELSE 0 END), 0) AS pending_fen,
                  COALESCE(SUM(CASE WHEN cl.entry_type = 'return_reversal'
                    THEN ABS(cl.amount_fen) ELSE 0 END), 0) AS reversed_fen,
@@ -212,6 +240,7 @@ export class DrizzleSalesReportRepository implements SalesReportRepository {
           FROM commission_ledger cl
           JOIN stores s ON s.id = cl.store_id
           JOIN users u ON u.id = cl.beneficiary_id
+          LEFT JOIN orders co ON co.id = cl.order_id
           LEFT JOIN settlement_items si ON si.ledger_entry_id = cl.id
           LEFT JOIN settlement_batches sb ON sb.id = si.batch_id
           WHERE cl.entry_type IN ('accrual', 'return_reversal', 'manual_positive', 'manual_negative')

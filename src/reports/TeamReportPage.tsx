@@ -84,7 +84,7 @@ export const TeamReportPage = ({
     <PageLayout
       eyebrow="团队管理"
       title="团队销售报表"
-      description="主管仅查看本营业厅，管理员可查看全公司；导出沿用当前筛选范围。"
+      description="营业厅经理查看本厅，大区经理查看所管营业厅，人力资源、财务和管理员查看全公司；导出沿用当前筛选范围。"
     >
       <ReportFilters
         allowTeamFilters
@@ -111,10 +111,10 @@ export const TeamReportPage = ({
                   <div><dt>成交率</dt><dd>{formatReportRate(row.conversionRateBps)}</dd></div>
                   <div><dt>一次性原额</dt><dd>{formatReportFen(row.oneTimeOriginalFen)}</dd></div>
                   <div><dt>退单额</dt><dd>{formatReportFen(row.returnedFen)}</dd></div>
-                  <div><dt>净额</dt><dd>{formatReportFen(row.oneTimeNetFen)}</dd></div>
+                  <div><dt>一次性设备净额</dt><dd>{formatReportFen(row.oneTimeNetFen)}</dd></div>
                   <div><dt>FTTR / 心连心月费</dt><dd>{formatReportFen(row.fttrMonthlyFen)} / {formatReportFen(row.heartMonthlyFen)}</dd></div>
-                  <div><dt>36 月名义额</dt><dd>{formatReportFen(row.contract36Fen)}</dd></div>
-                  <div><dt>提成净额</dt><dd>{formatReportFen(row.commissionNetFen)}</dd></div>
+                  <div><dt>36个月合约月费合计</dt><dd>{formatReportFen(row.contract36Fen)}</dd></div>
+                  <div><dt>期间提成净额</dt><dd>{formatReportFen(row.commissionNetFen)}</dd></div>
                 </dl>
               </article>
             ))}

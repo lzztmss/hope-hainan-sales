@@ -1,4 +1,4 @@
-import { and, count, eq, inArray, sql } from "drizzle-orm";
+import { and, count, eq, inArray, or, sql } from "drizzle-orm";
 
 import type { AppDatabase, DbClient, DbTransaction } from "../db/client.js";
 import type { UserScope } from "../auth/authorization.js";
@@ -9,6 +9,7 @@ import {
   orders,
   returnItems,
   returns as returnTable,
+  users,
 } from "../db/schema.js";
 import type {
   ReturnCompletionWrite,
@@ -40,12 +41,14 @@ const mapItem = (row: ReturnItemRow): ReturnItemRecord => ({
   label: row.label,
   quantity: row.quantity,
   maxRefundFen: snapshotMaxRefund(row),
+  refundFen: row.refundFen,
 });
 
 const mapRequest = (
   row: ReturnRow,
   itemRows: readonly ReturnItemRow[],
   orderNo: string,
+  requestedByName: string | null,
 ): ReturnRequestRecord => {
   const items = itemRows.map(mapItem);
   return {
@@ -55,16 +58,22 @@ const mapRequest = (
     idempotencyKey: row.idempotencyKey,
     completionIdempotencyKey: row.completionIdempotencyKey,
     orderId: row.orderId,
+    serviceType: row.serviceType,
     returnType: row.returnType,
+    returnKind: row.returnKind,
+    reasonCategory: row.reasonCategory,
+    orderStatusBefore: row.orderStatusBefore,
     status: row.status,
     reason: row.reason,
     requestedBy: row.requestedBy,
+    requestedByName,
     requestedAt: row.requestedAt,
     decidedBy: row.decidedBy,
     decidedAt: row.decidedAt,
     decisionNote: row.decisionNote,
     completedBy: row.completedBy,
     completedAt: row.completedAt,
+    requestedRefundFen: row.requestedRefundFen,
     refundFen: row.refundFen,
     maxRefundFen: items.reduce((sum, item) => sum + item.maxRefundFen, 0),
     items,
@@ -88,7 +97,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
   }
 
   private async loadRequest(row: ReturnRow): Promise<ReturnRequestRecord> {
-    const [items, orderRows] = await Promise.all([
+    const [items, orderRows, userRows] = await Promise.all([
       this.executor
         .select()
         .from(returnItems)
@@ -98,10 +107,15 @@ export class DrizzleReturnRepository implements ReturnRepository {
         .from(orders)
         .where(eq(orders.id, row.orderId))
         .limit(1),
+      this.executor
+        .select({ displayName: users.displayName })
+        .from(users)
+        .where(eq(users.id, row.requestedBy))
+        .limit(1),
     ]);
     const orderNo = orderRows[0]?.orderNo;
     if (!orderNo) throw new Error("退单关联订单不存在");
-    return mapRequest(row, items, orderNo);
+    return mapRequest(row, items, orderNo, userRows[0]?.displayName ?? null);
   }
 
   async findByRequestIdempotencyKey(
@@ -134,6 +148,8 @@ export class DrizzleReturnRepository implements ReturnRepository {
         sellerId: orders.sellerId,
         storeId: orders.storeId,
         status: orders.status,
+        salesChannel: orders.salesChannel,
+        signedAt: orders.signedAt,
         paymentMode: orders.paymentMode,
         refundedFen: orders.refundedFen,
       })
@@ -150,7 +166,11 @@ export class DrizzleReturnRepository implements ReturnRepository {
       .select({ id: returnTable.id })
       .from(returnTable)
       .where(
-        and(eq(returnTable.orderId, orderId), eq(returnTable.status, "completed")),
+        and(
+          eq(returnTable.orderId, orderId),
+          eq(returnTable.status, "completed"),
+          eq(returnTable.serviceType, "refund"),
+        ),
       );
     const completedIds = completedReturns.map((entry) => entry.id);
     const returnedRows =
@@ -196,11 +216,16 @@ export class DrizzleReturnRepository implements ReturnRepository {
         returnNo: input.returnNo,
         idempotencyKey: input.idempotencyKey,
         orderId: input.orderId,
+        serviceType: input.serviceType,
         returnType: input.returnType,
+        returnKind: input.returnKind,
+        reasonCategory: input.reasonCategory,
+        orderStatusBefore: input.orderStatusBefore,
         status: "requested",
         reason: input.reason,
         requestedBy: input.requestedBy,
         requestedAt: input.requestedAt,
+        requestedRefundFen: input.requestedRefundFen,
       })
       .returning();
     if (!created) throw new Error("退单创建失败");
@@ -229,7 +254,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
       .where(
         and(
           eq(orders.id, input.orderId),
-          inArray(orders.status, ["activated", "completed", "partially_returned"]),
+          inArray(orders.status, ["signed", "reconciled", "paid", "partially_returned"]),
         ),
       );
     return this.loadRequest(created);
@@ -246,11 +271,20 @@ export class DrizzleReturnRepository implements ReturnRepository {
 
   async listRequests(
     scope: UserScope,
-    filters: { orderId?: string; status?: ReturnRequestRecord["status"]; storeId?: string; sellerId?: string },
+    filters: {
+      orderId?: string;
+      query?: string;
+      status?: ReturnRequestRecord["status"];
+      serviceType?: ReturnRequestRecord["serviceType"];
+      returnKind?: ReturnRequestRecord["returnKind"];
+      storeId?: string;
+      sellerId?: string;
+    },
     paging?: { page: number; pageSize: number },
   ): Promise<{ items: ReturnRequestRecord[]; total: number }> {
     const conditions = [];
     if (scope.kind === "store") conditions.push(eq(orders.storeId, scope.storeId));
+    if (scope.kind === "region") conditions.push(inArray(orders.storeId, [...scope.storeIds]));
     if (scope.kind === "seller") {
       conditions.push(
         eq(orders.storeId, scope.storeId),
@@ -258,7 +292,17 @@ export class DrizzleReturnRepository implements ReturnRepository {
       );
     }
     if (filters.orderId) conditions.push(eq(returnTable.orderId, filters.orderId));
+    const queryText = filters.query?.trim();
+    if (queryText) {
+      const queryCondition = or(
+        sql`instr(lower(${orders.orderNo}), lower(${queryText})) > 0`,
+        sql`instr(lower(${returnTable.returnNo}), lower(${queryText})) > 0`,
+      );
+      if (queryCondition) conditions.push(queryCondition);
+    }
     if (filters.status) conditions.push(eq(returnTable.status, filters.status));
+    if (filters.serviceType) conditions.push(eq(returnTable.serviceType, filters.serviceType));
+    if (filters.returnKind) conditions.push(eq(returnTable.returnKind, filters.returnKind));
     if (filters.storeId) conditions.push(eq(orders.storeId, filters.storeId));
     if (filters.sellerId) conditions.push(eq(orders.sellerId, filters.sellerId));
     const where = and(...conditions);
@@ -283,6 +327,62 @@ export class DrizzleReturnRepository implements ReturnRepository {
     };
   }
 
+  async listRequestsForOrderIds(
+    scope: UserScope,
+    orderIds: readonly string[],
+  ): Promise<ReturnRequestRecord[]> {
+    if (orderIds.length === 0) return [];
+    const result: ReturnRequestRecord[] = [];
+    const chunkSize = 400;
+    for (let offset = 0; offset < orderIds.length; offset += chunkSize) {
+      const chunk = orderIds.slice(offset, offset + chunkSize);
+      const conditions = [inArray(returnTable.orderId, [...chunk])];
+      if (scope.kind === "store") conditions.push(eq(orders.storeId, scope.storeId));
+      if (scope.kind === "region") conditions.push(inArray(orders.storeId, [...scope.storeIds]));
+      if (scope.kind === "seller") {
+        conditions.push(
+          eq(orders.storeId, scope.storeId),
+          eq(orders.sellerId, scope.sellerId),
+        );
+      }
+      const rows = await this.executor
+        .select({
+          request: returnTable,
+          orderNo: orders.orderNo,
+          requestedByName: users.displayName,
+        })
+        .from(returnTable)
+        .innerJoin(orders, eq(orders.id, returnTable.orderId))
+        .leftJoin(users, eq(users.id, returnTable.requestedBy))
+        .where(and(...conditions))
+        .orderBy(returnTable.requestedAt, returnTable.id);
+      const returnIds = rows.map(({ request }) => request.id);
+      const itemRows = returnIds.length === 0
+        ? []
+        : await this.executor
+            .select()
+            .from(returnItems)
+            .where(inArray(returnItems.returnId, returnIds));
+      const itemsByReturn = new Map<string, ReturnItemRow[]>();
+      for (const item of itemRows) {
+        const grouped = itemsByReturn.get(item.returnId) ?? [];
+        grouped.push(item);
+        itemsByReturn.set(item.returnId, grouped);
+      }
+      for (const row of rows) {
+        result.push(
+          mapRequest(
+            row.request,
+            itemsByReturn.get(row.request.id) ?? [],
+            row.orderNo,
+            row.requestedByName,
+          ),
+        );
+      }
+    }
+    return result;
+  }
+
   async saveDecision(
     id: string,
     decision: ReturnDecisionWrite,
@@ -300,29 +400,10 @@ export class DrizzleReturnRepository implements ReturnRepository {
       .returning();
     if (!updated) throw new Error("退单已被其他操作更新");
     if (decision.status === "rejected") {
-      const [order] = await this.executor
-        .select({ completedAt: orders.completedAt })
-        .from(orders)
-        .where(eq(orders.id, updated.orderId))
-        .limit(1);
-      const completedReturns = await this.executor
-        .select({ id: returnTable.id })
-        .from(returnTable)
-        .where(
-          and(
-            eq(returnTable.orderId, updated.orderId),
-            eq(returnTable.status, "completed"),
-          ),
-        );
       await this.executor
         .update(orders)
         .set({
-          status:
-            completedReturns.length > 0
-              ? "partially_returned"
-              : order?.completedAt
-                ? "completed"
-                : "activated",
+          status: updated.orderStatusBefore ?? "signed",
           updatedAt: decision.decidedAt,
           version: sql`${orders.version} + 1`,
         })
@@ -344,7 +425,8 @@ export class DrizzleReturnRepository implements ReturnRepository {
       .select()
       .from(returnItems)
       .where(eq(returnItems.returnId, id));
-    let remainingRefund = completion.refundFen;
+    const completionRefundFen = current.serviceType === "refund" ? completion.refundFen : 0;
+    let remainingRefund = completionRefundFen;
     for (let index = 0; index < itemRows.length; index += 1) {
       const item = itemRows[index]!;
       const isLast = index === itemRows.length - 1;
@@ -353,7 +435,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
         : current.maxRefundFen === 0
           ? 0
           : Math.floor(
-              (completion.refundFen * snapshotMaxRefund(item)) /
+              (completionRefundFen * snapshotMaxRefund(item)) /
                 current.maxRefundFen,
             );
       remainingRefund -= allocated;
@@ -370,7 +452,7 @@ export class DrizzleReturnRepository implements ReturnRepository {
         completionIdempotencyKey: completion.completionIdempotencyKey,
         completedBy: completion.completedBy,
         completedAt: completion.completedAt,
-        refundFen: completion.refundFen,
+        refundFen: completionRefundFen,
         updatedAt: completion.completedAt,
         version: sql`${returnTable.version} + 1`,
       })
@@ -378,10 +460,22 @@ export class DrizzleReturnRepository implements ReturnRepository {
       .returning();
     if (!updated) throw new Error("退单已被其他操作更新");
 
+    if (current.serviceType === "exchange") {
+      await this.executor
+        .update(orders)
+        .set({
+          status: current.orderStatusBefore ?? "signed",
+          updatedAt: completion.completedAt,
+          version: sql`${orders.version} + 1`,
+        })
+        .where(eq(orders.id, current.orderId));
+      return this.loadRequest(updated);
+    }
+
     await this.executor
       .update(orders)
       .set({
-        refundedFen: sql`${orders.refundedFen} + ${completion.refundFen}`,
+        refundedFen: sql`${orders.refundedFen} + ${completionRefundFen}`,
         updatedAt: completion.completedAt,
         version: sql`${orders.version} + 1`,
       })
@@ -394,7 +488,9 @@ export class DrizzleReturnRepository implements ReturnRepository {
     await this.executor
       .update(orders)
       .set({
-        status: fullyReturned ? "returned" : "partially_returned",
+        // 部分退单是订单上的业务记录，不应覆盖“已签收/已对账/已收款”资金状态。
+        // 只有所有计价商品都退完时，订单主状态才进入“已退单”。
+        status: fullyReturned ? "returned" : current.orderStatusBefore ?? "signed",
         updatedAt: completion.completedAt,
       })
       .where(eq(orders.id, current.orderId));

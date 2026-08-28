@@ -22,6 +22,41 @@
       "when": 1787120570000,
       "tag": "0002_monthly_return_refund_cap",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1787280000000,
+      "tag": "0003_regional_managers",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1787709600000,
+      "tag": "0004_order_v2",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1787716800000,
+      "tag": "0005_after_sales",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1787731200000,
+      "tag": "0006_order_sales_channel",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1787882400000,
+      "tag": "0007_regional_manager_employment_dates",
+      "breakpoints": true
     }
   ]
 }

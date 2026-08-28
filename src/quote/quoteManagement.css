@@ -48,12 +48,21 @@
 .quote-order-confirm header, .quote-order-confirm footer { display: flex; align-items: center; justify-content: space-between; gap: var(--hfttr-space-3); }
 .quote-order-confirm header h2, .quote-order-confirm header span, .quote-order-confirm > p { margin: 0; }
 .quote-order-confirm > p { margin-block: var(--hfttr-space-4); color: var(--app-color-text-muted); line-height: 1.6; }
+.quote-order-channel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--hfttr-space-2); margin: 0 0 var(--hfttr-space-4); padding: 0; border: 0; }
+.quote-order-channel legend { grid-column: 1 / -1; margin-bottom: var(--hfttr-space-1); color: var(--app-color-primary-strong); font-weight: 800; }
+.quote-order-channel label { display: flex; align-items: flex-start; gap: var(--hfttr-space-2); min-height: 5.25rem; padding: var(--hfttr-space-3); border: 1px solid var(--app-color-border); border-radius: var(--app-radius-control); cursor: pointer; }
+.quote-order-channel label:has(input:checked) { border-color: var(--app-color-primary); background: var(--app-color-surface-subtle); box-shadow: inset 0 0 0 1px var(--app-color-primary); }
+.quote-order-channel input { margin-top: .2rem; }
+.quote-order-channel span { display: grid; gap: var(--hfttr-space-1); }
+.quote-order-channel small { color: var(--app-color-text-muted); line-height: 1.4; }
 .quote-order-confirm ul { display: grid; gap: var(--hfttr-space-2); margin: 0 0 var(--hfttr-space-5); padding: 0; list-style: none; }
 .quote-order-confirm li { display: grid; grid-template-columns: 5rem 1fr; gap: var(--hfttr-space-3); padding: var(--hfttr-space-3); border: 1px solid var(--app-color-border); border-radius: var(--app-radius-control); }
 .quote-order-confirm li span { color: var(--app-color-text-muted); font-size: var(--hfttr-font-size-sm); font-weight: 700; }
 .quote-order-confirm li[data-kind="package"] { border-left: 4px solid var(--app-color-primary); background: var(--app-color-surface-subtle); }
 .quote-order-confirm button { min-height: var(--app-control-min-size); padding-inline: var(--hfttr-space-4); border: 1px solid var(--app-color-border); border-radius: var(--app-radius-control); background: white; font: inherit; font-weight: 700; }
 .quote-order-confirm button.is-primary { border-color: var(--app-color-primary); background: var(--app-color-primary); color: white; }
+.quote-order-confirm button:disabled { cursor: not-allowed; opacity: .6; }
+@media (max-width: 30rem) { .quote-order-channel { grid-template-columns: 1fr; } }
 @media (min-width: 42rem) {
   .quote-management__filter-row.is-primary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .quote-management__filter-row.is-secondary { grid-template-columns: repeat(2, minmax(0, 1fr)); }

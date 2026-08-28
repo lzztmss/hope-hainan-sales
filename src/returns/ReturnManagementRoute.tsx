@@ -5,7 +5,7 @@ import type {
   AuthenticatedUser,
   ReturnRecordDto,
 } from "../api/client";
-import type { ReturnStatus } from "../orders/types";
+import type { AfterSalesServiceType, ReturnKind, ReturnStatus } from "../orders/types";
 import { usePageAutoRefresh } from "../hooks/usePageAutoRefresh";
 import { ReturnManagementPage } from "./ReturnManagementPage";
 import {
@@ -30,7 +30,10 @@ export const ReturnManagementRoute = ({
   const [items, setItems] = useState<readonly ReturnRecordDto[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [query, setQuery] = useState("");
   const [status, setStatus] = useState<ReturnStatus | "">("");
+  const [serviceType, setServiceType] = useState<AfterSalesServiceType | "">("");
+  const [returnKind, setReturnKind] = useState<ReturnKind | "">("");
   const [storeId, setStoreId] = useState("");
   const [sellerId, setSellerId] = useState("");
   const [filterOptions, setFilterOptions] = useState<{ stores: Array<{ id: string; label: string }>; sellers: Array<{ id: string; label: string; storeId: string }> }>({ stores: [], sellers: [] });
@@ -44,7 +47,7 @@ export const ReturnManagementRoute = ({
       setLoadError(null);
     }
     try {
-      const result = await api.listReturns({ status: status || undefined, storeId: storeId || undefined, sellerId: sellerId || undefined, page: requestedPage, pageSize: 20 });
+      const result = await api.listReturns({ query: query || undefined, status: status || undefined, serviceType: serviceType || undefined, returnKind: returnKind || undefined, storeId: storeId || undefined, sellerId: sellerId || undefined, page: requestedPage, pageSize: 20 });
       setItems(result.items);
       setTotal(result.total);
       setPage(result.page);
@@ -57,7 +60,7 @@ export const ReturnManagementRoute = ({
     } finally {
       if (!background) setLoading(false);
     }
-  }, [api, sellerId, status, storeId]);
+  }, [api, query, returnKind, sellerId, serviceType, status, storeId]);
 
   useEffect(() => {
     void client.listOrderFilterOptions().then(setFilterOptions).catch(() => setFilterOptions({ stores: [], sellers: [] }));
@@ -95,14 +98,20 @@ export const ReturnManagementRoute = ({
         replaceRecord(await api.decideReturn(input));
       }}
       onReload={() => setReloadVersion((version) => version + 1)}
+      onQueryChange={setQuery}
       onStatusChange={setStatus}
+      onServiceTypeChange={setServiceType}
+      onReturnKindChange={setReturnKind}
       onStoreChange={(value) => { setStoreId(value); setSellerId(""); }}
       onSellerChange={setSellerId}
       storeId={storeId}
       sellerId={sellerId}
       stores={filterOptions.stores}
       sellers={filterOptions.sellers}
+      query={query}
       status={status}
+      serviceType={serviceType}
+      returnKind={returnKind}
     />
   );
 };

@@ -335,6 +335,9 @@ export const createCommissionLedgerService = (
     async validateReversalForCompletedReturn(
       completedReturn: ReturnRequestRecord,
     ): Promise<void> {
+      if (completedReturn.serviceType !== "refund") {
+        throw new Error("换货不涉及提成冲销");
+      }
       if (completedReturn.status !== "completed" || !completedReturn.completedAt) {
         throw new Error("只有已完成退单可以冲销提成");
       }
@@ -348,6 +351,9 @@ export const createCommissionLedgerService = (
     async reverseForCompletedReturn(
       completedReturn: ReturnRequestRecord,
     ): Promise<CommissionReversalResult> {
+      if (completedReturn.serviceType !== "refund") {
+        throw new Error("换货不涉及提成冲销");
+      }
       if (completedReturn.status !== "completed" || !completedReturn.completedAt) {
         throw new Error("只有已完成退单可以冲销提成");
       }

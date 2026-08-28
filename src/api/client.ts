@@ -20,7 +20,7 @@ import type {
 } from "../orders/types";
 import { APP_BASE_PATH } from "../appBasePath";
 
-export type ApiUserRole = "sales" | "store_manager" | "admin";
+export type ApiUserRole = "sales" | "store_manager" | "regional_manager" | "hr" | "finance" | "admin";
 
 export interface AuthenticatedUser {
   id: string;
@@ -29,6 +29,7 @@ export interface AuthenticatedUser {
   storeId: string | null;
   storeName?: string | null;
   mustChangePassword: boolean;
+  managedStores?: readonly { id: string; name: string }[];
 }
 
 export interface LoginInput {
@@ -231,6 +232,7 @@ export interface OrderDto {
   sellerId: string;
   storeId: string;
   status: OrderStatus;
+  salesChannel: "online" | "offline";
   paymentMode: OrderPaymentMode;
   fttrKind: "none" | "standard" | "custom";
   fttrPlan: number | null;
@@ -241,12 +243,22 @@ export interface OrderDto {
   monthlyTotalFen: number;
   contract36Fen: number;
   refundedFen: number;
+  commissionPayoutStatus: "ineligible" | "pending" | "paid";
+  commissionNetFen: number;
+  commissionPaidFen: number;
+  commissionReversedFen: number;
   customer: OrderCustomerDto;
   storeSnapshot?: Readonly<Record<string, unknown>> | null;
   sellerSnapshot?: Readonly<Record<string, unknown>> | null;
   lines: readonly OrderLineDto[];
   acceptedAt: string | null;
   activatedAt: string | null;
+  signedAt: string | null;
+  signedBy: string | null;
+  reconciledAt: string | null;
+  reconciledBy: string | null;
+  paidAt: string | null;
+  paidBy: string | null;
   completedAt: string | null;
   cancelledAt: string | null;
   deletedAt: string | null;
@@ -264,6 +276,13 @@ export interface OrderListApiQuery {
   sellerQuery?: string;
   status?: OrderStatus;
   paymentMode?: OrderPaymentMode;
+  signedDateFrom?: string;
+  signedDateTo?: string;
+  reconciledDateFrom?: string;
+  reconciledDateTo?: string;
+  commissionPayoutStatus?: "ineligible" | "pending" | "paid";
+  reconciliationStatus?: "pending" | "reconciled";
+  collectionStatus?: "unpaid" | "paid";
   cursor?: string;
   page?: number;
   limit?: number;
@@ -275,6 +294,12 @@ export interface OrderListApiResponse {
   total: number;
   page: number;
   pageSize: number;
+}
+
+export interface OrderExportDownload {
+  blob: Blob;
+  filename: string;
+  orderCount: number | null;
 }
 
 export interface OrderFilterOptionsApiResponse {
@@ -292,6 +317,7 @@ export interface OrderMutationDto {
   id: string;
   orderNo: string;
   status: OrderStatus;
+  salesChannel: "online" | "offline";
   version: number;
   deletedAt: string | null;
   updatedAt: string;
@@ -311,7 +337,10 @@ export interface ReturnRecordDto {
   returnNo: string;
   orderNo: string;
   orderId: string;
+  serviceType: "refund" | "exchange";
   returnType: ReturnType;
+  returnKind: "normal" | "special";
+  reasonCategory: "no_reason" | "quality" | "order_mismatch" | "service_issue" | "other";
   status: ReturnStatus;
   reason: string;
   requestedBy: string;
@@ -322,13 +351,18 @@ export interface ReturnRecordDto {
   decisionNote: string | null;
   completedBy: string | null;
   completedAt: string | null;
+  requestedRefundFen: number;
   refundFen: number;
   maxRefundFen: number;
   items: readonly ReturnItemDto[];
 }
 
 export interface RequestOrderReturnApiInput {
+  serviceType: "refund" | "exchange";
   type: ReturnType;
+  kind: "normal" | "special";
+  reasonCategory: "no_reason" | "quality" | "order_mismatch" | "service_issue" | "other";
+  requestedRefundFen: number;
   reason: string;
   items: readonly { orderLineId: string; quantity: number }[];
 }
@@ -366,6 +400,7 @@ export interface ApiClient {
   createOrderFromQuote(
     quoteId: string,
     idempotencyKey: string,
+    salesChannel: "online" | "offline",
     attributions?: readonly OrderAttributionApiInput[],
   ): Promise<OrderMutationDto>;
   confirmQuote(
@@ -388,6 +423,7 @@ export interface ApiClient {
   listCommissionPolicyVersions(): Promise<readonly CommissionPolicyVersionDto[]>;
   listOrderReturns(orderId: string): Promise<readonly ReturnRecordDto[]>;
   listOrders(query: OrderListApiQuery): Promise<OrderListApiResponse>;
+  exportOrders(query: OrderListApiQuery): Promise<OrderExportDownload>;
   listOrderFilterOptions(): Promise<OrderFilterOptionsApiResponse>;
   login(input: LoginInput): Promise<AuthenticatedUser>;
   logout(): Promise<void>;
@@ -425,6 +461,11 @@ export interface ApiClient {
     command: OrderTransitionCommand,
     expectedVersion: number,
   ): Promise<OrderMutationDto>;
+  batchTransitionOrders(
+    items: readonly { orderId: string; expectedVersion: number }[],
+    command: "RECONCILE" | "MARK_PAID",
+  ): Promise<{ updated: number }>;
+  batchPayOrderCommissions(orderIds: readonly string[], idempotencyKey: string): Promise<{ paidOrders: number; totalFen: number }>;
   updateCommissionRule(
     policyId: string,
     ruleId: string,
@@ -626,6 +667,67 @@ export const createApiClient = ({
     return payload;
   };
 
+  const requestDownload = async (path: string): Promise<OrderExportDownload> => {
+    let response: Response;
+    try {
+      response = await fetcher(`${baseUrl}${path}`, {
+        credentials: "include",
+        headers: {
+          Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        },
+      });
+    } catch {
+      throw new ApiError("网络连接失败，请检查网络后重试", 0);
+    }
+    if (!response.ok) {
+      const payload = await readJson(response);
+      const errorPayload = (payload ?? {}) as ErrorPayload;
+      throw new ApiError(
+        typeof errorPayload.error === "string"
+          ? errorPayload.error
+          : "导出失败，请稍后重试",
+        response.status,
+      );
+    }
+    const disposition = response.headers.get("Content-Disposition") ?? "";
+    const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+    const fallback = /filename="?([^";]+)"?/i.exec(disposition)?.[1];
+    let filename = fallback ?? "订单对账明细.xlsx";
+    if (encoded) {
+      try {
+        filename = decodeURIComponent(encoded);
+      } catch {
+        filename = "订单对账明细.xlsx";
+      }
+    }
+    const countHeader = response.headers.get("X-Export-Order-Count");
+    const parsedCount = countHeader === null ? Number.NaN : Number(countHeader);
+    return {
+      blob: await response.blob(),
+      filename,
+      orderCount: Number.isSafeInteger(parsedCount) ? parsedCount : null,
+    };
+  };
+
+  const orderQueryParameters = (query: OrderListApiQuery): URLSearchParams => {
+    const parameters = new URLSearchParams();
+    if (query.query) parameters.set("query", query.query);
+    if (query.orderNo) parameters.set("orderNo", query.orderNo);
+    if (query.customerPhoneTail) parameters.set("customerPhoneTail", query.customerPhoneTail);
+    if (query.storeQuery) parameters.set("storeQuery", query.storeQuery);
+    if (query.sellerQuery) parameters.set("sellerQuery", query.sellerQuery);
+    if (query.status) parameters.set("status", query.status);
+    if (query.paymentMode) parameters.set("paymentMode", query.paymentMode);
+    if (query.signedDateFrom) parameters.set("signedDateFrom", query.signedDateFrom);
+    if (query.signedDateTo) parameters.set("signedDateTo", query.signedDateTo);
+    if (query.reconciledDateFrom) parameters.set("reconciledDateFrom", query.reconciledDateFrom);
+    if (query.reconciledDateTo) parameters.set("reconciledDateTo", query.reconciledDateTo);
+    if (query.commissionPayoutStatus) parameters.set("commissionPayoutStatus", query.commissionPayoutStatus);
+    if (query.reconciliationStatus) parameters.set("reconciliationStatus", query.reconciliationStatus);
+    if (query.collectionStatus) parameters.set("collectionStatus", query.collectionStatus);
+    return parameters;
+  };
+
   return {
     async getCurrentUser() {
       return readUser(await request("/api/auth/me"));
@@ -712,12 +814,13 @@ export const createApiClient = ({
         method: "POST",
       });
     },
-    async createOrderFromQuote(quoteId, orderKey, attributions) {
+    async createOrderFromQuote(quoteId, orderKey, salesChannel, attributions) {
       return (await request("/api/orders", {
         method: "POST",
         headers: { "Idempotency-Key": orderKey },
         body: JSON.stringify({
           quoteId,
+          salesChannel,
           ...(attributions ? { attributions } : {}),
         }),
       })) as OrderMutationDto;
@@ -734,16 +837,7 @@ export const createApiClient = ({
       );
     },
     async listOrders(query) {
-      const parameters = new URLSearchParams();
-      if (query.query) parameters.set("query", query.query);
-      if (query.orderNo) parameters.set("orderNo", query.orderNo);
-      if (query.customerPhoneTail) {
-        parameters.set("customerPhoneTail", query.customerPhoneTail);
-      }
-      if (query.storeQuery) parameters.set("storeQuery", query.storeQuery);
-      if (query.sellerQuery) parameters.set("sellerQuery", query.sellerQuery);
-      if (query.status) parameters.set("status", query.status);
-      if (query.paymentMode) parameters.set("paymentMode", query.paymentMode);
+      const parameters = orderQueryParameters(query);
       if (query.cursor) parameters.set("cursor", query.cursor);
       if (query.page) parameters.set("page", String(query.page));
       parameters.set("limit", String(query.limit ?? 100));
@@ -751,6 +845,10 @@ export const createApiClient = ({
         ? "/api/orders/recycle-bin"
         : "/api/orders";
       return readOrderList(await request(`${path}?${parameters.toString()}`));
+    },
+    async exportOrders(query) {
+      const parameters = orderQueryParameters(query);
+      return requestDownload(`/api/orders/export?${parameters.toString()}`);
     },
     async listOrderFilterOptions() {
       return (await request("/api/order-filter-options")) as OrderFilterOptionsApiResponse;
@@ -768,6 +866,19 @@ export const createApiClient = ({
           body: JSON.stringify({ command, expectedVersion }),
         },
       )) as OrderMutationDto;
+    },
+    async batchTransitionOrders(items, command) {
+      return (await request("/api/orders/batch-transitions", {
+        method: "POST",
+        body: JSON.stringify({ items, command }),
+      })) as { updated: number };
+    },
+    async batchPayOrderCommissions(orderIds, idempotencyKey) {
+      return (await request("/api/orders/batch-commission-payout", {
+        method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
+        body: JSON.stringify({ orderIds }),
+      })) as { paidOrders: number; totalFen: number };
     },
     async deleteOrder(orderId) {
       return (await request(`/api/orders/${encodeURIComponent(orderId)}`, {

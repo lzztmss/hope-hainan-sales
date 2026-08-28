@@ -1,7 +1,7 @@
 import { eq, or } from "drizzle-orm";
 
 import type { AppDatabase } from "../db/client.js";
-import { sessions, stores, users } from "../db/schema.js";
+import { regionalManagerStores, sessions, stores, users } from "../db/schema.js";
 import type {
   AuthRepository,
   AuthUserRecord,
@@ -24,6 +24,19 @@ const userSelection = {
 export class DrizzleAuthRepository implements AuthRepository {
   constructor(private readonly db: AppDatabase) {}
 
+  private async withManagedStores(
+    row: Omit<AuthUserRecord, "managedStores"> | null,
+  ): Promise<AuthUserRecord | null> {
+    if (!row) return null;
+    if (row.role !== "regional_manager") return { ...row, managedStores: [] };
+    const managedStores = await this.db
+      .select({ id: stores.id, name: stores.name })
+      .from(regionalManagerStores)
+      .innerJoin(stores, eq(stores.id, regionalManagerStores.storeId))
+      .where(eq(regionalManagerStores.regionalManagerId, row.id));
+    return { ...row, managedStores };
+  }
+
   async findUserByIdentifier(identifier: string): Promise<AuthUserRecord | null> {
     const [row] = await this.db
       .select(userSelection)
@@ -36,7 +49,7 @@ export class DrizzleAuthRepository implements AuthRepository {
         ),
       )
       .limit(1);
-    return row ?? null;
+    return this.withManagedStores(row ?? null);
   }
 
   async findUserById(id: string): Promise<AuthUserRecord | null> {
@@ -46,7 +59,7 @@ export class DrizzleAuthRepository implements AuthRepository {
       .leftJoin(stores, eq(stores.id, users.storeId))
       .where(eq(users.id, id))
       .limit(1);
-    return row ?? null;
+    return this.withManagedStores(row ?? null);
   }
 
   async createSession(session: StoredSession): Promise<void> {

@@ -23,15 +23,15 @@ const salesMetrics: ReadonlyArray<{
   { key: "oneTimeNetFen", label: "一次性设备净额", kind: "money", tone: "primary" },
   { key: "fttrMonthlyFen", label: "FTTR 月费", kind: "money" },
   { key: "heartMonthlyFen", label: "心连心月增费", kind: "money" },
-  { key: "contract36Fen", label: "36 月名义额", kind: "money" },
+  { key: "contract36Fen", label: "36个月合约月费合计", kind: "money" },
 ];
 
 const commissionMetrics: ReadonlyArray<{ key: keyof SalesReportMetrics; label: string }> = [
   { key: "commissionEstimatedFen", label: "预计提成" },
   { key: "commissionPendingSettlementFen", label: "待结算" },
-  { key: "commissionPaidFen", label: "已发提成" },
-  { key: "commissionReversedFen", label: "退单冲销" },
-  { key: "commissionNetFen", label: "净提成" },
+  { key: "commissionPaidFen", label: "期间已发提成" },
+  { key: "commissionReversedFen", label: "期间退单扣回" },
+  { key: "commissionNetFen", label: "期间提成净额" },
 ];
 
 export const ReportSummary = ({ metrics }: { metrics: SalesReportMetrics }) => (

@@ -40,6 +40,9 @@ export interface DashboardLedgerRecord {
   ruleSku: string | null;
   ruleName: string | null;
   activatedAt: Date | null;
+  signedAt: Date | null;
+  reconciledAt: Date | null;
+  orderPaidAt: Date | null;
   orderCreatedAt: Date | null;
   calculationSnapshot: Record<string, unknown> | null;
   settlementStatus: DashboardSettlementStatus | null;
@@ -75,7 +78,9 @@ export interface MissingCommissionOrder {
   customerNameEncrypted: string | null;
   customerPhoneTail: string | null;
   customerSnapshot: Record<string, unknown>;
-  activatedAt: Date;
+  activatedAt: Date | null;
+  referenceAt: Date;
+  issue: "missing_activation" | "missing_policy";
 }
 
 export interface CommissionDashboardRepositoryFilters {
@@ -114,6 +119,7 @@ export interface CommissionDashboardSummary {
   accruedNetFen: number;
   pendingSettlementFen: number;
   pendingPaymentFen: number;
+  pendingDeductionFen: number;
   paidThisMonthFen: number;
   paidLifetimeFen: number;
   reversedLifetimeFen: number;
@@ -274,6 +280,9 @@ const normalizeFilters = (
   filters: CommissionDashboardFilters,
 ): { scope: UserScope; repository: CommissionDashboardRepositoryFilters } => {
   const scope = scopeForUser(user);
+  if (scope.kind === "region") {
+    throw new CommissionDashboardError("大区经理提成功能暂未开放", 403);
+  }
   if (scope.kind === "seller") {
     if (filters.storeId && filters.storeId !== scope.storeId) {
       throw new CommissionDashboardError("无权查询其他营业厅提成", 403);
@@ -454,7 +463,7 @@ const ledgerLineLabel = (
   row: DashboardLedgerRecord,
   baseLabel: string,
 ): string => {
-  if (row.entryType === "return_reversal") return `${baseLabel}（退单冲回）`;
+  if (row.entryType === "return_reversal") return `${baseLabel}（退单扣回）`;
   if (row.entryType === "manual_positive") return `${baseLabel}（人工增加）`;
   if (row.entryType === "manual_negative") return `${baseLabel}（人工扣减）`;
   return baseLabel;
@@ -501,15 +510,18 @@ const ledgerOrderStatus = (
   rows: readonly DashboardLedgerRecord[],
 ): Pick<CommissionDashboardOrder, "status" | "statusLabel"> => {
   if (rows.some((row) => row.entryType === "return_reversal")) {
-    return { status: "reversed", statusLabel: "含退单冲回 · 当前净额" };
+    return { status: "reversed", statusLabel: "含退单扣回 · 当前净额" };
   }
-  if (rows.some((row) => row.settlementStatus === null || row.settlementStatus === "draft")) {
-    return { status: "accrued", statusLabel: "已计提 · 待结算" };
+  if (rows.some((row) => row.settlementStatus === "paid")) {
+    return { status: "paid", statusLabel: "已发放" };
   }
-  if (rows.some((row) => row.settlementStatus === "approved")) {
-    return { status: "settled", statusLabel: "已结算 · 待发放" };
+  if (rows.some((row) => row.orderPaidAt)) {
+    return { status: "settled", statusLabel: "已收款 · 待发放" };
   }
-  return { status: "paid", statusLabel: "已发放" };
+  if (rows.some((row) => row.signedAt)) {
+    return { status: "accrued", statusLabel: rows.some((row) => row.reconciledAt) ? "已对账 · 待结算" : "已签收 · 待结算" };
+  }
+  return { status: "estimated", statusLabel: "预计提成 · 待签收" };
 };
 
 const presentLedgerOrders = (
@@ -639,13 +651,15 @@ const presentMissingAccrualOrders = (
       order.customerSnapshot,
       decryptPii,
     ),
-    activatedAt: formatShanghaiDateTime(order.activatedAt),
+    activatedAt: order.activatedAt ? formatShanghaiDateTime(order.activatedAt) : "未记录",
     status: "exception",
-    statusLabel: "提成异常 · 激活时无有效规则 · 待管理员处理",
+    statusLabel: order.issue === "missing_activation"
+      ? "提成异常 · 缺少激活时间 · 待管理员处理"
+      : "提成异常 · 激活时无有效规则 · 待管理员处理",
     amountFen: 0,
     lines: [],
     ledgerEntries: [],
-    sortAt: order.activatedAt,
+    sortAt: order.referenceAt,
   }));
 
 const summarizeLedger = (
@@ -655,6 +669,7 @@ const summarizeLedger = (
   let accruedNetFen = 0;
   let pendingSettlementFen = 0;
   let pendingPaymentFen = 0;
+  let pendingDeductionFen = 0;
   let paidThisMonthFen = 0;
   let paidLifetimeFen = 0;
   let reversedLifetimeFen = 0;
@@ -673,19 +688,24 @@ const summarizeLedger = (
         "累计退单冲回",
       );
     }
-    if (row.settlementStatus === "approved") {
-      pendingPaymentFen = addFen(
-        pendingPaymentFen,
-        row.settlementAmountFen ?? row.amountFen,
-        "待发放提成",
-      );
-    } else if (row.settlementStatus === "paid") {
+    if (row.settlementStatus === "paid") {
       const settledFen = row.settlementAmountFen ?? row.amountFen;
       paidLifetimeFen = addFen(paidLifetimeFen, settledFen, "累计已发提成");
       if (row.paidAt && row.paidAt >= period.start && row.paidAt < period.end) {
         paidThisMonthFen = addFen(paidThisMonthFen, settledFen, "本月已发提成");
       }
-    } else {
+    } else if (row.orderPaidAt) {
+      const amountFen = row.settlementAmountFen ?? row.amountFen;
+      if (amountFen >= 0) {
+        pendingPaymentFen = addFen(pendingPaymentFen, amountFen, "待发放提成");
+      } else {
+        pendingDeductionFen = addFen(
+          pendingDeductionFen,
+          Math.abs(amountFen),
+          "待扣回提成",
+        );
+      }
+    } else if (row.signedAt) {
       pendingSettlementFen = addFen(
         pendingSettlementFen,
         row.amountFen,
@@ -697,6 +717,7 @@ const summarizeLedger = (
     accruedNetFen,
     pendingSettlementFen,
     pendingPaymentFen,
+    pendingDeductionFen,
     paidThisMonthFen,
     paidLifetimeFen,
     reversedLifetimeFen,
@@ -795,11 +816,14 @@ export const createCommissionDashboardService = (
         .filter((row) => row.orderId && hasUnconfiguredSnapshot(row.calculationSnapshot))
         .map((row) => row.orderId!),
     ).size;
+    const activatedEstimatedFen = scopedLedger
+      .filter((row) => row.orderStatus === "activated" && !row.signedAt && row.settlementStatus !== "paid")
+      .reduce((sum, row) => addFen(sum, row.amountFen, "已激活预计提成"), 0);
     return {
       normalized,
       ledgerRows: scopedLedger,
       orders: [...estimated.orders, ...ledgerOrders, ...exceptionalOrders],
-      estimatedFen: estimated.totalFen,
+      estimatedFen: addFen(estimated.totalFen, activatedEstimatedFen, "预计提成"),
       unconfiguredOrders: estimated.unconfiguredOrders + snapshotUnconfigured,
     };
   };

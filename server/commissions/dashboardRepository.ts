@@ -88,6 +88,7 @@ const isDashboardLedgerEntryType = (
 const ledgerScopeCondition = (scope: UserScope): SQL | undefined => {
   if (scope.kind === "global") return undefined;
   if (scope.kind === "store") return eq(commissionLedger.storeId, scope.storeId);
+  if (scope.kind === "region") return inArray(commissionLedger.storeId, [...scope.storeIds]);
   return and(
     eq(commissionLedger.storeId, scope.storeId),
     eq(commissionLedger.beneficiaryId, scope.sellerId),
@@ -116,6 +117,7 @@ const estimatedOrderScopeConditions = (
 ): SQL[] => {
   if (scope.kind === "global") return [];
   if (scope.kind === "store") return [eq(orders.storeId, scope.storeId)];
+  if (scope.kind === "region") return [inArray(orders.storeId, [...scope.storeIds])];
   return [
     eq(orders.storeId, scope.storeId),
     orderHasBeneficiary(executor, scope.sellerId),
@@ -173,6 +175,9 @@ export class DrizzleCommissionDashboardRepository
         ruleFttrPlan: commissionRules.fttrPlan,
         ruleName: commissionRules.ruleName,
         activatedAt: orders.activatedAt,
+        signedAt: orders.signedAt,
+        reconciledAt: orders.reconciledAt,
+        orderPaidAt: orders.paidAt,
         orderCreatedAt: orders.createdAt,
         calculationSnapshot: orderCommissionSnapshots.calculationSnapshot,
         settlementStatus: settlementBatches.status,
@@ -227,6 +232,9 @@ export class DrizzleCommissionDashboardRepository
         }),
         ruleName: row.ruleName,
         activatedAt: row.activatedAt,
+        signedAt: row.signedAt,
+        reconciledAt: row.reconciledAt,
+        orderPaidAt: row.orderPaidAt,
         orderCreatedAt: row.orderCreatedAt,
         calculationSnapshot: row.calculationSnapshot,
         settlementStatus: row.settlementStatus,
@@ -350,7 +358,7 @@ export class DrizzleCommissionDashboardRepository
     filters: CommissionDashboardRepositoryFilters,
   ): Promise<readonly MissingCommissionOrder[]> {
     const conditions: SQL[] = [
-      inArray(orders.status, ["activated", "completed", "return_pending", "returned"]),
+      inArray(orders.status, ["activated", "signed", "reconciled", "paid", "return_pending", "partially_returned", "returned"]),
       isNull(orders.deletedAt),
       notExists(
         this.executor
@@ -374,16 +382,24 @@ export class DrizzleCommissionDashboardRepository
         customerPhoneTail: customers.phoneTail,
         customerSnapshot: orders.customerSnapshot,
         activatedAt: orders.activatedAt,
+        signedAt: orders.signedAt,
+        createdAt: orders.createdAt,
       })
       .from(orders)
       .innerJoin(customers, eq(customers.id, orders.customerId))
       .where(and(...conditions))
       .orderBy(desc(orders.activatedAt), desc(orders.id));
 
-    return rows.map((row) => {
-      if (!row.activatedAt) throw new Error("提成异常订单缺少激活时间");
-      return { ...row, activatedAt: row.activatedAt };
-    });
+    return rows.map((row) => ({
+      id: row.id,
+      orderNo: row.orderNo,
+      customerNameEncrypted: row.customerNameEncrypted,
+      customerPhoneTail: row.customerPhoneTail,
+      customerSnapshot: row.customerSnapshot,
+      activatedAt: row.activatedAt,
+      referenceAt: row.activatedAt ?? row.signedAt ?? row.createdAt,
+      issue: row.activatedAt ? "missing_policy" as const : "missing_activation" as const,
+    }));
   }
 
   async findEffectivePolicy(

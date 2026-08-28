@@ -73,6 +73,7 @@
   gap: 9px;
   min-width: 0;
   padding: 16px;
+  position: relative;
 }
 
 .commission-summary-card span {
@@ -83,6 +84,17 @@
 .commission-summary-card strong {
   font-size: clamp(20px, 3vw, 28px);
   font-variant-numeric: tabular-nums;
+}
+
+.commission-summary-card__deduction {
+  color: #b42318;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.3;
+  position: absolute;
+  right: 14px;
+  top: 14px;
 }
 
 .commission-summary-card.is-primary {

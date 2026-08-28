@@ -2,7 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { UserStoreManagementPage, type ManagedStoreView } from "./UserStoreManagementPage";
+import { UserStoreManagementPage, type ManagedStoreView, type ManagedUserView } from "./UserStoreManagementPage";
 
 afterEach(cleanup);
 
@@ -73,5 +73,51 @@ describe("营业厅与账号管理表单", () => {
       "指定营业厅经理的原因至少填写 2 个字符",
     );
     expect(onUpdateStore).not.toHaveBeenCalled();
+  });
+
+  it("编辑大区经理时取消本人营业厅后仍可重新选中", async () => {
+    const user = userEvent.setup();
+    const regionalManager: ManagedUserView = {
+      id: "00000000-0000-4000-8000-000000000099",
+      workNo: "REGION001",
+      displayName: "测试大区经理",
+      phoneMasked: null,
+      role: "regional_manager",
+      personnelType: "unicom",
+      storeId: null,
+      managedStoreIds: [store.id],
+      storeName: null,
+      employmentStartDate: "2026-08-01",
+      employmentEndDate: null,
+      active: true,
+      mustChangePassword: false,
+      lastLoginAt: null,
+      createdAt: "2026-08-01T00:00:00.000Z",
+      updatedAt: "2026-08-01T00:00:00.000Z",
+    };
+    const assignedStore = {
+      ...store,
+      regionalManagerUserId: regionalManager.id,
+      regionalManagerName: regionalManager.displayName,
+    };
+    render(
+      <UserStoreManagementPage
+        stores={[assignedStore]}
+        users={[regionalManager]}
+        onUpdateUser={vi.fn()}
+      />,
+    );
+
+    const editButton = screen.getAllByRole("button", { name: "编辑账号" })[0]!;
+    await user.click(editButton);
+    const checkbox = screen.getByRole("checkbox", { name: /测试营业厅/ });
+    expect(checkbox).toBeChecked();
+
+    await user.click(checkbox);
+    expect(checkbox).not.toBeChecked();
+    expect(checkbox).toBeEnabled();
+
+    await user.click(checkbox);
+    expect(checkbox).toBeChecked();
   });
 });

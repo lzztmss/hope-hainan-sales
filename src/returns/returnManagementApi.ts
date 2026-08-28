@@ -2,7 +2,7 @@ import {
   ApiError,
   type ReturnRecordDto,
 } from "../api/client";
-import type { ReturnStatus } from "../orders/types";
+import type { AfterSalesServiceType, ReturnKind, ReturnStatus } from "../orders/types";
 import { createClientKey } from "../utils/clientKey";
 
 export interface DecideManagedReturnInput {
@@ -17,7 +17,7 @@ export interface CompleteManagedReturnInput {
 }
 
 export interface ReturnManagementApi {
-  listReturns(filters?: { status?: ReturnStatus; storeId?: string; sellerId?: string; page?: number; pageSize?: number }): Promise<{ items: readonly ReturnRecordDto[]; total: number; page: number; pageSize: number }>;
+  listReturns(filters?: { query?: string; status?: ReturnStatus; serviceType?: AfterSalesServiceType; returnKind?: ReturnKind; storeId?: string; sellerId?: string; page?: number; pageSize?: number }): Promise<{ items: readonly ReturnRecordDto[]; total: number; page: number; pageSize: number }>;
   decideReturn(input: DecideManagedReturnInput): Promise<ReturnRecordDto>;
   completeReturn(input: CompleteManagedReturnInput): Promise<ReturnRecordDto>;
 }
@@ -58,6 +58,8 @@ const isReturnRecord = (value: unknown): value is ReturnRecordDto => {
     typeof value.requestedBy === "string" &&
     typeof value.reason === "string" &&
     typeof value.requestedAt === "string" &&
+    (value.serviceType === "refund" || value.serviceType === "exchange") &&
+    typeof value.requestedRefundFen === "number" &&
     typeof value.maxRefundFen === "number" &&
     typeof value.refundFen === "number" &&
     typeof value.status === "string" &&
@@ -126,7 +128,10 @@ export const createReturnManagementApi = ({
   return {
     async listReturns(filters = {}) {
       const parameters = new URLSearchParams();
+      if (filters.query?.trim()) parameters.set("query", filters.query.trim());
       if (filters.status) parameters.set("status", filters.status);
+      if (filters.serviceType) parameters.set("serviceType", filters.serviceType);
+      if (filters.returnKind) parameters.set("returnKind", filters.returnKind);
       if (filters.storeId) parameters.set("storeId", filters.storeId);
       if (filters.sellerId) parameters.set("sellerId", filters.sellerId);
       parameters.set("page", String(filters.page ?? 1));

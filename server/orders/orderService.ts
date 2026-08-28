@@ -87,6 +87,7 @@ export interface OrderWriteRecord {
   storeId: string;
   sellerId: string;
   status: OrderStatus;
+  salesChannel: "online" | "offline";
   paymentMode: PaymentMode;
   fttrKind: FttrKind;
   fttrPlan: number | null;
@@ -110,6 +111,12 @@ export interface OrderRecord extends OrderWriteRecord {
   refundedFen: number;
   acceptedAt: Date | null;
   activatedAt: Date | null;
+  signedAt: Date | null;
+  signedBy: string | null;
+  reconciledAt: Date | null;
+  reconciledBy: string | null;
+  paidAt: Date | null;
+  paidBy: string | null;
   completedAt: Date | null;
   cancelledAt: Date | null;
   deletedAt: Date | null;
@@ -119,6 +126,10 @@ export interface OrderRecord extends OrderWriteRecord {
   lines: OrderLineRecord[];
   attributions: OrderAttributionRecord[];
   returnNos?: string[];
+  commissionPayoutStatus?: "ineligible" | "pending" | "paid";
+  commissionNetFen?: number;
+  commissionPaidFen?: number;
+  commissionReversedFen?: number;
 }
 
 export interface OrderListFilters {
@@ -135,6 +146,13 @@ export interface OrderListFilters {
   productSku?: string;
   dateFrom?: Date;
   dateTo?: Date;
+  signedDateFrom?: Date;
+  signedDateTo?: Date;
+  reconciledDateFrom?: Date;
+  reconciledDateTo?: Date;
+  commissionPayoutStatus?: "ineligible" | "pending" | "paid";
+  reconciliationStatus?: "pending" | "reconciled";
+  collectionStatus?: "unpaid" | "paid";
   cursor?: string;
   limit: number;
   page?: number;
@@ -185,6 +203,7 @@ export interface OrderRepository {
     expectedVersion: number,
     status: OrderStatus,
     at: Date,
+    actorUserId: string,
   ): Promise<OrderRecord | null>;
   setDeletedAt(
     id: string,
@@ -194,6 +213,12 @@ export interface OrderRepository {
   hasCommissionLedger(orderId: string): Promise<boolean>;
   list(scope: UserScope, filters: OrderListFilters): Promise<OrderListResult>;
   listFilterOptions(scope: UserScope): Promise<OrderFilterOptions>;
+  payCommissionsForOrders(
+    orderIds: readonly string[],
+    actorUserId: string,
+    at: Date,
+    idempotencyKey: string,
+  ): Promise<{ paidOrders: number; totalFen: number }>;
   writeAudit(input: OrderAuditInput): Promise<void>;
 }
 
@@ -286,6 +311,7 @@ const presentOrder = (
     sellerId: order.sellerId,
     storeId: order.storeId,
     status: order.status,
+    salesChannel: order.salesChannel,
     paymentMode: order.paymentMode,
     fttrKind: order.fttrKind,
     fttrPlan: order.fttrPlan,
@@ -296,6 +322,10 @@ const presentOrder = (
     monthlyTotalFen: order.monthlyTotalFen,
     contract36Fen: order.contract36Fen,
     refundedFen: order.refundedFen,
+    commissionPayoutStatus: order.commissionPayoutStatus ?? "ineligible",
+    commissionNetFen: order.commissionNetFen ?? 0,
+    commissionPaidFen: order.commissionPaidFen ?? 0,
+    commissionReversedFen: order.commissionReversedFen ?? 0,
     customer: {
       name: customerName,
       phoneMasked:
@@ -310,6 +340,12 @@ const presentOrder = (
     attributions: order.attributions,
     acceptedAt: order.acceptedAt,
     activatedAt: order.activatedAt,
+    signedAt: order.signedAt,
+    signedBy: order.signedBy,
+    reconciledAt: order.reconciledAt,
+    reconciledBy: order.reconciledBy,
+    paidAt: order.paidAt,
+    paidBy: order.paidBy,
     completedAt: order.completedAt,
     cancelledAt: order.cancelledAt,
     deletedAt: order.deletedAt,
@@ -429,6 +465,7 @@ export const createOrderService = (options: OrderServiceOptions) => {
     async createOrderFromQuote(
       user: AuthenticatedUser,
       quoteId: string,
+      salesChannel: "online" | "offline",
       attributions: OrderAttributionInput[] | undefined,
       idempotencyKey: string,
     ): Promise<OrderRecord> {
@@ -496,6 +533,7 @@ export const createOrderService = (options: OrderServiceOptions) => {
             storeId: quote.storeId,
             sellerId: quote.sellerId,
             status: "pending",
+            salesChannel,
             paymentMode: quote.paymentMode,
             fttrKind: quote.fttrKind,
             fttrPlan: quote.fttrPlan,
@@ -564,7 +602,7 @@ export const createOrderService = (options: OrderServiceOptions) => {
         throw new OrderServiceError("回收站中的订单不能变更状态", 409);
       }
       if (command === "ACTIVATE" && order.status === "activated") {
-        if (user.role !== "store_manager" && user.role !== "admin") {
+        if (user.role !== "store_manager" && user.role !== "regional_manager" && user.role !== "admin") {
           throw new OrderServiceError("不允许的订单状态变更", 400);
         }
         await options.commissionAccrual.accrueForActivatedOrder(
@@ -596,24 +634,12 @@ export const createOrderService = (options: OrderServiceOptions) => {
           );
         }
       }
-      if (nextStatus === "completed") {
-        try {
-          await options.commissionAccrual.accrueForActivatedOrder(
-            order.id,
-            `activation:${order.id}`,
-          );
-        } catch (error) {
-          throw new OrderServiceError(
-            error instanceof Error ? error.message : "订单提成生成失败",
-            409,
-          );
-        }
-      }
       const updated = await options.repository.transition(
         order.id,
         expectedVersion,
         nextStatus,
         changedAt,
+        user.id,
       );
       if (!updated) {
         throw new OrderServiceError("订单已被其他操作更新，请刷新后重试", 409);
@@ -635,10 +661,75 @@ export const createOrderService = (options: OrderServiceOptions) => {
       return updated;
     },
 
+    async batchTransitionOrders(
+      user: AuthenticatedUser,
+      inputs: readonly { orderId: string; expectedVersion: number }[],
+      command: "RECONCILE" | "MARK_PAID",
+    ): Promise<{ updated: number }> {
+      if (inputs.length < 1 || inputs.length > 100) {
+        throw new OrderServiceError("每次请选择1至100笔订单", 400);
+      }
+      if (new Set(inputs.map((item) => item.orderId)).size !== inputs.length) {
+        throw new OrderServiceError("批量订单不能重复", 400);
+      }
+      const scope = scopeForUser(user);
+      await options.repository.runTransaction(async (repository) => {
+        for (const input of inputs) {
+          const order = await repository.findById(input.orderId, scope);
+          if (!order || order.deletedAt) throw new OrderServiceError("订单不存在或无权操作", 404);
+          if (order.version !== input.expectedVersion) {
+            throw new OrderServiceError(`${order.orderNo} 已被更新，请刷新后重试`, 409);
+          }
+          let nextStatus: OrderStatus;
+          try {
+            nextStatus = nextStatusForCommand(order.status, command, user.role);
+          } catch {
+            throw new OrderServiceError(`${order.orderNo} 当前状态不能执行此操作`, 400);
+          }
+          const changedAt = now();
+          const updated = await repository.transition(order.id, order.version, nextStatus, changedAt, user.id);
+          if (!updated) throw new OrderServiceError(`${order.orderNo} 已被更新，请刷新后重试`, 409);
+          await repository.writeAudit({
+            actorUserId: user.id,
+            storeId: order.storeId,
+            orderId: order.id,
+            action: `order.batch.${command.toLowerCase()}`,
+            beforeSnapshot: { status: order.status, version: order.version },
+            afterSnapshot: { status: updated.status, version: updated.version },
+          });
+        }
+      });
+      return { updated: inputs.length };
+    },
+
+    async batchPayCommissions(
+      user: AuthenticatedUser,
+      orderIds: readonly string[],
+      idempotencyKey: string,
+    ): Promise<{ paidOrders: number; totalFen: number }> {
+      if (user.role !== "hr" && user.role !== "admin") {
+        throw new OrderServiceError("只有人力资源或管理员可以发放提成", 403);
+      }
+      validateIdempotencyKey(idempotencyKey);
+      if (orderIds.length < 1 || orderIds.length > 100 || new Set(orderIds).size !== orderIds.length) {
+        throw new OrderServiceError("每次请选择1至100笔不重复的订单", 400);
+      }
+      for (const orderId of orderIds) {
+        const order = await requireVisibleOrder(user, orderId);
+        if (!order.paidAt) throw new OrderServiceError(`${order.orderNo} 尚未收款，不能发放提成`, 400);
+      }
+      return options.repository.runTransaction((repository) =>
+        repository.payCommissionsForOrders(orderIds, user.id, now(), idempotencyKey),
+      );
+    },
+
     async softDeleteOrder(
       user: AuthenticatedUser,
       orderId: string,
     ): Promise<OrderRecord> {
+      if (user.role !== "sales" && user.role !== "store_manager" && user.role !== "admin") {
+        throw new OrderServiceError("当前角色无权删除订单", 403);
+      }
       const order = await requireVisibleOrder(user, orderId);
       if (order.deletedAt) return order;
       if (order.status !== "pending" && order.status !== "accepted") {

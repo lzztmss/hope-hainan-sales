@@ -24,7 +24,7 @@ import type {
 import { PageLayout } from "../components/layout";
 import { createClientKey } from "../utils/clientKey";
 import { QuotePrintDocument } from "./QuotePrintDocument";
-import { OrderCompositionDialog } from "./OrderCompositionDialog";
+import { OrderCompositionDialog, type OrderSalesChannel } from "./OrderCompositionDialog";
 import "./quoteWorkflow.css";
 
 export type QuoteWorkflowClient = Pick<
@@ -473,7 +473,7 @@ export const QuoteWorkflowPage = ({
 
   const documentVersion = initialQuote ? initialQuote.version + 1 : 1;
 
-  const convertToOrder = async (): Promise<void> => {
+  const convertToOrder = async (salesChannel: OrderSalesChannel): Promise<void> => {
     if (!savedQuote || createdOrder || orderBusy) return;
     setOrderBusy(true);
     setOrderError(null);
@@ -483,6 +483,7 @@ export const QuoteWorkflowPage = ({
         await client.createOrderFromQuote(
           savedQuote.id,
           orderIdempotencyKey.current,
+          salesChannel,
         ),
       );
       setOrderCompositionOpen(false);
@@ -824,7 +825,7 @@ export const QuoteWorkflowPage = ({
           busy={orderBusy}
           lines={savedQuote.calculation.chargeLines}
           onClose={() => setOrderCompositionOpen(false)}
-          onConfirm={() => void convertToOrder()}
+          onConfirm={(channel) => void convertToOrder(channel)}
         />
       ) : null}
     </PageLayout>

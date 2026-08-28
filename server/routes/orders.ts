@@ -9,11 +9,13 @@ import {
   type OrderRecord,
   type OrderService,
 } from "../orders/orderService.js";
+import type { OrderExportService } from "../orders/orderExportService.js";
 import { SESSION_COOKIE_NAME } from "./auth.js";
 import { sendValidationError } from "./validationError.js";
 
 const orderFieldLabels = {
   quoteId: "报价单",
+  salesChannel: "销售渠道",
   attributions: "销售归属",
   command: "订单状态操作",
   expectedVersion: "订单版本",
@@ -22,6 +24,7 @@ const orderFieldLabels = {
 export interface RegisterOrderRoutesOptions {
   authService: AuthService;
   orderService: OrderService;
+  orderExportService?: OrderExportService;
   appOrigin: string;
 }
 
@@ -33,6 +36,7 @@ const attributionSchema = z.object({
 
 const createSchema = z.object({
   quoteId: z.string().uuid(),
+  salesChannel: z.enum(["online", "offline"]),
   attributions: z.array(attributionSchema).min(1).max(20).optional(),
 });
 
@@ -40,7 +44,9 @@ const transitionSchema = z.object({
   command: z.enum([
     "ACCEPT",
     "ACTIVATE",
-    "COMPLETE",
+    "SIGN",
+    "RECONCILE",
+    "MARK_PAID",
     "CANCEL",
     "VOID",
     "REQUEST_RETURN",
@@ -48,6 +54,18 @@ const transitionSchema = z.object({
     "COMPLETE_FULL_RETURN",
   ]),
   expectedVersion: z.number().int().min(1),
+});
+
+const batchTransitionSchema = z.object({
+  command: z.enum(["RECONCILE", "MARK_PAID"]),
+  items: z.array(z.object({
+    orderId: z.string().uuid(),
+    expectedVersion: z.number().int().min(1),
+  })).min(1).max(100),
+});
+
+const batchCommissionPayoutSchema = z.object({
+  orderIds: z.array(z.string().uuid()).min(1).max(100),
 });
 
 const dateSchema = z
@@ -66,7 +84,9 @@ const listQuerySchema = z.object({
       "pending",
       "accepted",
       "activated",
-      "completed",
+      "signed",
+      "reconciled",
+      "paid",
       "cancelled",
       "return_pending",
       "partially_returned",
@@ -83,6 +103,13 @@ const listQuerySchema = z.object({
   productSku: z.string().trim().regex(/^[A-Z0-9_]{1,64}$/).optional(),
   dateFrom: dateSchema.optional(),
   dateTo: dateSchema.optional(),
+  signedDateFrom: dateSchema.optional(),
+  signedDateTo: dateSchema.optional(),
+  reconciledDateFrom: dateSchema.optional(),
+  reconciledDateTo: dateSchema.optional(),
+  commissionPayoutStatus: z.enum(["ineligible", "pending", "paid"]).optional(),
+  reconciliationStatus: z.enum(["pending", "reconciled"]).optional(),
+  collectionStatus: z.enum(["unpaid", "paid"]).optional(),
   cursor: z.string().max(500).optional(),
   page: z.coerce.number().int().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -126,6 +153,7 @@ const mutationResponse = (order: OrderRecord) => ({
   orderNo: order.orderNo,
   quoteId: order.quoteId,
   status: order.status,
+  salesChannel: order.salesChannel,
   sellerId: order.sellerId,
   storeId: order.storeId,
   paymentMode: order.paymentMode,
@@ -152,7 +180,21 @@ const parseListFilters = (
           24 * 60 * 60 * 1000,
       )
     : undefined;
+  const signedDateFrom = parsed.data.signedDateFrom
+    ? new Date(`${parsed.data.signedDateFrom}T00:00:00+08:00`)
+    : undefined;
+  const signedDateTo = parsed.data.signedDateTo
+    ? new Date(new Date(`${parsed.data.signedDateTo}T00:00:00+08:00`).getTime() + 86_400_000)
+    : undefined;
+  const reconciledDateFrom = parsed.data.reconciledDateFrom
+    ? new Date(`${parsed.data.reconciledDateFrom}T00:00:00+08:00`)
+    : undefined;
+  const reconciledDateTo = parsed.data.reconciledDateTo
+    ? new Date(new Date(`${parsed.data.reconciledDateTo}T00:00:00+08:00`).getTime() + 86_400_000)
+    : undefined;
   if (dateFrom && dateTo && dateFrom >= dateTo) return { success: false };
+  if (signedDateFrom && signedDateTo && signedDateFrom >= signedDateTo) return { success: false };
+  if (reconciledDateFrom && reconciledDateTo && reconciledDateFrom >= reconciledDateTo) return { success: false };
   return {
     success: true,
     filters: {
@@ -169,6 +211,13 @@ const parseListFilters = (
       productSku: parsed.data.productSku,
       dateFrom,
       dateTo,
+      signedDateFrom,
+      signedDateTo,
+      reconciledDateFrom,
+      reconciledDateTo,
+      commissionPayoutStatus: parsed.data.commissionPayoutStatus,
+      reconciliationStatus: parsed.data.reconciliationStatus,
+      collectionStatus: parsed.data.collectionStatus,
       cursor: parsed.data.cursor,
       page: parsed.data.page ?? (parsed.data.cursor ? undefined : 1),
       limit: parsed.data.limit,
@@ -197,6 +246,7 @@ export const registerOrderRoutes = async (
       const order = await options.orderService.createOrderFromQuote(
         user,
         parsed.data.quoteId,
+        parsed.data.salesChannel,
         parsed.data.attributions,
         idempotencyKey,
       );
@@ -229,6 +279,38 @@ export const registerOrderRoutes = async (
     }
     try {
       return await options.orderService.listOrders(user, parsed.filters);
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
+
+  app.get("/api/orders/export", async (request, reply) => {
+    const user = await resolveUser(request, reply, options.authService);
+    if (!user) return;
+    if (!options.orderExportService) {
+      return reply.status(503).send({ error: "订单导出服务暂不可用" });
+    }
+    const parsed = parseListFilters(request.query);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: "查询条件不正确" });
+    }
+    try {
+      const result = await options.orderExportService.exportOrders(
+        user,
+        parsed.filters,
+      );
+      const encodedFilename = encodeURIComponent(result.filename);
+      return reply
+        .header(
+          "Content-Type",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        .header(
+          "Content-Disposition",
+          `attachment; filename="orders.xlsx"; filename*=UTF-8''${encodedFilename}`,
+        )
+        .header("X-Export-Order-Count", String(result.orderCount))
+        .send(result.buffer);
     } catch (error) {
       return sendError(reply, error);
     }
@@ -281,6 +363,35 @@ export const registerOrderRoutes = async (
       }
     },
   );
+
+  app.post("/api/orders/batch-transitions", async (request, reply) => {
+    if (!ensureTrustedOrigin(request, reply, options.appOrigin)) return;
+    const user = await resolveUser(request, reply, options.authService);
+    if (!user) return;
+    const parsed = batchTransitionSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: "批量订单参数不正确" });
+    try {
+      return await options.orderService.batchTransitionOrders(user, parsed.data.items, parsed.data.command);
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
+
+  app.post("/api/orders/batch-commission-payout", async (request, reply) => {
+    if (!ensureTrustedOrigin(request, reply, options.appOrigin)) return;
+    const user = await resolveUser(request, reply, options.authService);
+    if (!user) return;
+    const parsed = batchCommissionPayoutSchema.safeParse(request.body);
+    if (!parsed.success) return reply.status(400).send({ error: "批量发放参数不正确" });
+    const keyHeader = request.headers["idempotency-key"];
+    const idempotencyKey = Array.isArray(keyHeader) ? keyHeader[0] : keyHeader;
+    if (!idempotencyKey) return reply.status(400).send({ error: "缺少幂等键" });
+    try {
+      return await options.orderService.batchPayCommissions(user, parsed.data.orderIds, idempotencyKey);
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
 
   app.delete<{ Params: { id: string } }>(
     "/api/orders/:id",

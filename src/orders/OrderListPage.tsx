@@ -7,6 +7,7 @@ import { OrderDetailPage } from "./OrderDetailPage";
 import { ReturnDialog } from "./ReturnDialog";
 import {
   ORDER_STATUS_LABELS,
+  type CommissionPayoutStatus,
   type DecideReturnInput,
   type OrderDetail,
   type OrderListFilters,
@@ -38,6 +39,9 @@ const EMPTY_FILTERS: OrderListFilters = {
 const ROLE_TITLES: Readonly<Record<OrderViewer["role"], string>> = {
   sales: "我的订单",
   store_manager: "本厅订单",
+  regional_manager: "大区订单",
+  hr: "全公司订单",
+  finance: "全公司订单",
   admin: "全部订单",
 };
 
@@ -45,6 +49,9 @@ const PAYMENT_LABELS: Readonly<Record<OrderPaymentMode, string>> = {
   one_time: "一次性支付",
   contract_36: "36 个月合约月付",
 };
+
+const globalDataRole = (role: OrderViewer["role"]): boolean =>
+  role === "admin" || role === "hr" || role === "finance";
 
 const scopeOrders = (items: OrderSummary[], viewer: OrderViewer): OrderSummary[] => {
   if (viewer.role === "sales") {
@@ -67,6 +74,13 @@ const normaliseFilters = (filters: OrderListFilters): OrderListFilters => {
   };
   if (filters.storeQuery?.trim()) normalised.storeQuery = filters.storeQuery.trim();
   if (filters.sellerQuery?.trim()) normalised.sellerQuery = filters.sellerQuery.trim();
+  if (filters.signedDateFrom) normalised.signedDateFrom = filters.signedDateFrom;
+  if (filters.signedDateTo) normalised.signedDateTo = filters.signedDateTo;
+  if (filters.reconciledDateFrom) normalised.reconciledDateFrom = filters.reconciledDateFrom;
+  if (filters.reconciledDateTo) normalised.reconciledDateTo = filters.reconciledDateTo;
+  if (filters.commissionPayoutStatus) normalised.commissionPayoutStatus = filters.commissionPayoutStatus;
+  if (filters.reconciliationStatus) normalised.reconciliationStatus = filters.reconciliationStatus;
+  if (filters.collectionStatus) normalised.collectionStatus = filters.collectionStatus;
   return normalised;
 };
 
@@ -97,6 +111,12 @@ export const OrderListPage = ({
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [returnOpen, setReturnOpen] = useState(false);
+  const [batchMode, setBatchMode] = useState<"reconcile" | "receive" | "payout" | null>(null);
+  const [selectedOrders, setSelectedOrders] = useState<Map<string, OrderSummary>>(new Map());
+  const selectedIds = useMemo(() => new Set(selectedOrders.keys()), [selectedOrders]);
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
   const openedInitialOrderId = useRef<string | null>(null);
 
   const loadOrders = useCallback(async (background = false, requestedPage = 1): Promise<void> => {
@@ -171,6 +191,35 @@ export const OrderListPage = ({
     return `共 ${total} 笔可见订单`;
   }, [appliedFilters.recycleBin, total]);
 
+  const canExport = viewer.role === "admin" || viewer.role === "hr" || viewer.role === "finance";
+
+  const exportOrders = async (): Promise<void> => {
+    if (!canExport || exportBusy || total === 0) return;
+    const confirmed = window.confirm(
+      `将按当前已应用的查询条件导出全部 ${total} 笔订单，不受当前分页影响。是否继续？`,
+    );
+    if (!confirmed) return;
+    setExportBusy(true);
+    setExportNotice(null);
+    setListError(null);
+    try {
+      const download = await adapter.exportOrders(appliedFilters);
+      const url = URL.createObjectURL(download.blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = download.filename;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setExportNotice(`已导出 ${download.orderCount ?? total} 笔订单：${download.filename}`);
+    } catch (error) {
+      setListError(error instanceof Error ? error.message : "订单导出失败，请重试");
+    } finally {
+      setExportBusy(false);
+    }
+  };
+
   const submitFiltersWithResolvedOwnership = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     const next = normaliseFilters(draftFilters);
@@ -179,6 +228,7 @@ export const OrderListPage = ({
     if (store) next.storeQuery = store.id;
     if (seller) next.sellerQuery = seller.id;
     setPage(1);
+    setSelectedOrders(new Map());
     setAppliedFilters(next);
     setFilterOpen(false);
   };
@@ -223,6 +273,102 @@ export const OrderListPage = ({
     </span>
   );
 
+  const batchModes = [
+    ...(viewer.role === "hr" || viewer.role === "admin" ? [
+      { id: "reconcile" as const, label: "批量对账" },
+    ] : []),
+    ...(viewer.role === "finance" || viewer.role === "admin" ? [
+      { id: "receive" as const, label: "批量确认收款" },
+    ] : []),
+    ...(viewer.role === "hr" || viewer.role === "admin" ? [
+      { id: "payout" as const, label: "批量发放提成" },
+    ] : []),
+  ];
+  const showCommissionStatus = viewer.role === "hr" || viewer.role === "admin";
+
+  const batchEligibility = (order: OrderSummary): { eligible: boolean; reason: string } => {
+    if (batchMode === "reconcile") {
+      return order.status === "signed"
+        ? { eligible: true, reason: "" }
+        : { eligible: false, reason: "只有已签收订单可以对账" };
+    }
+    if (batchMode === "receive") {
+      return order.status === "reconciled"
+        ? { eligible: true, reason: "" }
+        : { eligible: false, reason: "只有已对账订单可以确认收款" };
+    }
+    if (batchMode === "payout") {
+      if (!order.paidAt) return { eligible: false, reason: "订单尚未收款" };
+      if (order.commissionPayoutStatus === "paid") return { eligible: false, reason: "提成已经发放" };
+      if (order.commissionNetFen <= 0) return { eligible: false, reason: "没有可发放的净提成" };
+      return { eligible: true, reason: "" };
+    }
+    return { eligible: false, reason: "" };
+  };
+
+  const toggleSelection = (orderId: string, checked: boolean): void => {
+    setSelectedOrders((current) => {
+      const next = new Map(current);
+      const order = items.find((entry) => entry.id === orderId);
+      if (checked && order) next.set(orderId, order); else next.delete(orderId);
+      return next;
+    });
+  };
+
+  const eligiblePageIds = batchMode
+    ? items.filter((order) => batchEligibility(order).eligible).map((order) => order.id)
+    : [];
+  const allEligibleSelected = eligiblePageIds.length > 0 && eligiblePageIds.every((id) => selectedIds.has(id));
+
+  const toggleAllEligible = (checked: boolean): void => {
+    setSelectedOrders((current) => {
+      const next = new Map(current);
+      for (const order of items) {
+        if (!batchEligibility(order).eligible) continue;
+        if (checked) next.set(order.id, order); else next.delete(order.id);
+      }
+      return next;
+    });
+  };
+
+  const runBatchAction = async (): Promise<void> => {
+    if (!batchMode || selectedIds.size === 0) return;
+    const selected = [...selectedOrders.values()];
+    if (selected.length > 100) {
+      setListError("每次最多批量处理100笔订单");
+      return;
+    }
+    setBatchBusy(true);
+    setListError(null);
+    try {
+      if (batchMode === "payout") {
+        await adapter.batchPayCommissions(selected.map((order) => order.id));
+      } else {
+        await adapter.batchTransitionOrders(
+          selected.map((order) => ({
+            orderId: order.id,
+            expectedVersion: order.version,
+            command: batchMode === "reconcile" ? "RECONCILE" : "MARK_PAID",
+          })),
+          batchMode === "reconcile" ? "RECONCILE" : "MARK_PAID",
+        );
+      }
+      setSelectedOrders(new Map());
+      setBatchMode(null);
+      await loadOrders(false, page);
+    } catch (error) {
+      setListError(error instanceof Error ? error.message : "批量操作失败");
+    } finally {
+      setBatchBusy(false);
+    }
+  };
+
+  const payoutLabel = (status: CommissionPayoutStatus): string => ({
+    ineligible: "提成：未到发放条件",
+    pending: "提成：待发放",
+    paid: "提成：已发放",
+  })[status];
+
   return (
     <main className="order-page">
       <header className="order-page__header">
@@ -253,14 +399,26 @@ export const OrderListPage = ({
             <strong>筛选订单</strong>
             <span>按客户、状态、付款方式和归属快速查找</span>
           </div>
-          <button
-            aria-label="关闭筛选"
-            className="order-filter-close"
-            onClick={() => setFilterOpen(false)}
-            type="button"
-          >
-            关闭
-          </button>
+          <div className="order-filter-header-actions">
+            {canExport && !appliedFilters.recycleBin ? (
+              <button
+                className="order-export-action"
+                disabled={exportBusy || total === 0}
+                onClick={() => void exportOrders()}
+                type="button"
+              >
+                {exportBusy ? "正在导出…" : "导出 Excel"}
+              </button>
+            ) : null}
+            <button
+              aria-label="关闭筛选"
+              className="order-filter-close"
+              onClick={() => setFilterOpen(false)}
+              type="button"
+            >
+              关闭
+            </button>
+          </div>
         </header>
         <div className="order-filter-fields">
           <label className="order-filter-search">
@@ -296,7 +454,83 @@ export const OrderListPage = ({
               )}
             </select>
           </label>
-          {viewer.role === "admin" ? (
+          <label>
+            <span>签收日期从</span>
+            <input
+              onChange={(event) => setFilter("signedDateFrom", event.currentTarget.value || undefined)}
+              type="date"
+              value={draftFilters.signedDateFrom ?? ""}
+            />
+          </label>
+          <label>
+            <span>签收日期至</span>
+            <input
+              onChange={(event) => setFilter("signedDateTo", event.currentTarget.value || undefined)}
+              type="date"
+              value={draftFilters.signedDateTo ?? ""}
+            />
+          </label>
+          {viewer.role === "hr" || viewer.role === "finance" || viewer.role === "admin" ? (
+            <label className="order-filter-reconciliation-status">
+              <span>对账状态</span>
+              <select
+                onChange={(event) => setFilter("reconciliationStatus", event.currentTarget.value as "pending" | "reconciled" | "")}
+                value={draftFilters.reconciliationStatus ?? ""}
+              >
+                <option value="">全部对账状态</option>
+                <option value="pending">待对账</option>
+                <option value="reconciled">已对账</option>
+              </select>
+            </label>
+          ) : null}
+          {viewer.role === "hr" || viewer.role === "finance" || viewer.role === "admin" ? (
+            <label>
+              <span>对账日期从</span>
+              <input
+                onChange={(event) => setFilter("reconciledDateFrom", event.currentTarget.value || undefined)}
+                type="date"
+                value={draftFilters.reconciledDateFrom ?? ""}
+              />
+            </label>
+          ) : null}
+          {viewer.role === "hr" || viewer.role === "finance" || viewer.role === "admin" ? (
+            <label>
+              <span>对账日期至</span>
+              <input
+                onChange={(event) => setFilter("reconciledDateTo", event.currentTarget.value || undefined)}
+                type="date"
+                value={draftFilters.reconciledDateTo ?? ""}
+              />
+            </label>
+          ) : null}
+          {viewer.role === "hr" || viewer.role === "finance" || viewer.role === "admin" ? (
+            <label className="order-filter-collection-status">
+              <span>收款状态</span>
+              <select
+                onChange={(event) => setFilter("collectionStatus", event.currentTarget.value as "unpaid" | "paid" | "")}
+                value={draftFilters.collectionStatus ?? ""}
+              >
+                <option value="">全部收款状态</option>
+                <option value="unpaid">未收款</option>
+                <option value="paid">已收款</option>
+              </select>
+            </label>
+          ) : null}
+          {viewer.role === "hr" || viewer.role === "admin" ? (
+            <label>
+              <span>提成发放状态</span>
+              <select
+                onChange={(event) => setFilter("commissionPayoutStatus", event.currentTarget.value as CommissionPayoutStatus | "")}
+                value={draftFilters.commissionPayoutStatus ?? ""}
+              >
+                <option value="">全部发放状态</option>
+                <option value="ineligible">未到发放条件</option>
+                <option value="pending">待发放</option>
+                <option value="paid">已发放</option>
+              </select>
+            </label>
+          ) : null}
+          {globalDataRole(viewer.role) || viewer.role === "regional_manager" ? (
             <label>
               <span>营业厅</span>
               <input
@@ -328,14 +562,6 @@ export const OrderListPage = ({
               </datalist>
             </label>
           ) : null}
-          <label className="order-recycle-filter">
-            <input
-              checked={draftFilters.recycleBin}
-              onChange={(event) => setFilter("recycleBin", event.currentTarget.checked)}
-              type="checkbox"
-            />
-            <span>查看回收站</span>
-          </label>
         </div>
         <footer>
           <button
@@ -351,6 +577,8 @@ export const OrderListPage = ({
           <button className="order-primary-action" type="submit">查询</button>
         </footer>
       </form>
+
+      {exportNotice ? <p className="order-export-notice" role="status">{exportNotice}</p> : null}
 
       {listError ? (
         <section className="order-state-card is-error" role="alert">
@@ -369,10 +597,54 @@ export const OrderListPage = ({
         </section>
       ) : null}
 
+      {batchModes.length > 0 && !appliedFilters.recycleBin ? (
+        <section className="order-batch-toolbar" aria-label="订单批量操作">
+          <div>
+            {batchModes.map((mode) => (
+              <button
+                className={batchMode === mode.id ? "is-active" : ""}
+                key={mode.id}
+                onClick={() => {
+                  setBatchMode((current) => current === mode.id ? null : mode.id);
+                  setSelectedOrders(new Map());
+                }}
+                type="button"
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+          {batchMode ? (
+            <div className="order-batch-toolbar__action">
+              <span>已选 {selectedIds.size} 笔；不符合条件的订单仍显示，但不可勾选</span>
+              <button
+                className="order-primary-action"
+                disabled={batchBusy || selectedIds.size === 0}
+                onClick={() => void runBatchAction()}
+                type="button"
+              >
+                {batchBusy ? "正在处理…" : "确认批量处理"}
+              </button>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
       <div className="order-table-shell">
         <table aria-label="订单列表" className="order-desktop-table" data-testid="order-desktop-table">
           <thead>
             <tr>
+              {batchMode ? (
+                <th className="order-select-column">
+                  <input
+                    aria-label="选择本页全部可操作订单"
+                    checked={allEligibleSelected}
+                    disabled={eligiblePageIds.length === 0}
+                    onChange={(event) => toggleAllEligible(event.currentTarget.checked)}
+                    type="checkbox"
+                  />
+                </th>
+              ) : null}
               <th>订单与客户</th>
               <th>归属</th>
               <th>付款方式</th>
@@ -384,6 +656,18 @@ export const OrderListPage = ({
           <tbody>
             {items.map((order) => (
               <tr key={order.id}>
+                {batchMode ? (
+                  <td className="order-select-column">
+                    <input
+                      aria-label={`选择订单 ${order.orderNo}`}
+                      checked={selectedIds.has(order.id)}
+                      disabled={!batchEligibility(order).eligible}
+                      onChange={(event) => toggleSelection(order.id, event.currentTarget.checked)}
+                      title={batchEligibility(order).reason}
+                      type="checkbox"
+                    />
+                  </td>
+                ) : null}
                 <td>
                   <strong>{order.customerMasked}</strong>
                   <span>{order.orderNo}·{order.customerPhoneMasked}</span>
@@ -392,7 +676,20 @@ export const OrderListPage = ({
                 <td><strong>{order.storeName}</strong><span>{order.sellerName}</span></td>
                 <td>{PAYMENT_LABELS[order.paymentMode]}</td>
                 <td>{renderOrderAmount(order)}</td>
-                <td><OrderStatusBadge status={order.status} /></td>
+                <td>
+                  <span className="order-status-stack">
+                    <OrderStatusBadge status={order.status} />
+                    {order.paidAt && order.status !== "paid" ? <small className="order-finance-status">收款：已收款</small> : null}
+                    {showCommissionStatus ? (
+                      <small className={`order-commission-status is-${order.commissionPayoutStatus}`}>
+                        {payoutLabel(order.commissionPayoutStatus)}
+                      </small>
+                    ) : null}
+                    {showCommissionStatus && order.commissionPayoutStatus === "paid" && order.commissionReversedFen > 0 ? (
+                      <small>已发 {formatOrderMoney(order.commissionPaidFen)} · 扣回 {formatOrderMoney(order.commissionReversedFen)}</small>
+                    ) : null}
+                  </span>
+                </td>
                 <td>
                   <button
                     aria-label={`查看订单 ${order.orderNo}`}
@@ -410,7 +707,17 @@ export const OrderListPage = ({
 
       <ul aria-label="移动端订单列表" className="order-mobile-list">
         {items.map((order) => (
-          <li key={order.id}>
+          <li className={batchMode ? "is-batch-mode" : ""} key={order.id}>
+            {batchMode ? (
+              <input
+                aria-label={`选择订单 ${order.orderNo}`}
+                checked={selectedIds.has(order.id)}
+                disabled={!batchEligibility(order).eligible}
+                onChange={(event) => toggleSelection(order.id, event.currentTarget.checked)}
+                title={batchEligibility(order).reason}
+                type="checkbox"
+              />
+            ) : null}
             <button
               aria-label={`查看订单 ${order.orderNo}`}
               className="order-mobile-card"
@@ -419,7 +726,15 @@ export const OrderListPage = ({
             >
               <span className="order-mobile-card__topline">
                 <span>{order.customerMasked} · {order.customerPhoneMasked}</span>
-                <OrderStatusBadge status={order.status} />
+                <span className="order-status-stack">
+                  <OrderStatusBadge status={order.status} />
+                  {order.paidAt && order.status !== "paid" ? <small className="order-finance-status">收款：已收款</small> : null}
+                  {showCommissionStatus ? (
+                    <small className={`order-commission-status is-${order.commissionPayoutStatus}`}>
+                      {payoutLabel(order.commissionPayoutStatus)}
+                    </small>
+                  ) : null}
+                </span>
               </span>
               <strong>{order.orderNo}</strong>
               <span className="order-mobile-card__meta">
@@ -453,11 +768,6 @@ export const OrderListPage = ({
             onDecideReturn={async (input: DecideReturnInput) => {
               await adapter.decideReturn(input);
               await Promise.all([reloadDetail(), loadOrders()]);
-            }}
-            onDelete={async () => {
-              await adapter.softDeleteOrder(detail.id);
-              setDetail(null);
-              await loadOrders();
             }}
             onOpenReturn={() => setReturnOpen(true)}
             onRestore={async () => {

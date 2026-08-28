@@ -4,11 +4,12 @@ import {
   count,
   desc,
   eq,
+  inArray,
   type SQL,
 } from "drizzle-orm";
 
 import type { AppDatabase, DbClient, DbTransaction } from "../db/client.js";
-import { auditLogs, sessions, stores, users } from "../db/schema.js";
+import { auditLogs, regionalManagerStores, sessions, stores, users } from "../db/schema.js";
 import type {
   AdminAuditInput,
   AdminRepository,
@@ -28,6 +29,7 @@ const toStoreRecord = (
   row: StoreRow,
   activeUserCount: number,
   manager?: { id: string; displayName: string } | null,
+  regionalManager?: { id: string; displayName: string } | null,
 ): AdminStoreRecord => ({
   id: row.id,
   code: row.code,
@@ -36,6 +38,8 @@ const toStoreRecord = (
   activeUserCount,
   managerUserId: manager?.id ?? null,
   managerName: manager?.displayName ?? null,
+  regionalManagerUserId: regionalManager?.id ?? null,
+  regionalManagerName: regionalManager?.displayName ?? null,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });
@@ -55,6 +59,8 @@ const userSelection = {
   isPrimaryStoreManager: users.isPrimaryStoreManager,
   mustChangePassword: users.mustChangePassword,
   lastLoginAt: users.lastLoginAt,
+  employmentStartDate: users.employmentStartDate,
+  employmentEndDate: users.employmentEndDate,
   createdAt: users.createdAt,
   updatedAt: users.updatedAt,
 };
@@ -101,6 +107,16 @@ export class DrizzleAdminRepository implements AdminRepository {
     return manager ?? null;
   }
 
+  private async regionalManager(storeId: string) {
+    const [manager] = await this.executor
+      .select({ id: users.id, displayName: users.displayName })
+      .from(regionalManagerStores)
+      .innerJoin(users, eq(users.id, regionalManagerStores.regionalManagerId))
+      .where(eq(regionalManagerStores.storeId, storeId))
+      .limit(1);
+    return manager ?? null;
+  }
+
   async listStores(): Promise<readonly AdminStoreRecord[]> {
     const [storeRows, countRows] = await Promise.all([
       this.executor.select().from(stores).orderBy(desc(stores.active), asc(stores.code)),
@@ -121,6 +137,7 @@ export class DrizzleAdminRepository implements AdminRepository {
           row,
           counts.get(row.id) ?? 0,
           await this.primaryManager(row.id),
+          await this.regionalManager(row.id),
         ),
       ),
     );
@@ -137,6 +154,7 @@ export class DrizzleAdminRepository implements AdminRepository {
           row,
           await this.activeUserCount(row.id),
           await this.primaryManager(row.id),
+          await this.regionalManager(row.id),
         )
       : null;
   }
@@ -161,6 +179,7 @@ export class DrizzleAdminRepository implements AdminRepository {
           row,
           await this.activeUserCount(row.id),
           await this.primaryManager(row.id),
+          await this.regionalManager(row.id),
         )
       : null;
   }
@@ -198,6 +217,14 @@ export class DrizzleAdminRepository implements AdminRepository {
     filters: AdminUserFilters,
   ): Promise<{ items: readonly AdminUserRecord[]; total: number; activeTotal: number; mustChangePasswordTotal: number }> {
     const conditions: SQL[] = [];
+    if (filters.allowedStoreIds) {
+      conditions.push(
+        filters.allowedStoreIds.length > 0
+          ? inArray(users.storeId, [...filters.allowedStoreIds])
+          : eq(users.id, "__no_access__"),
+        inArray(users.role, ["sales", "store_manager"]),
+      );
+    }
     if (filters.storeId) conditions.push(eq(users.storeId, filters.storeId));
     if (filters.role) conditions.push(eq(users.role, filters.role));
     if (filters.active !== undefined) {
@@ -206,8 +233,8 @@ export class DrizzleAdminRepository implements AdminRepository {
     const where = conditions.length > 0 ? and(...conditions) : undefined;
     const [[totalRow], [activeRow], [mustChangeRow]] = await Promise.all([
       this.executor.select({ value: count() }).from(users).where(where),
-      this.executor.select({ value: count() }).from(users).where(eq(users.active, true)),
-      this.executor.select({ value: count() }).from(users).where(eq(users.mustChangePassword, true)),
+      this.executor.select({ value: count() }).from(users).where(and(where, eq(users.active, true))),
+      this.executor.select({ value: count() }).from(users).where(and(where, eq(users.mustChangePassword, true))),
     ]);
     let query = this.executor
       .select(userSelection)
@@ -220,7 +247,16 @@ export class DrizzleAdminRepository implements AdminRepository {
         .limit(filters.pageSize ?? 20)
         .offset(((filters.page ?? 1) - 1) * (filters.pageSize ?? 20)) as typeof query;
     }
-    const items = await query;
+    const rows = await query;
+    const items = await Promise.all(
+      rows.map(async (row) => {
+        const assignments = await this.executor
+          .select({ storeId: regionalManagerStores.storeId })
+          .from(regionalManagerStores)
+          .where(eq(regionalManagerStores.regionalManagerId, row.id));
+        return { ...row, managedStoreIds: assignments.map((entry) => entry.storeId) };
+      }),
+    );
     return {
       items,
       total: Number(totalRow?.value ?? 0),
@@ -236,7 +272,12 @@ export class DrizzleAdminRepository implements AdminRepository {
       .leftJoin(stores, eq(stores.id, users.storeId))
       .where(eq(users.id, id))
       .limit(1);
-    return row ?? null;
+    if (!row) return null;
+    const assignments = await this.executor
+      .select({ storeId: regionalManagerStores.storeId })
+      .from(regionalManagerStores)
+      .where(eq(regionalManagerStores.regionalManagerId, row.id));
+    return { ...row, managedStoreIds: assignments.map((entry) => entry.storeId) };
   }
 
   async findUserForUpdate(id: string): Promise<AdminUserRecord | null> {
@@ -268,6 +309,26 @@ export class DrizzleAdminRepository implements AdminRepository {
       .where(eq(users.id, id))
       .returning({ id: users.id });
     return row ? this.loadUser(row.id) : null;
+  }
+
+  async replaceRegionalManagerStores(
+    userId: string,
+    storeIds: readonly string[],
+    at: Date,
+  ): Promise<void> {
+    await this.executor
+      .delete(regionalManagerStores)
+      .where(eq(regionalManagerStores.regionalManagerId, userId));
+    if (storeIds.length > 0) {
+      await this.executor.insert(regionalManagerStores).values(
+        storeIds.map((storeId) => ({
+          regionalManagerId: userId,
+          storeId,
+          createdAt: at,
+          updatedAt: at,
+        })),
+      );
+    }
   }
 
   async listActiveAdminsForUpdate(): Promise<readonly string[]> {

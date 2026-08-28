@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, isNotNull, isNull, lt, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, sql, type SQL } from "drizzle-orm";
 
 import type { QuoteCalculation } from "../../shared/pricing/types.js";
 import type {
@@ -55,6 +55,7 @@ const mapQuote = (row: QuoteRow): ConfirmedQuote => ({
 const scopeCondition = (scope: UserScope): SQL | undefined => {
   if (scope.kind === "global") return undefined;
   if (scope.kind === "store") return eq(quotes.storeId, scope.storeId);
+  if (scope.kind === "region") return inArray(quotes.storeId, [...scope.storeIds]);
   return and(eq(quotes.storeId, scope.storeId), eq(quotes.sellerId, scope.sellerId));
 };
 

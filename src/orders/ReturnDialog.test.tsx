@@ -1,10 +1,19 @@
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ReturnDialog } from "./ReturnDialog";
 import type { OrderDetail } from "./types";
 
+afterEach(cleanup);
+
 const order: OrderDetail = {
+  signedAt: new Date().toISOString(),
+  reconciledAt: null,
+  paidAt: null,
+  commissionPayoutStatus: "ineligible",
+  commissionNetFen: 0,
+  commissionPaidFen: 0,
+  commissionReversedFen: 0,
   id: "order-1",
   orderNo: "XLXDD-001",
   customerMasked: "测*",
@@ -13,7 +22,8 @@ const order: OrderDetail = {
   sellerName: "销售员",
   storeId: "store-1",
   storeName: "营业厅",
-  status: "completed",
+  status: "signed",
+  salesChannel: "online",
   paymentMode: "one_time",
   oneTimeFen: 119800,
   monthlyTotalFen: 0,
@@ -59,6 +69,21 @@ const order: OrderDetail = {
       monthlySubtotalFen: 0,
       locations: [],
     },
+    {
+      id: "gateway-component",
+      lineType: "component",
+      sku: "gateway",
+      label: "迷你网关",
+      unit: "个",
+      quantity: 1,
+      returnedQuantity: 0,
+      refundableQuantity: 0,
+      refundableUnitFen: 0,
+      monthlyUnitFen: 0,
+      oneTimeSubtotalFen: 0,
+      monthlySubtotalFen: 0,
+      locations: ["客厅路由器附近"],
+    },
   ],
 };
 
@@ -76,10 +101,16 @@ describe("整单退单商品明细", () => {
     const list = screen.getByRole("region", { name: "整单退回商品" });
     expect(within(list).getByText("心连心·居家双护（套餐整套退回）")).toBeInTheDocument();
     expect(within(list).getByText("人体传感器")).toBeInTheDocument();
-    expect(screen.getByText("客户最高可退 ¥1,198.00")).toBeInTheDocument();
+    const components = screen.getByRole("region", { name: "套餐内设备" });
+    expect(within(components).getByText("迷你网关 × 1个")).toBeInTheDocument();
+    expect(within(components).getByText("套餐内含 · 不另收费")).toBeInTheDocument();
+    expect(within(components).getByText("随整套一并退回")).toBeInTheDocument();
+    expect(within(components).getByText("心连心·居家双护：¥899.00（一次性支付）")).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "申请退款金额（元）" })).not.toHaveAttribute("placeholder");
+    expect(screen.queryByText(/系统参考/)).not.toBeInTheDocument();
   });
 
-  it("月付商品展示一个计费月的现金退款上限", () => {
+  it("月付商品只要求填写申请退款金额", () => {
     render(
       <ReturnDialog
         open
@@ -88,23 +119,58 @@ describe("整单退单商品明细", () => {
           paymentMode: "contract_36",
           oneTimeFen: 0,
           monthlyTotalFen: 19_800,
-          lines: [{
-            ...order.lines[1]!,
-            label: "睡眠监测床垫",
-            refundableUnitFen: 4_000,
-            monthlyUnitFen: 4_000,
-            oneTimeSubtotalFen: 0,
-            monthlySubtotalFen: 4_000,
-          }],
+          lines: [
+            {
+              ...order.lines[0]!,
+              refundableUnitFen: 3_000,
+              monthlyUnitFen: 3_000,
+              oneTimeSubtotalFen: 0,
+              monthlySubtotalFen: 3_000,
+            },
+            order.lines[2]!,
+          ],
         }}
         onClose={vi.fn()}
         onSubmit={vi.fn()}
       />,
     );
 
-    expect(screen.getByText("客户最高可退 ¥40.00")).toBeInTheDocument();
-    expect(
-      screen.getByText(/月付商品按一个月的商品月费计算退款上限/),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "申请退款金额（元）" })).toBeInTheDocument();
+    expect(screen.getByText("心连心·居家双护：¥30.00/月（36个月合约月付）")).toBeInTheDocument();
+    expect(screen.queryByText(/系统参考/)).not.toBeInTheDocument();
+  });
+
+  it("7天内只开放普通处理，且无理由退货仅在线上订单显示", () => {
+    const { rerender } = render(<ReturnDialog open order={order} onClose={vi.fn()} onSubmit={vi.fn()} />);
+    expect(screen.getByRole("radio", { name: /普通处理/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /特殊处理/ })).toBeDisabled();
+    expect(screen.getByRole("option", { name: "7天无理由退货（仅限线上订单）" })).toBeInTheDocument();
+
+    rerender(<ReturnDialog open order={{ ...order, salesChannel: "offline" }} onClose={vi.fn()} onSubmit={vi.fn()} />);
+    expect(screen.queryByRole("option", { name: /无理由退货/ })).not.toBeInTheDocument();
+    expect(screen.getByText("线下订单")).toBeInTheDocument();
+  });
+
+  it("退货退款超过7日自动切换为特殊处理并禁用普通处理", () => {
+    render(
+      <ReturnDialog
+        open
+        order={{ ...order, signedAt: "2026-07-01T02:00:00.000Z" }}
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("radio", { name: /普通处理/ })).toBeDisabled();
+    expect(within(dialog).getByRole("radio", { name: /特殊处理/ })).toBeChecked();
+    expect(within(dialog).getByText(/特殊.*退货退款.*单独标识/)).toBeInTheDocument();
+  });
+
+  it("只提供退货退款，不显示换货入口", () => {
+    render(<ReturnDialog open order={{ ...order, signedAt: new Date().toISOString() }} onClose={vi.fn()} onSubmit={vi.fn()} />);
+    expect(screen.getByRole("heading", { name: "申请退货退款" })).toBeInTheDocument();
+    expect(screen.queryByText("换货")).not.toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "申请退款金额（元）" })).toBeInTheDocument();
   });
 });

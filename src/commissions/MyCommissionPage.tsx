@@ -7,6 +7,7 @@ export interface MyCommissionSummary {
   accruedNetFen: number;
   pendingSettlementFen: number;
   pendingPaymentFen: number;
+  pendingDeductionFen: number;
   paidThisMonthFen: number;
   paidLifetimeFen: number;
   reversedLifetimeFen: number;
@@ -59,13 +60,13 @@ const summaryDefinitions: ReadonlyArray<{
   tone: "primary" | "normal" | "warning" | "success";
 }> = [
   { key: "estimatedFen", label: "预计提成", tone: "normal" },
-  { key: "accruedNetFen", label: "已计提净额", tone: "primary" },
+  { key: "accruedNetFen", label: "本月提成净额", tone: "primary" },
   { key: "pendingSettlementFen", label: "待结算", tone: "warning" },
   { key: "pendingPaymentFen", label: "待发放", tone: "warning" },
   { key: "paidThisMonthFen", label: "本月已发放", tone: "success" },
   { key: "paidLifetimeFen", label: "累计已发放", tone: "success" },
-  { key: "reversedLifetimeFen", label: "累计退单扣回", tone: "normal" },
-  { key: "netLifetimeFen", label: "累计净提成", tone: "primary" },
+  { key: "reversedLifetimeFen", label: "历史累计扣回", tone: "normal" },
+  { key: "netLifetimeFen", label: "历史提成净额", tone: "primary" },
 ];
 
 export const MyCommissionPage = ({ dashboard, onPageChange }: MyCommissionPageProps) => {
@@ -75,7 +76,7 @@ export const MyCommissionPage = ({ dashboard, onPageChange }: MyCommissionPagePr
       <div>
         <p>销售激励</p>
         <h1 id="my-commission-title">我的提成</h1>
-        <span>{dashboard.periodLabel}·数据以订单生效和结算状态为准</span>
+        <span>{dashboard.periodLabel} · 数据按订单签收、公司收款和实际发放状态统计</span>
       </div>
     </header>
 
@@ -90,11 +91,16 @@ export const MyCommissionPage = ({ dashboard, onPageChange }: MyCommissionPagePr
           <strong>
             {displayMoney(dashboard.summary[definition.key], false)}
           </strong>
+          {definition.key === "pendingPaymentFen" && dashboard.summary.pendingDeductionFen > 0 ? (
+            <em className="commission-summary-card__deduction">
+              待扣回 {displayMoney(dashboard.summary.pendingDeductionFen)}
+            </em>
+          ) : null}
         </article>
       ))}
     </section>
     <p className="commission-summary-note">
-      已计提净额为本月已计提提成减本月退单扣回；累计净提成为历史全部已计提提成减全部退单扣回。客户实际退款与提成扣回分别核算。
+      待结算是订单已签收或已对账、仍在等待联通向公司付款的提成；待发放是公司已经收款、尚未向提成人员实际发放的提成。历史累计扣回是一共扣回过的提成，不是当前尚待扣回余额；客户退款与提成扣回分别核算。
     </p>
 
     {dashboard.unconfiguredOrders > 0 ? (
@@ -111,7 +117,7 @@ export const MyCommissionPage = ({ dashboard, onPageChange }: MyCommissionPagePr
       <div className="commission-order-section__heading">
         <div>
           <h2 id="commission-orders-title">按订单查看</h2>
-          <p>每笔提成都保留商品、数量、适用规则和退单冲回。</p>
+          <p>每笔提成都保留商品、数量、适用规则和退单扣回。</p>
         </div>
       </div>
 

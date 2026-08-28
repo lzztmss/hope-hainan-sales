@@ -44,7 +44,7 @@ export interface SalesReportResponse {
     timeZone: "Asia/Shanghai";
   };
   scope: {
-    kind: "seller" | "store" | "global";
+    kind: "seller" | "store" | "region" | "global";
     label: string;
   };
   totals: SalesReportMetrics;

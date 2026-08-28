@@ -12,6 +12,7 @@ describe("我的提成异常订单", () => {
         accruedNetFen: 0,
         pendingSettlementFen: 0,
         pendingPaymentFen: 0,
+        pendingDeductionFen: 0,
         paidThisMonthFen: 0,
         paidLifetimeFen: 0,
         reversedLifetimeFen: 0,
@@ -42,5 +43,30 @@ describe("我的提成异常订单", () => {
     expect(
       screen.getByTestId("commission-order-order-missing-accrual"),
     ).toHaveTextContent("¥0.00");
+  });
+
+  it("待发放显示正向金额，并在右上角单独显示待扣回", () => {
+    const dashboard: MyCommissionDashboard = {
+      periodLabel: "2026年8月",
+      summary: {
+        estimatedFen: 0,
+        accruedNetFen: 0,
+        pendingSettlementFen: 0,
+        pendingPaymentFen: 30_000,
+        pendingDeductionFen: 10_000,
+        paidThisMonthFen: 0,
+        paidLifetimeFen: 0,
+        reversedLifetimeFen: 10_000,
+        netLifetimeFen: 20_000,
+      },
+      unconfiguredOrders: 0,
+      orders: [],
+    };
+
+    render(<MyCommissionPage dashboard={dashboard} />);
+
+    const pendingCards = screen.getAllByTestId("commission-summary-待发放");
+    expect(pendingCards.some((card) => card.textContent?.includes("¥300.00"))).toBe(true);
+    expect(pendingCards.some((card) => card.textContent?.includes("待扣回 ¥100.00"))).toBe(true);
   });
 });
