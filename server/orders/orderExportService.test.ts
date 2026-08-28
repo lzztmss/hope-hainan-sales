@@ -132,6 +132,7 @@ describe("订单Excel导出", () => {
     expect(orderSheet.getCell("J6").value).toBe(159);
     expect(orderSheet.getCell("L6").value).toBe(20);
     expect(orderSheet.getCell("M6").value).toBe(179);
+    expect(orderSheet.getCell("N5").value).toBe("36个月合约月费合计");
     expect(orderSheet.getCell("Q6").value).toBeInstanceOf(Date);
     expect(orderSheet.autoFilter).toBeTruthy();
 
