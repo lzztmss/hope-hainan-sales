@@ -52,7 +52,7 @@ const REGIONAL_NAVIGATION: readonly NavigationItem[] = [
   { href: "/orders", label: "订单管理" },
   { href: "/returns", label: "售后审批" },
   { href: "/reports/team", label: "大区报表" },
-  { href: "/regional/users", label: "名下账号" },
+  { href: "/regional/users", label: "销售名单" },
   { href: "/profile", label: "个人中心" },
 ];
 

@@ -55,6 +55,8 @@ export interface AdminUserRecord {
   isPrimaryStoreManager: boolean;
   mustChangePassword: boolean;
   lastLoginAt: Date | null;
+  employmentStartDate: string | null;
+  employmentEndDate: string | null;
   createdAt: Date;
   updatedAt: Date;
   managedStoreIds: readonly string[];
@@ -72,6 +74,8 @@ export interface AdminUserView {
   active: boolean;
   mustChangePassword: boolean;
   lastLoginAt: string | null;
+  employmentStartDate: string | null;
+  employmentEndDate: string | null;
   createdAt: string;
   updatedAt: string;
   managedStoreIds: readonly string[];
@@ -113,6 +117,8 @@ export interface AdminUserWrite {
   storeId: string | null;
   active: boolean;
   mustChangePassword: boolean;
+  employmentStartDate: string | null;
+  employmentEndDate: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -129,6 +135,8 @@ export interface AdminUserPatch {
   active?: boolean;
   isPrimaryStoreManager?: boolean;
   mustChangePassword?: boolean;
+  employmentStartDate?: string | null;
+  employmentEndDate?: string | null;
   updatedAt: Date;
 }
 
@@ -189,6 +197,8 @@ export interface CreateAdminUserInput {
   personnelType: PersonnelType;
   storeId: string | null;
   managedStoreIds?: readonly string[];
+  employmentStartDate?: string | null;
+  employmentEndDate?: string | null;
   active?: boolean;
   initialPassword: string;
   reason: string;
@@ -202,6 +212,8 @@ export interface UpdateAdminUserInput {
   personnelType?: PersonnelType;
   storeId?: string | null;
   managedStoreIds?: readonly string[];
+  employmentStartDate?: string | null;
+  employmentEndDate?: string | null;
   active?: boolean;
   reason: string;
 }
@@ -268,6 +280,47 @@ const validateInitialPassword = (value: string): void => {
   if (value.length < 8 || value.length > 128) {
     throw new AdminServiceError("初始密码长度必须为8至128位", 400);
   }
+};
+
+const normalizeEmploymentDate = (
+  value: string | null | undefined,
+  label: string,
+): string | null => {
+  if (value === null || value === undefined || value.trim() === "") return null;
+  const normalized = value.trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalized);
+  if (!match) throw new AdminServiceError(`${label}格式应为YYYY-MM-DD`, 400);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  if (
+    probe.getUTCFullYear() !== year ||
+    probe.getUTCMonth() !== month - 1 ||
+    probe.getUTCDate() !== day
+  ) {
+    throw new AdminServiceError(`${label}不是有效日期`, 400);
+  }
+  return normalized;
+};
+
+const employmentDatesForRole = (
+  role: UserRole,
+  startInput: string | null | undefined,
+  endInput: string | null | undefined,
+): { employmentStartDate: string | null; employmentEndDate: string | null } => {
+  if (role !== "regional_manager") {
+    return { employmentStartDate: null, employmentEndDate: null };
+  }
+  const employmentStartDate = normalizeEmploymentDate(startInput, "入职日期");
+  const employmentEndDate = normalizeEmploymentDate(endInput, "离职日期");
+  if (!employmentStartDate) {
+    throw new AdminServiceError("大区经理必须填写入职日期", 400);
+  }
+  if (employmentEndDate && employmentEndDate < employmentStartDate) {
+    throw new AdminServiceError("离职日期不得早于入职日期", 400);
+  }
+  return { employmentStartDate, employmentEndDate };
 };
 
 const isUniqueViolation = (error: unknown): boolean =>
@@ -350,6 +403,8 @@ const userView = (
   active: user.active,
   mustChangePassword: user.mustChangePassword,
   lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
+  employmentStartDate: user.employmentStartDate,
+  employmentEndDate: user.employmentEndDate,
   createdAt: user.createdAt.toISOString(),
   updatedAt: user.updatedAt.toISOString(),
   managedStoreIds: user.managedStoreIds,
@@ -371,6 +426,8 @@ const userAuditSnapshot = (
     storeName: view.storeName,
     active: view.active,
     mustChangePassword: view.mustChangePassword,
+    employmentStartDate: view.employmentStartDate,
+    employmentEndDate: view.employmentEndDate,
   };
 };
 
@@ -618,6 +675,11 @@ export const createAdminService = (options: AdminServiceOptions) => {
             phoneEncrypted: null,
             phoneLookupHash: null,
           };
+          const employmentDates = employmentDatesForRole(
+            input.role,
+            input.employmentStartDate,
+            input.employmentEndDate,
+          );
           const created = await repository.createUser({
             workNo: normalizeCode(input.workNo, "工号"),
             displayName: normalizeName(input.displayName, "姓名", 120),
@@ -628,6 +690,7 @@ export const createAdminService = (options: AdminServiceOptions) => {
             storeId: store?.id ?? null,
             active,
             mustChangePassword: true,
+            ...employmentDates,
             createdAt: at,
             updatedAt: at,
           });
@@ -693,7 +756,20 @@ export const createAdminService = (options: AdminServiceOptions) => {
             storeId:
               input.storeId === undefined ? existing.storeId : input.storeId,
             active: input.active ?? existing.active,
+            employmentStartDate:
+              input.employmentStartDate === undefined
+                ? existing.employmentStartDate
+                : input.employmentStartDate,
+            employmentEndDate:
+              input.employmentEndDate === undefined
+                ? existing.employmentEndDate
+                : input.employmentEndDate,
           };
+          const employmentDates = employmentDatesForRole(
+            next.role,
+            next.employmentStartDate,
+            next.employmentEndDate,
+          );
           const store = await validateAssignment(
             repository,
             next.role,
@@ -723,6 +799,14 @@ export const createAdminService = (options: AdminServiceOptions) => {
             personnelType: input.personnelType,
             storeId: input.storeId === undefined ? undefined : store?.id ?? null,
             active: input.active,
+            employmentStartDate:
+              input.employmentStartDate !== undefined || input.role !== undefined
+                ? employmentDates.employmentStartDate
+                : undefined,
+            employmentEndDate:
+              input.employmentEndDate !== undefined || input.role !== undefined
+                ? employmentDates.employmentEndDate
+                : undefined,
             isPrimaryStoreManager:
               existing.isPrimaryStoreManager &&
               (next.role !== "store_manager" ||

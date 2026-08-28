@@ -18,6 +18,7 @@ const reasonSchema = z.string().trim().min(2).max(500);
 const roleSchema = z.enum(["sales", "store_manager", "regional_manager", "hr", "finance", "admin"]);
 const personnelTypeSchema = z.enum(["unicom", "auxiliary", "admin"]);
 const storeIdSchema = z.string().uuid();
+const employmentDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 const createStoreSchema = z.object({
   code: z.string().trim().min(2).max(64),
@@ -47,6 +48,8 @@ const createUserSchema = z.object({
   personnelType: personnelTypeSchema,
   storeId: storeIdSchema.nullable(),
   managedStoreIds: z.array(storeIdSchema).max(100).optional(),
+  employmentStartDate: employmentDateSchema.nullable().optional(),
+  employmentEndDate: employmentDateSchema.nullable().optional(),
   active: z.boolean().optional(),
   initialPassword: z.string().min(8).max(128),
   reason: reasonSchema,
@@ -61,6 +64,8 @@ const updateUserSchema = z
     personnelType: personnelTypeSchema.optional(),
     storeId: storeIdSchema.nullable().optional(),
     managedStoreIds: z.array(storeIdSchema).max(100).optional(),
+    employmentStartDate: employmentDateSchema.nullable().optional(),
+    employmentEndDate: employmentDateSchema.nullable().optional(),
     active: z.boolean().optional(),
     reason: reasonSchema,
   })

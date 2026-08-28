@@ -287,6 +287,12 @@ export const ReturnDialog = ({
             </label>
           </fieldset>
 
+          <p className="return-component-note" role="note">
+            {type === "full"
+              ? "整单退货完成后，销售报表会按FTTR一并退订统计，不再计入该订单的FTTR月费。"
+              : "部分退货只处理所选商品，FTTR不退订，FTTR月费保持不变；心连心月增费按剩余月付商品调整。"}
+          </p>
+
           <section className="return-line-list" aria-label={type === "full" ? "整单退回商品" : "可退计价商品"}>
             {displayedLines.map((line) => {
               const state = partial[line.id];

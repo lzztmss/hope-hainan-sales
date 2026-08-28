@@ -59,6 +59,8 @@ const userSelection = {
   isPrimaryStoreManager: users.isPrimaryStoreManager,
   mustChangePassword: users.mustChangePassword,
   lastLoginAt: users.lastLoginAt,
+  employmentStartDate: users.employmentStartDate,
+  employmentEndDate: users.employmentEndDate,
   createdAt: users.createdAt,
   updatedAt: users.updatedAt,
 };

@@ -50,6 +50,13 @@
       "when": 1787731200000,
       "tag": "0006_order_sales_channel",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1787882400000,
+      "tag": "0007_regional_manager_employment_dates",
+      "breakpoints": true
     }
   ]
 }

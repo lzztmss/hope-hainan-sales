@@ -194,12 +194,21 @@ export class DrizzleSalesReportRepository implements SalesReportRepository {
           SELECT o.store_id, s.name AS store_name, o.seller_id,
                  u.display_name AS seller_name,
                  COALESCE(SUM(o.one_time_fen), 0) AS one_time_fen,
-                 COALESCE(SUM(o.fttr_monthly_fen), 0) AS fttr_monthly_fen,
-                 COALESCE(SUM(o.heart_monthly_fen), 0) AS heart_monthly_fen,
-                 COALESCE(SUM(o.contract_36_fen), 0) AS contract_36_fen
+                 COALESCE(SUM(CASE WHEN o.status = 'returned' THEN 0 ELSE o.fttr_monthly_fen END), 0) AS fttr_monthly_fen,
+                 COALESCE(SUM(CASE WHEN o.status = 'returned' THEN 0 ELSE MAX(o.heart_monthly_fen - COALESCE(rr.returned_monthly_fen, 0), 0) END), 0) AS heart_monthly_fen,
+                 COALESCE(SUM(CASE WHEN o.status = 'returned' THEN 0 ELSE MAX(o.contract_36_fen - COALESCE(rr.returned_monthly_fen, 0) * 36, 0) END), 0) AS contract_36_fen
           FROM orders o
           JOIN stores s ON s.id = o.store_id
           JOIN users u ON u.id = o.seller_id
+          LEFT JOIN (
+            SELECT r.order_id,
+                   COALESCE(SUM(ri.quantity * ol.monthly_unit_fen), 0) AS returned_monthly_fen
+            FROM returns r
+            JOIN return_items ri ON ri.return_id = r.id
+            JOIN order_lines ol ON ol.id = ri.order_line_id
+            WHERE r.status = 'completed' AND r.service_type = 'refund'
+            GROUP BY r.order_id
+          ) rr ON rr.order_id = o.id
           WHERE o.activated_at >= ? AND o.activated_at < ?
             AND o.deleted_at IS NULL
             ${orderScope.clause}

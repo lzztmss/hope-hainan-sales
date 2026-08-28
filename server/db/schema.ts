@@ -185,6 +185,8 @@ export const users = sqliteTable(
       .default(false)
       .notNull(),
     lastLoginAt: integer("last_login_at", { mode: "timestamp_ms" }),
+    employmentStartDate: text("employment_start_date"),
+    employmentEndDate: text("employment_end_date"),
     ...timestamps,
   },
   (table) => [
