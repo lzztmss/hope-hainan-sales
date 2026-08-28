@@ -184,6 +184,7 @@ export interface CompleteReturnInput {
 
 export interface OrderManagementAdapter {
   listOrders(filters: OrderListFilters, page?: number, pageSize?: number): Promise<OrderListResult>;
+  exportOrders(filters: OrderListFilters): Promise<{ blob: Blob; filename: string; orderCount: number | null }>;
   getOrder(orderId: string): Promise<OrderDetail>;
   transitionOrder(input: TransitionOrderInput): Promise<void>;
   batchTransitionOrders(inputs: readonly TransitionOrderInput[], command: "RECONCILE" | "MARK_PAID"): Promise<void>;

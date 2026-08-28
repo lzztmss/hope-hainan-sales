@@ -115,6 +115,8 @@ export const OrderListPage = ({
   const [selectedOrders, setSelectedOrders] = useState<Map<string, OrderSummary>>(new Map());
   const selectedIds = useMemo(() => new Set(selectedOrders.keys()), [selectedOrders]);
   const [batchBusy, setBatchBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
   const openedInitialOrderId = useRef<string | null>(null);
 
   const loadOrders = useCallback(async (background = false, requestedPage = 1): Promise<void> => {
@@ -188,6 +190,35 @@ export const OrderListPage = ({
     if (appliedFilters.recycleBin) return `回收站内共 ${total} 笔订单`;
     return `共 ${total} 笔可见订单`;
   }, [appliedFilters.recycleBin, total]);
+
+  const canExport = viewer.role === "admin" || viewer.role === "hr" || viewer.role === "finance";
+
+  const exportOrders = async (): Promise<void> => {
+    if (!canExport || exportBusy || total === 0) return;
+    const confirmed = window.confirm(
+      `将按当前已应用的查询条件导出全部 ${total} 笔订单，不受当前分页影响。是否继续？`,
+    );
+    if (!confirmed) return;
+    setExportBusy(true);
+    setExportNotice(null);
+    setListError(null);
+    try {
+      const download = await adapter.exportOrders(appliedFilters);
+      const url = URL.createObjectURL(download.blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = download.filename;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setExportNotice(`已导出 ${download.orderCount ?? total} 笔订单：${download.filename}`);
+    } catch (error) {
+      setListError(error instanceof Error ? error.message : "订单导出失败，请重试");
+    } finally {
+      setExportBusy(false);
+    }
+  };
 
   const submitFiltersWithResolvedOwnership = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -368,14 +399,26 @@ export const OrderListPage = ({
             <strong>筛选订单</strong>
             <span>按客户、状态、付款方式和归属快速查找</span>
           </div>
-          <button
-            aria-label="关闭筛选"
-            className="order-filter-close"
-            onClick={() => setFilterOpen(false)}
-            type="button"
-          >
-            关闭
-          </button>
+          <div className="order-filter-header-actions">
+            {canExport && !appliedFilters.recycleBin ? (
+              <button
+                className="order-export-action"
+                disabled={exportBusy || total === 0}
+                onClick={() => void exportOrders()}
+                type="button"
+              >
+                {exportBusy ? "正在导出…" : "导出 Excel"}
+              </button>
+            ) : null}
+            <button
+              aria-label="关闭筛选"
+              className="order-filter-close"
+              onClick={() => setFilterOpen(false)}
+              type="button"
+            >
+              关闭
+            </button>
+          </div>
         </header>
         <div className="order-filter-fields">
           <label className="order-filter-search">
@@ -534,6 +577,8 @@ export const OrderListPage = ({
           <button className="order-primary-action" type="submit">查询</button>
         </footer>
       </form>
+
+      {exportNotice ? <p className="order-export-notice" role="status">{exportNotice}</p> : null}
 
       {listError ? (
         <section className="order-state-card is-error" role="alert">

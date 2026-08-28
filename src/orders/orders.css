@@ -160,6 +160,34 @@
   display: block;
 }
 
+.order-filter-header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--hfttr-space-2);
+}
+
+.order-page .order-export-action {
+  border-color: var(--app-color-primary);
+  background: var(--app-color-primary);
+  color: var(--app-color-text-inverse);
+}
+
+.order-page .order-export-action:hover {
+  background: var(--app-color-primary-strong);
+}
+
+.order-export-notice {
+  margin: 0;
+  padding: var(--hfttr-space-3) var(--hfttr-space-4);
+  border: var(--app-border-width) solid var(--hfttr-color-success-700);
+  border-radius: var(--app-radius-control);
+  background: var(--hfttr-color-success-100);
+  color: var(--hfttr-color-success-700);
+  font-size: var(--hfttr-font-size-sm);
+}
+
 .order-filter-panel > header strong {
   color: var(--app-color-primary-strong);
   font-size: var(--hfttr-font-size-lg);

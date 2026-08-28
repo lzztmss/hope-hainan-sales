@@ -27,6 +27,7 @@ export type OrderApiClient = Pick<
   | "getOrder"
   | "listOrderReturns"
   | "listOrders"
+  | "exportOrders"
   | "listOrderFilterOptions"
   | "requestOrderReturn"
   | "restoreOrder"
@@ -327,6 +328,9 @@ export const createOrderManagementAdapter = (
       const response = await client.listOrders(listQueryFor(filters, page, pageSize));
       const items = response.items.map((order) => mapSummary(order, viewer));
       return { items, total: response.total };
+    },
+    async exportOrders(filters) {
+      return client.exportOrders(listQueryFor(filters, 1, 100));
     },
     async getOrder(orderId) {
       const [order, returns] = await Promise.all([

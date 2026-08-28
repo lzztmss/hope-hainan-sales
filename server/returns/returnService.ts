@@ -51,6 +51,7 @@ export interface ReturnItemRecord {
   label: string;
   quantity: number;
   maxRefundFen: number;
+  refundFen: number;
 }
 
 export type ReturnRequestStatus =
@@ -145,6 +146,10 @@ export interface ReturnRepository {
     filters: { orderId?: string; query?: string; status?: ReturnRequestStatus; serviceType?: "refund" | "exchange"; returnKind?: "normal" | "special"; storeId?: string; sellerId?: string },
     paging?: { page: number; pageSize: number },
   ): Promise<{ items: ReturnRequestRecord[]; total: number }>;
+  listRequestsForOrderIds(
+    scope: UserScope,
+    orderIds: readonly string[],
+  ): Promise<ReturnRequestRecord[]>;
   saveDecision(
     id: string,
     decision: ReturnDecisionWrite,
@@ -283,6 +288,7 @@ const buildItems = (
       label: line.label,
       quantity: selection.quantity,
       maxRefundFen: line.refundableUnitFen * selection.quantity,
+      refundFen: 0,
     };
   });
 };

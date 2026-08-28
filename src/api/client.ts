@@ -296,6 +296,12 @@ export interface OrderListApiResponse {
   pageSize: number;
 }
 
+export interface OrderExportDownload {
+  blob: Blob;
+  filename: string;
+  orderCount: number | null;
+}
+
 export interface OrderFilterOptionsApiResponse {
   stores: Array<{ id: string; label: string }>;
   sellers: Array<{ id: string; label: string; storeId: string }>;
@@ -417,6 +423,7 @@ export interface ApiClient {
   listCommissionPolicyVersions(): Promise<readonly CommissionPolicyVersionDto[]>;
   listOrderReturns(orderId: string): Promise<readonly ReturnRecordDto[]>;
   listOrders(query: OrderListApiQuery): Promise<OrderListApiResponse>;
+  exportOrders(query: OrderListApiQuery): Promise<OrderExportDownload>;
   listOrderFilterOptions(): Promise<OrderFilterOptionsApiResponse>;
   login(input: LoginInput): Promise<AuthenticatedUser>;
   logout(): Promise<void>;
@@ -660,6 +667,67 @@ export const createApiClient = ({
     return payload;
   };
 
+  const requestDownload = async (path: string): Promise<OrderExportDownload> => {
+    let response: Response;
+    try {
+      response = await fetcher(`${baseUrl}${path}`, {
+        credentials: "include",
+        headers: {
+          Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        },
+      });
+    } catch {
+      throw new ApiError("网络连接失败，请检查网络后重试", 0);
+    }
+    if (!response.ok) {
+      const payload = await readJson(response);
+      const errorPayload = (payload ?? {}) as ErrorPayload;
+      throw new ApiError(
+        typeof errorPayload.error === "string"
+          ? errorPayload.error
+          : "导出失败，请稍后重试",
+        response.status,
+      );
+    }
+    const disposition = response.headers.get("Content-Disposition") ?? "";
+    const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+    const fallback = /filename="?([^";]+)"?/i.exec(disposition)?.[1];
+    let filename = fallback ?? "订单对账明细.xlsx";
+    if (encoded) {
+      try {
+        filename = decodeURIComponent(encoded);
+      } catch {
+        filename = "订单对账明细.xlsx";
+      }
+    }
+    const countHeader = response.headers.get("X-Export-Order-Count");
+    const parsedCount = countHeader === null ? Number.NaN : Number(countHeader);
+    return {
+      blob: await response.blob(),
+      filename,
+      orderCount: Number.isSafeInteger(parsedCount) ? parsedCount : null,
+    };
+  };
+
+  const orderQueryParameters = (query: OrderListApiQuery): URLSearchParams => {
+    const parameters = new URLSearchParams();
+    if (query.query) parameters.set("query", query.query);
+    if (query.orderNo) parameters.set("orderNo", query.orderNo);
+    if (query.customerPhoneTail) parameters.set("customerPhoneTail", query.customerPhoneTail);
+    if (query.storeQuery) parameters.set("storeQuery", query.storeQuery);
+    if (query.sellerQuery) parameters.set("sellerQuery", query.sellerQuery);
+    if (query.status) parameters.set("status", query.status);
+    if (query.paymentMode) parameters.set("paymentMode", query.paymentMode);
+    if (query.signedDateFrom) parameters.set("signedDateFrom", query.signedDateFrom);
+    if (query.signedDateTo) parameters.set("signedDateTo", query.signedDateTo);
+    if (query.reconciledDateFrom) parameters.set("reconciledDateFrom", query.reconciledDateFrom);
+    if (query.reconciledDateTo) parameters.set("reconciledDateTo", query.reconciledDateTo);
+    if (query.commissionPayoutStatus) parameters.set("commissionPayoutStatus", query.commissionPayoutStatus);
+    if (query.reconciliationStatus) parameters.set("reconciliationStatus", query.reconciliationStatus);
+    if (query.collectionStatus) parameters.set("collectionStatus", query.collectionStatus);
+    return parameters;
+  };
+
   return {
     async getCurrentUser() {
       return readUser(await request("/api/auth/me"));
@@ -769,23 +837,7 @@ export const createApiClient = ({
       );
     },
     async listOrders(query) {
-      const parameters = new URLSearchParams();
-      if (query.query) parameters.set("query", query.query);
-      if (query.orderNo) parameters.set("orderNo", query.orderNo);
-      if (query.customerPhoneTail) {
-        parameters.set("customerPhoneTail", query.customerPhoneTail);
-      }
-      if (query.storeQuery) parameters.set("storeQuery", query.storeQuery);
-      if (query.sellerQuery) parameters.set("sellerQuery", query.sellerQuery);
-      if (query.status) parameters.set("status", query.status);
-      if (query.paymentMode) parameters.set("paymentMode", query.paymentMode);
-      if (query.signedDateFrom) parameters.set("signedDateFrom", query.signedDateFrom);
-      if (query.signedDateTo) parameters.set("signedDateTo", query.signedDateTo);
-      if (query.reconciledDateFrom) parameters.set("reconciledDateFrom", query.reconciledDateFrom);
-      if (query.reconciledDateTo) parameters.set("reconciledDateTo", query.reconciledDateTo);
-      if (query.commissionPayoutStatus) parameters.set("commissionPayoutStatus", query.commissionPayoutStatus);
-      if (query.reconciliationStatus) parameters.set("reconciliationStatus", query.reconciliationStatus);
-      if (query.collectionStatus) parameters.set("collectionStatus", query.collectionStatus);
+      const parameters = orderQueryParameters(query);
       if (query.cursor) parameters.set("cursor", query.cursor);
       if (query.page) parameters.set("page", String(query.page));
       parameters.set("limit", String(query.limit ?? 100));
@@ -793,6 +845,10 @@ export const createApiClient = ({
         ? "/api/orders/recycle-bin"
         : "/api/orders";
       return readOrderList(await request(`${path}?${parameters.toString()}`));
+    },
+    async exportOrders(query) {
+      const parameters = orderQueryParameters(query);
+      return requestDownload(`/api/orders/export?${parameters.toString()}`);
     },
     async listOrderFilterOptions() {
       return (await request("/api/order-filter-options")) as OrderFilterOptionsApiResponse;

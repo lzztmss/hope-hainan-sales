@@ -41,6 +41,7 @@ const mapItem = (row: ReturnItemRow): ReturnItemRecord => ({
   label: row.label,
   quantity: row.quantity,
   maxRefundFen: snapshotMaxRefund(row),
+  refundFen: row.refundFen,
 });
 
 const mapRequest = (
@@ -324,6 +325,62 @@ export class DrizzleReturnRepository implements ReturnRepository {
       items: await Promise.all(rows.map(({ request }) => this.loadRequest(request))),
       total: Number(totalRow?.value ?? 0),
     };
+  }
+
+  async listRequestsForOrderIds(
+    scope: UserScope,
+    orderIds: readonly string[],
+  ): Promise<ReturnRequestRecord[]> {
+    if (orderIds.length === 0) return [];
+    const result: ReturnRequestRecord[] = [];
+    const chunkSize = 400;
+    for (let offset = 0; offset < orderIds.length; offset += chunkSize) {
+      const chunk = orderIds.slice(offset, offset + chunkSize);
+      const conditions = [inArray(returnTable.orderId, [...chunk])];
+      if (scope.kind === "store") conditions.push(eq(orders.storeId, scope.storeId));
+      if (scope.kind === "region") conditions.push(inArray(orders.storeId, [...scope.storeIds]));
+      if (scope.kind === "seller") {
+        conditions.push(
+          eq(orders.storeId, scope.storeId),
+          eq(orders.sellerId, scope.sellerId),
+        );
+      }
+      const rows = await this.executor
+        .select({
+          request: returnTable,
+          orderNo: orders.orderNo,
+          requestedByName: users.displayName,
+        })
+        .from(returnTable)
+        .innerJoin(orders, eq(orders.id, returnTable.orderId))
+        .leftJoin(users, eq(users.id, returnTable.requestedBy))
+        .where(and(...conditions))
+        .orderBy(returnTable.requestedAt, returnTable.id);
+      const returnIds = rows.map(({ request }) => request.id);
+      const itemRows = returnIds.length === 0
+        ? []
+        : await this.executor
+            .select()
+            .from(returnItems)
+            .where(inArray(returnItems.returnId, returnIds));
+      const itemsByReturn = new Map<string, ReturnItemRow[]>();
+      for (const item of itemRows) {
+        const grouped = itemsByReturn.get(item.returnId) ?? [];
+        grouped.push(item);
+        itemsByReturn.set(item.returnId, grouped);
+      }
+      for (const row of rows) {
+        result.push(
+          mapRequest(
+            row.request,
+            itemsByReturn.get(row.request.id) ?? [],
+            row.orderNo,
+            row.requestedByName,
+          ),
+        );
+      }
+    }
+    return result;
   }
 
   async saveDecision(

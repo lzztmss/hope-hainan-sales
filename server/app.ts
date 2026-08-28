@@ -8,6 +8,7 @@ import type { AdminService } from "./admin/adminService.js";
 import type { CommissionRuleService } from "./commissions/ruleService.js";
 import type { CommissionDashboardService } from "./commissions/dashboardService.js";
 import type { OrderService } from "./orders/orderService.js";
+import type { OrderExportService } from "./orders/orderExportService.js";
 import type { QuoteService } from "./quotes/quoteService.js";
 import type { ReturnService } from "./returns/returnService.js";
 import type { SalesReportService } from "./reports/salesReportService.js";
@@ -28,6 +29,7 @@ export interface AppDependencies {
   commissionRuleService?: CommissionRuleService;
   commissionDashboardService?: CommissionDashboardService;
   orderService?: OrderService;
+  orderExportService?: OrderExportService;
   returnService?: ReturnService;
   adminService?: AdminService;
   salesReportService?: SalesReportService;
@@ -94,6 +96,7 @@ export const buildApp = (
         await registerOrderRoutes(securedApp, {
           authService: _dependencies.authService!,
           orderService: _dependencies.orderService,
+          orderExportService: _dependencies.orderExportService,
           appOrigin: _dependencies.appOrigin ?? "http://127.0.0.1:5173",
         });
       }

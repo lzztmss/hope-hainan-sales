@@ -9,6 +9,7 @@ import {
   type OrderRecord,
   type OrderService,
 } from "../orders/orderService.js";
+import type { OrderExportService } from "../orders/orderExportService.js";
 import { SESSION_COOKIE_NAME } from "./auth.js";
 import { sendValidationError } from "./validationError.js";
 
@@ -23,6 +24,7 @@ const orderFieldLabels = {
 export interface RegisterOrderRoutesOptions {
   authService: AuthService;
   orderService: OrderService;
+  orderExportService?: OrderExportService;
   appOrigin: string;
 }
 
@@ -277,6 +279,38 @@ export const registerOrderRoutes = async (
     }
     try {
       return await options.orderService.listOrders(user, parsed.filters);
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
+
+  app.get("/api/orders/export", async (request, reply) => {
+    const user = await resolveUser(request, reply, options.authService);
+    if (!user) return;
+    if (!options.orderExportService) {
+      return reply.status(503).send({ error: "订单导出服务暂不可用" });
+    }
+    const parsed = parseListFilters(request.query);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: "查询条件不正确" });
+    }
+    try {
+      const result = await options.orderExportService.exportOrders(
+        user,
+        parsed.filters,
+      );
+      const encodedFilename = encodeURIComponent(result.filename);
+      return reply
+        .header(
+          "Content-Type",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        .header(
+          "Content-Disposition",
+          `attachment; filename="orders.xlsx"; filename*=UTF-8''${encodedFilename}`,
+        )
+        .header("X-Export-Order-Count", String(result.orderCount))
+        .send(result.buffer);
     } catch (error) {
       return sendError(reply, error);
     }

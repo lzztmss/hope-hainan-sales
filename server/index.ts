@@ -13,6 +13,7 @@ import { createCommissionDashboardService } from "./commissions/dashboardService
 import { createDatabaseClient } from "./db/client.js";
 import { DrizzleOrderRepository } from "./orders/orderRepository.js";
 import { createOrderService } from "./orders/orderService.js";
+import { createOrderExportService } from "./orders/orderExportService.js";
 import { DrizzleQuoteRepository } from "./quotes/quoteRepository.js";
 import { createQuoteService } from "./quotes/quoteService.js";
 import { DrizzleReturnRepository } from "./returns/returnRepository.js";
@@ -61,15 +62,21 @@ const commissionDashboardService = createCommissionDashboardService({
   repository: new DrizzleCommissionDashboardRepository(databaseClient),
   decryptPii: pii.decryptPii,
 });
+const orderRepository = new DrizzleOrderRepository(databaseClient);
+const returnRepository = new DrizzleReturnRepository(databaseClient);
 const orderService = createOrderService({
-  repository: new DrizzleOrderRepository(databaseClient),
+  repository: orderRepository,
   activeCatalogVersion: ACTIVE_CATALOG.version,
   decryptPii: pii.decryptPii,
   commissionAccrual: commissionLedgerService,
 });
 const returnService = createReturnService({
-  repository: new DrizzleReturnRepository(databaseClient),
+  repository: returnRepository,
   commissionReversal: commissionLedgerService,
+});
+const orderExportService = createOrderExportService({
+  orderService,
+  returnRepository,
 });
 const adminService = createAdminService({
   repository: new DrizzleAdminRepository(databaseClient),
@@ -88,6 +95,7 @@ const app = buildApp({
   commissionRuleService,
   commissionDashboardService,
   orderService,
+  orderExportService,
   returnService,
   adminService,
   salesReportService,
