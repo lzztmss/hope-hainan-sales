@@ -1,0 +1,204 @@
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+
+import type { ApiClient, AuthenticatedUser, OrderFilterOptionsApiResponse, QuoteDetailDto, QuoteStatus } from "../api/client";
+import { LIST_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { PageLayout } from "../components/layout";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { Badge } from "../components/ui/badge";
+import { FilePlus2 } from "lucide-react";
+import { usePageAutoRefresh } from "../hooks/usePageAutoRefresh";
+import "./quoteManagement.css";
+
+const STATUS_LABELS: Record<QuoteStatus, string> = {
+  confirmed: "已确认",
+  converted: "已转订单",
+  expired: "已过期",
+  lost: "未成交",
+  voided: "已作废",
+};
+
+const money = (fen: number) =>
+  `¥${(fen / 100).toLocaleString("zh-CN", { minimumFractionDigits: 2 })}`;
+
+interface AppliedQuoteFilters {
+  dateFrom: string;
+  dateTo: string;
+  query: string;
+  sellerId: string;
+  status: QuoteStatus | "";
+  storeId: string;
+}
+
+const globalDataRole = (role: AuthenticatedUser["role"]): boolean =>
+  role === "admin" || role === "hr" || role === "finance";
+
+export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: AuthenticatedUser }) => {
+  const [searchParams] = useSearchParams();
+  const initialQuery = searchParams.get("query") ?? "";
+  const [items, setItems] = useState<readonly QuoteDetailDto[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [query, setQuery] = useState(initialQuery);
+  const [status, setStatus] = useState<QuoteStatus | "">("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [storeId, setStoreId] = useState("");
+  const [sellerId, setSellerId] = useState("");
+  const [options, setOptions] = useState<OrderFilterOptionsApiResponse>({ stores: [], sellers: [] });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const appliedFilters = useRef<AppliedQuoteFilters>({
+    dateFrom: "",
+    dateTo: "",
+    query: initialQuery,
+    sellerId: "",
+    status: "",
+    storeId: "",
+  });
+
+  const load = useCallback(async (filters: AppliedQuoteFilters, requestedPage = 1, background = false) => {
+    if (!background) {
+      setLoading(true);
+      setError(null);
+    }
+    try {
+      const result = await client.listQuotes({
+        query: filters.query.trim() || undefined,
+        status: filters.status || undefined,
+        storeId: filters.storeId || undefined,
+        sellerId: filters.sellerId || undefined,
+        dateFrom: filters.dateFrom || undefined,
+        dateTo: filters.dateTo || undefined,
+        page: requestedPage,
+        pageSize: LIST_PAGE_SIZE,
+      });
+      setItems(result.items);
+      setTotal(result.total);
+      setPage(result.page);
+      setError(null);
+    } catch (reason) {
+      if (!background) setError(reason instanceof Error ? reason.message : "报价读取失败");
+    } finally {
+      if (!background) setLoading(false);
+    }
+  }, [client]);
+
+  useEffect(() => {
+    appliedFilters.current = { ...appliedFilters.current, query: initialQuery };
+    void load(appliedFilters.current);
+  }, [initialQuery, load]);
+  useEffect(() => {
+    if (viewer.role === "sales") return;
+    void client.listOrderFilterOptions().then(setOptions).catch(() => setOptions({ stores: [], sellers: [] }));
+  }, [client, viewer.role]);
+
+  usePageAutoRefresh({
+    enabled: !loading,
+    intervalMs: 15_000,
+    onRefresh: () => load(appliedFilters.current, page, true),
+  });
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    appliedFilters.current = { dateFrom, dateTo, query, sellerId, status, storeId };
+    void load(appliedFilters.current);
+  };
+
+  const reset = () => {
+    const cleared: AppliedQuoteFilters = {
+      dateFrom: "",
+      dateTo: "",
+      query: "",
+      sellerId: "",
+      status: "",
+      storeId: "",
+    };
+    setQuery("");
+    setStatus("");
+    setDateFrom("");
+    setDateTo("");
+    setStoreId("");
+    setSellerId("");
+    appliedFilters.current = cleared;
+    void load(cleared);
+  };
+
+  return (
+    <PageLayout
+      eyebrow="销售报价"
+      title={globalDataRole(viewer.role) ? "全部报价" : viewer.role === "regional_manager" ? "大区报价" : viewer.role === "store_manager" ? "本厅报价" : "我的报价"}
+      description={globalDataRole(viewer.role) ? "查询全公司营业厅报价，可按营业厅和销售员筛选。" : viewer.role === "regional_manager" ? "只读查询所管营业厅报价，可按营业厅和销售员筛选。" : viewer.role === "store_manager" ? "仅展示本营业厅报价，可按本厅销售员筛选。" : "查询已保存报价，未转订单的报价可以继续修改、打印或转为订单。"}
+      actions={viewer.role === "sales" ? <Link className="quote-management__primary-link" to="/quotes/new"><FilePlus2 aria-hidden="true" />新建报价</Link> : null}
+    >
+      <section className="ops-list" aria-label="报价管理">
+      <header className="ops-list__heading"><h2>报价列表</h2><span>共 {total} 笔报价</span></header>
+      <form className="quote-management__filters" onSubmit={submit}>
+        <div className="quote-management__filter-row is-primary">
+          <label className="is-search">
+            <span>搜索报价</span>
+            <input
+              type="search"
+              placeholder="报价单号、客户姓名或手机号"
+              value={query}
+              onChange={(event) => setQuery(event.currentTarget.value)}
+            />
+          </label>
+          <label>
+            <span>报价状态</span>
+            <select value={status} onChange={(event) => setStatus(event.currentTarget.value as QuoteStatus | "")}>
+              <option value="">全部状态</option>
+              {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>开始日期</span>
+            <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.currentTarget.value)} />
+          </label>
+          <label>
+            <span>结束日期</span>
+            <input type="date" value={dateTo} onChange={(event) => setDateTo(event.currentTarget.value)} />
+          </label>
+        </div>
+        <div className="quote-management__filter-row is-secondary">
+          {globalDataRole(viewer.role) || viewer.role === "regional_manager" ? <label><span>营业厅</span><select value={storeId} onChange={(event) => { setStoreId(event.currentTarget.value); setSellerId(""); }}><option value="">全部营业厅</option>{options.stores.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
+          {viewer.role !== "sales" ? <label><span>销售员</span><select value={sellerId} onChange={(event) => setSellerId(event.currentTarget.value)}><option value="">全部可见销售员</option>{options.sellers.filter((option) => !storeId || option.storeId === storeId).map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label> : null}
+          <div className="quote-management__filter-actions">
+            <button className="is-secondary" disabled={loading} onClick={reset} type="button">重置</button>
+            <button type="submit" disabled={loading}>查询</button>
+          </div>
+        </div>
+      </form>
+
+      {error ? <p className="quote-management__error" role="alert">{error}</p> : null}
+      {loading ? <p role="status">正在读取报价…</p> : null}
+      {!loading && !error && items.length === 0 ? (
+        <div className="quote-management__empty">没有找到符合条件的报价。</div>
+      ) : null}
+      <Table aria-label="报价列表">
+        <TableHeader><TableRow><TableHead>报价单号 / 客户</TableHead>{viewer.role !== "sales" ? <TableHead>销售归属</TableHead> : null}<TableHead>客户情况</TableHead><TableHead>费用</TableHead><TableHead>状态</TableHead><TableHead>更新时间</TableHead><TableHead>操作</TableHead></TableRow></TableHeader>
+        <TableBody>
+        {items.map((quote) => (
+          <TableRow key={quote.id}>
+            <TableCell><strong>{quote.quoteNo}</strong><small>{quote.customer.name} · {quote.customer.phoneMasked}</small></TableCell>
+            {viewer.role !== "sales" ? <TableCell><strong>{options.stores.find((option) => option.id === quote.storeId)?.label ?? viewer.storeName ?? "营业厅"}</strong><small>{options.sellers.find((option) => option.id === quote.sellerId)?.label ?? "销售员"}</small></TableCell> : null}
+            <TableCell>{quote.customer.elderCount} 位长者</TableCell>
+            <TableCell><strong>{money(quote.calculation.oneTimeFen)}</strong><small>月费 {money(quote.calculation.monthlyTotalFen)}</small></TableCell>
+            <TableCell><Badge variant={quote.status === "converted" ? "secondary" : "outline"}>{STATUS_LABELS[quote.status]}</Badge></TableCell>
+            <TableCell>{new Date(quote.updatedAt).toLocaleString("zh-CN")}</TableCell>
+            <TableCell><Link to={`/quotes/${quote.id}`}>查看报价详情</Link></TableCell>
+          </TableRow>
+        ))}
+        </TableBody>
+      </Table>
+      <Pagination
+        onPageChange={(nextPage) => void load(appliedFilters.current, nextPage)}
+        page={page}
+        totalItems={total}
+      />
+      </section>
+    </PageLayout>
+  );
+};

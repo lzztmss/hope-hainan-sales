@@ -48,6 +48,14 @@ export interface DashboardLedgerRecord {
   settlementStatus: DashboardSettlementStatus | null;
   settlementAmountFen: number | null;
   paidAt: Date | null;
+  returnItems?: readonly DashboardReturnItem[];
+}
+
+export interface DashboardReturnItem {
+  id: string;
+  sku: string;
+  label: string;
+  quantity: number;
 }
 
 export interface EstimatedCommissionAttribution {
@@ -127,11 +135,14 @@ export interface CommissionDashboardSummary {
 }
 
 export interface CommissionDashboardOrderLine {
+  id: string;
   sku: string;
   label: string;
   quantity: number;
   unitCommissionFen: number;
   subtotalFen: number;
+  entryType: DashboardLedgerEntryType | "estimated";
+  settlementStatus: "unsettled" | "paid";
 }
 
 export interface CommissionDashboardLedgerEntry {
@@ -155,6 +166,7 @@ export interface CommissionDashboardOrder {
   amountFen: number;
   lines: CommissionDashboardOrderLine[];
   ledgerEntries: CommissionDashboardLedgerEntry[];
+  payoutStatus: "ineligible" | "pending" | "paid" | "deduction";
 }
 
 export interface CommissionDashboard {
@@ -203,6 +215,21 @@ interface SnapshotItem {
   unitAmountFen: number;
   subtotalFen: number;
 }
+
+const shanghaiCalendarDay = (value: Date): number => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((entry) => entry.type === type)?.value ?? "";
+  return Date.parse(`${part("year")}-${part("month")}-${part("day")}T00:00:00Z`);
+};
+
+const settlementWaitDays = (signedAt: Date, at: Date): number =>
+  Math.max(0, 7 - Math.floor((shanghaiCalendarDay(at) - shanghaiCalendarDay(signedAt)) / 86_400_000));
 
 const MONEY_ENTRY_TYPES: readonly DashboardLedgerEntryType[] = [
   "accrual",
@@ -479,8 +506,11 @@ const linesForLedgerRows = (
     group.push(row);
     groups.set(key, group);
   }
-  return Array.from(groups.values()).map((group) => {
+  return Array.from(groups.values()).flatMap((group) => {
     const first = group[0]!;
+    const settlementStatus = group.every((row) => row.settlementStatus === "paid")
+      ? "paid" as const
+      : "unsettled" as const;
     const subtotalFen = group.reduce(
       (sum, row) => addFen(sum, row.amountFen, "订单提成明细"),
       0,
@@ -488,26 +518,66 @@ const linesForLedgerRows = (
     const snapshotItems = parseSnapshotItems(first.calculationSnapshot).filter(
       (item) => item.ruleId === first.ruleId,
     );
-    const baseQuantity = snapshotItems.reduce((sum, item) => sum + item.quantity, 0);
-    const baseLabel =
-      snapshotItems[0]?.label ??
-      first.ruleName ??
-      first.ruleSku ??
-      (first.entryType.startsWith("manual") ? "人工提成调整" : "订单提成");
-    let quantity = first.entryType === "accrual" && baseQuantity > 0 ? baseQuantity : 1;
-    if (subtotalFen % quantity !== 0) quantity = 1;
-    return {
-      sku: first.ruleSku ?? first.entryType.toUpperCase(),
-      label: ledgerLineLabel(first, baseLabel),
-      quantity,
-      unitCommissionFen: subtotalFen / quantity,
-      subtotalFen,
-    };
+    const returnedItems = Array.from(
+      new Map(group.flatMap((row) => row.returnItems ?? []).map((item) => [item.id, item])).values(),
+    );
+    const sourceItems = first.entryType === "return_reversal"
+      ? returnedItems.flatMap((item) => {
+          const snapshot = snapshotItems.find((entry) => entry.sku === item.sku);
+          return snapshot ? [{ ...item, unitAmountFen: snapshot.unitAmountFen }] : [];
+        })
+      : snapshotItems;
+    if (sourceItems.length === 0) {
+      const label = first.ruleName ?? first.ruleSku ?? (first.entryType.startsWith("manual") ? "人工提成调整" : "订单提成");
+      return [{
+        id: `${first.eventKey}:${first.ruleId ?? "manual"}`,
+        sku: first.ruleSku ?? first.entryType.toUpperCase(),
+        label: ledgerLineLabel(first, label),
+        quantity: 1,
+        unitCommissionFen: subtotalFen,
+        subtotalFen,
+        entryType: first.entryType,
+        settlementStatus,
+      }];
+    }
+    const weights = sourceItems.map((item) => item.quantity * item.unitAmountFen);
+    const totalWeight = weights.reduce((sum, value) => sum + value, 0);
+    let allocatedFen = 0;
+    return sourceItems.map((item, index) => {
+      const itemSubtotalFen = index === sourceItems.length - 1
+        ? subtotalFen - allocatedFen
+        : totalWeight > 0 ? Math.trunc((subtotalFen * weights[index]!) / totalWeight) : 0;
+      allocatedFen += itemSubtotalFen;
+      const quantity = itemSubtotalFen % item.quantity === 0 ? item.quantity : 1;
+      return {
+        id: `${first.eventKey}:${first.ruleId ?? "manual"}:${item.sku}:${index}`,
+        sku: item.sku,
+        label: ledgerLineLabel(first, item.label),
+        quantity,
+        unitCommissionFen: itemSubtotalFen / quantity,
+        subtotalFen: itemSubtotalFen,
+        entryType: first.entryType,
+        settlementStatus,
+      };
+    });
   });
+};
+
+const payoutStatusFor = (
+  rows: readonly DashboardLedgerRecord[],
+): CommissionDashboardOrder["payoutStatus"] => {
+  const unsettledFen = rows
+    .filter((row) => row.settlementStatus === null)
+    .reduce((sum, row) => addFen(sum, row.amountFen, "订单未发放提成"), 0);
+  if (unsettledFen < 0) return "deduction";
+  if (unsettledFen > 0 && rows.some((row) => row.orderPaidAt)) return "pending";
+  if (unsettledFen === 0 && rows.some((row) => row.settlementStatus === "paid")) return "paid";
+  return "ineligible";
 };
 
 const ledgerOrderStatus = (
   rows: readonly DashboardLedgerRecord[],
+  at: Date,
 ): Pick<CommissionDashboardOrder, "status" | "statusLabel"> => {
   if (rows.some((row) => row.entryType === "return_reversal")) {
     return { status: "reversed", statusLabel: "含退单扣回 · 当前净额" };
@@ -519,6 +589,11 @@ const ledgerOrderStatus = (
     return { status: "settled", statusLabel: "已收款 · 待发放" };
   }
   if (rows.some((row) => row.signedAt)) {
+    const signedAt = rows.find((row) => row.signedAt)?.signedAt;
+    const waitDays = signedAt ? settlementWaitDays(signedAt, at) : 0;
+    if (waitDays > 0 && !rows.some((row) => row.reconciledAt)) {
+      return { status: "accrued", statusLabel: `已签收 · 观察期还需 ${waitDays} 天` };
+    }
     return { status: "accrued", statusLabel: rows.some((row) => row.reconciledAt) ? "已对账 · 待结算" : "已签收 · 待结算" };
   }
   return { status: "estimated", statusLabel: "预计提成 · 待签收" };
@@ -526,6 +601,7 @@ const ledgerOrderStatus = (
 
 const presentLedgerOrders = (
   rows: readonly DashboardLedgerRecord[],
+  at: Date,
   decryptPii?: (encrypted: string) => string,
 ): PresentedOrder[] => {
   const byOrder = new Map<string, DashboardLedgerRecord[]>();
@@ -558,7 +634,7 @@ const presentLedgerOrders = (
         decryptPii,
       ),
       activatedAt: formatShanghaiDateTime(first.activatedAt ?? sortAt),
-      ...ledgerOrderStatus(sorted),
+      ...ledgerOrderStatus(sorted, at),
       amountFen,
       lines: linesForLedgerRows(sorted),
       ledgerEntries: sorted.map((row) => ({
@@ -571,6 +647,7 @@ const presentLedgerOrders = (
         occurredAt: row.occurredAt.toISOString(),
         settlementStatus: row.settlementStatus ?? "unsettled",
       })),
+      payoutStatus: payoutStatusFor(sorted),
       sortAt,
     };
   });
@@ -609,11 +686,14 @@ const presentEstimatedOrders = (
       if (subtotalFen % quantity !== 0) quantity = 1;
       return [
         {
+          id: `${order.id}:${item.sku}`,
           sku: item.sku,
           label: item.label,
           quantity,
           unitCommissionFen: subtotalFen / quantity,
           subtotalFen,
+          entryType: "estimated",
+          settlementStatus: "unsettled",
         },
       ];
     });
@@ -632,6 +712,7 @@ const presentEstimatedOrders = (
       amountFen,
       lines,
       ledgerEntries: [],
+      payoutStatus: "ineligible",
       sortAt: order.createdAt,
     };
   });
@@ -659,12 +740,14 @@ const presentMissingAccrualOrders = (
     amountFen: 0,
     lines: [],
     ledgerEntries: [],
+    payoutStatus: "ineligible",
     sortAt: order.referenceAt,
   }));
 
 const summarizeLedger = (
   rows: readonly DashboardLedgerRecord[],
   period: Period,
+  at: Date,
 ): Omit<CommissionDashboardSummary, "estimatedFen"> => {
   let accruedNetFen = 0;
   let pendingSettlementFen = 0;
@@ -705,7 +788,7 @@ const summarizeLedger = (
           "待扣回提成",
         );
       }
-    } else if (row.signedAt) {
+    } else if (row.signedAt && settlementWaitDays(row.signedAt, at) === 0) {
       pendingSettlementFen = addFen(
         pendingSettlementFen,
         row.amountFen,
@@ -800,7 +883,7 @@ export const createCommissionDashboardService = (
     const scopedEstimated = orderId
       ? estimatedOrders.filter((order) => order.id === orderId)
       : [...estimatedOrders];
-    const ledgerOrders = presentLedgerOrders(scopedLedger, options.decryptPii);
+    const ledgerOrders = presentLedgerOrders(scopedLedger, now(), options.decryptPii);
     const exceptionalOrders = presentMissingAccrualOrders(
       missingAccrualOrders,
       options.decryptPii,
@@ -840,13 +923,16 @@ export const createCommissionDashboardService = (
         throw new CommissionDashboardError("每页数量必须为1至100", 400);
       }
       const loaded = await loadPresented(user, filters);
+      const periodOrders = loaded.orders.filter(
+        (order) => order.sortAt >= period.start && order.sortAt < period.end,
+      );
       const requestedPage = filters.page ?? 1;
-      const page = paginate(loaded.orders, filters.cursor, limit, requestedPage);
+      const page = paginate(periodOrders, filters.cursor, limit, requestedPage);
       return {
         periodLabel: period.label,
         summary: {
           estimatedFen: loaded.estimatedFen,
-          ...summarizeLedger(loaded.ledgerRows, period),
+          ...summarizeLedger(loaded.ledgerRows, period, at),
         },
         orders: page.orders,
         unconfiguredOrders: loaded.unconfiguredOrders,

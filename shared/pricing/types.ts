@@ -7,10 +7,6 @@ export type FttrKind = "none" | "standard" | "custom";
 export type RoomType = "one_bedroom" | "two_bedroom" | "three_bedroom";
 
 export type ChargeSku =
-  | "FULL_FAMILY"
-  | "WATCH_MATTRESS"
-  | "WATCH_STANDARD"
-  | "MATTRESS_STANDARD"
   | "WATCH"
   | "MATTRESS"
   | "STANDARD_BUNDLE"

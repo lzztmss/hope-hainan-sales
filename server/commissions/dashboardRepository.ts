@@ -24,6 +24,7 @@ import {
   orderCommissionSnapshots,
   orderLines,
   orders,
+  returnItems,
   settlementBatches,
   settlementItems,
   users,
@@ -183,6 +184,7 @@ export class DrizzleCommissionDashboardRepository
         settlementStatus: settlementBatches.status,
         settlementAmountFen: settlementItems.amountFen,
         paidAt: settlementBatches.paidAt,
+        returnId: commissionLedger.returnId,
       })
       .from(commissionLedger)
       .innerJoin(users, eq(users.id, commissionLedger.beneficiaryId))
@@ -203,6 +205,19 @@ export class DrizzleCommissionDashboardRepository
       )
       .where(and(...conditions))
       .orderBy(desc(commissionLedger.occurredAt), desc(commissionLedger.id));
+
+    const returnIds = [...new Set(rows.flatMap((row) => row.returnId ? [row.returnId] : []))];
+    const returnItemRows = returnIds.length === 0 ? [] : await this.executor
+      .select({ id: returnItems.id, returnId: returnItems.returnId, sku: returnItems.sku, label: returnItems.label, quantity: returnItems.quantity })
+      .from(returnItems)
+      .where(inArray(returnItems.returnId, returnIds))
+      .orderBy(returnItems.createdAt, returnItems.id);
+    const returnItemsByReturn = new Map<string, typeof returnItemRows>();
+    for (const item of returnItemRows) {
+      const items = returnItemsByReturn.get(item.returnId) ?? [];
+      items.push(item);
+      returnItemsByReturn.set(item.returnId, items);
+    }
 
     return rows.map((row): DashboardLedgerRecord => {
       if (!isDashboardLedgerEntryType(row.entryType)) {
@@ -240,6 +255,7 @@ export class DrizzleCommissionDashboardRepository
         settlementStatus: row.settlementStatus,
         settlementAmountFen: row.settlementAmountFen,
         paidAt: row.paidAt,
+        returnItems: row.returnId ? (returnItemsByReturn.get(row.returnId) ?? []) : [],
       };
     });
   }

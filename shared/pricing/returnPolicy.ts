@@ -5,10 +5,6 @@ import type { ChargeSku, PaymentMode } from "./types.js";
  * 单品及配件仍可按订单剩余数量申请部分退货。
  */
 export const NON_RETURNABLE_PACKAGE_SKUS: ReadonlySet<ChargeSku> = new Set([
-  "FULL_FAMILY",
-  "WATCH_MATTRESS",
-  "WATCH_STANDARD",
-  "MATTRESS_STANDARD",
   "STANDARD_BUNDLE",
   "ONE_KEY",
   "HOME_DUAL",

@@ -98,6 +98,52 @@ describe("按订单批量发放提成", () => {
     );
     expect(paidOrders.items.map((item) => item.orderNo)).toEqual(["XLXDD-PAYOUT"]);
     expect(paidOrders.items[0]?.status).toBe("returned");
+
+    const nextQuoteId = "00000000-0000-4000-8000-000000000107";
+    const nextOrderId = "00000000-0000-4000-8000-000000000108";
+    const reversalAt = new Date("2026-08-28T02:00:00.000Z");
+    const nextMonthAt = new Date("2026-09-01T02:00:00.000Z");
+    await client.db.insert(commissionLedger).values({
+      orderId,
+      beneficiaryId: sellerId,
+      storeId,
+      entryType: "return_reversal",
+      eventKey: "return:after-payout",
+      amountFen: -1000,
+      occurredAt: reversalAt,
+      createdBy: sellerId,
+    });
+    await client.db.insert(quotes).values({
+      id: nextQuoteId, quoteNo: "XLX-PAYOUT-NEXT", idempotencyKey: "quote-payout-next-key", customerId, storeId,
+      sellerId, status: "converted", paymentMode: "one_time", fttrKind: "none", fttrPlan: null,
+      fttrMonthlyFen: 0, heartMonthlyFen: 0, oneTimeFen: 5000, monthlyTotalFen: 0,
+      contract36Fen: 0, catalogVersion: "test", customerSnapshot: {}, quoteSnapshot: {}, confirmedAt: nextMonthAt,
+    });
+    await client.db.insert(orders).values({
+      id: nextOrderId, orderNo: "XLXDD-PAYOUT-NEXT", quoteId: nextQuoteId, customerId, idempotencyKey: "order-payout-next-key",
+      storeId, sellerId, status: "paid", salesChannel: "offline", paymentMode: "one_time",
+      fttrKind: "none", fttrPlan: null, fttrMonthlyFen: 0, heartMonthlyFen: 0, oneTimeFen: 5000,
+      monthlyTotalFen: 0, contract36Fen: 0, catalogVersion: "test", catalogSnapshot: {},
+      customerSnapshot: {}, quoteSnapshot: {}, storeSnapshot: {}, sellerSnapshot: {}, createdBy: sellerId,
+      signedAt: nextMonthAt, reconciledAt: nextMonthAt, paidAt: nextMonthAt,
+    });
+    await client.db.insert(commissionLedger).values({
+      orderId: nextOrderId,
+      beneficiaryId: sellerId,
+      storeId,
+      entryType: "accrual",
+      eventKey: "activation:payout-next",
+      amountFen: 5000,
+      occurredAt: nextMonthAt,
+      createdBy: sellerId,
+    });
+    const nextMonthPayout = await repository.payCommissionsForOrders(
+      [nextOrderId],
+      hrId,
+      nextMonthAt,
+      "payout-next-month-key",
+    );
+    expect(nextMonthPayout).toEqual({ paidOrders: 1, totalFen: 4000 });
     await client.close();
   });
 });

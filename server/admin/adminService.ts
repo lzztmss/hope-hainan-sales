@@ -12,6 +12,7 @@ import {
 
 export type PersonnelType = "unicom" | "auxiliary" | "admin";
 
+
 export interface AdminStoreRecord {
   id: string;
   code: string;
@@ -139,6 +140,7 @@ export interface AdminUserPatch {
   employmentEndDate?: string | null;
   updatedAt: Date;
 }
+
 
 export interface AdminAuditInput {
   actorUserId: string;

@@ -54,6 +54,17 @@ const transitionSchema = z.object({
     "COMPLETE_FULL_RETURN",
   ]),
   expectedVersion: z.number().int().min(1),
+  actualSignedDate: z.string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .refine((value) => !Number.isNaN(Date.parse(`${value}T12:00:00+08:00`)))
+    .optional(),
+}).superRefine((value, context) => {
+  if (value.command === "SIGN" && !value.actualSignedDate) {
+    context.addIssue({ code: "custom", path: ["actualSignedDate"], message: "请选择实际收货日期" });
+  }
+  if (value.command !== "SIGN" && value.actualSignedDate) {
+    context.addIssue({ code: "custom", path: ["actualSignedDate"], message: "只有确认签收时可以填写实际收货日期" });
+  }
 });
 
 const batchTransitionSchema = z.object({
@@ -356,6 +367,9 @@ export const registerOrderRoutes = async (
             request.params.id,
             parsed.data.command,
             parsed.data.expectedVersion,
+            parsed.data.actualSignedDate
+              ? new Date(`${parsed.data.actualSignedDate}T12:00:00+08:00`)
+              : undefined,
           ),
         );
       } catch (error) {

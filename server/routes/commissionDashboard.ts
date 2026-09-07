@@ -91,6 +91,9 @@ export const registerCommissionDashboardRoutes = async (
   app.get("/api/commissions/dashboard", async (request, reply) => {
     const user = await resolveUser(request, reply, options.authService);
     if (!user) return;
+    if (user.role !== "hr" && user.role !== "admin") {
+      return reply.status(403).send({ error: "只有人力资源或管理员可以查看销售提成详情" });
+    }
     const parsed = dashboardQuerySchema.safeParse(request.query);
     if (!parsed.success) return invalidQuery(reply);
     const filters: CommissionDashboardFilters = {
@@ -113,6 +116,9 @@ export const registerCommissionDashboardRoutes = async (
     async (request, reply) => {
       const user = await resolveUser(request, reply, options.authService);
       if (!user) return;
+      if (user.role !== "hr" && user.role !== "admin") {
+        return reply.status(403).send({ error: "只有人力资源或管理员可以查看销售提成详情" });
+      }
       if (!z.string().uuid().safeParse(request.params.orderId).success) {
         return invalidQuery(reply);
       }

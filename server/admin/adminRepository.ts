@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
   and,
   asc,
@@ -5,11 +7,19 @@ import {
   desc,
   eq,
   inArray,
+  isNull,
   type SQL,
 } from "drizzle-orm";
 
 import type { AppDatabase, DbClient, DbTransaction } from "../db/client.js";
-import { auditLogs, regionalManagerStores, sessions, stores, users } from "../db/schema.js";
+import {
+  auditLogs,
+  regionalManagerStoreHistory,
+  regionalManagerStores,
+  sessions,
+  stores,
+  users,
+} from "../db/schema.js";
 import type {
   AdminAuditInput,
   AdminRepository,
@@ -316,6 +326,24 @@ export class DrizzleAdminRepository implements AdminRepository {
     storeIds: readonly string[],
     at: Date,
   ): Promise<void> {
+    const currentRows = await this.executor
+      .select({ storeId: regionalManagerStores.storeId })
+      .from(regionalManagerStores)
+      .where(eq(regionalManagerStores.regionalManagerId, userId));
+    const current = new Set(currentRows.map((row) => row.storeId));
+    const next = new Set(storeIds);
+    const removed = [...current].filter((storeId) => !next.has(storeId));
+    const added = [...next].filter((storeId) => !current.has(storeId));
+    if (removed.length > 0) {
+      await this.executor
+        .update(regionalManagerStoreHistory)
+        .set({ effectiveTo: at })
+        .where(and(
+          eq(regionalManagerStoreHistory.regionalManagerId, userId),
+          inArray(regionalManagerStoreHistory.storeId, removed),
+          isNull(regionalManagerStoreHistory.effectiveTo),
+        ));
+    }
     await this.executor
       .delete(regionalManagerStores)
       .where(eq(regionalManagerStores.regionalManagerId, userId));
@@ -327,6 +355,11 @@ export class DrizzleAdminRepository implements AdminRepository {
           createdAt: at,
           updatedAt: at,
         })),
+      );
+    }
+    if (added.length > 0) {
+      await this.executor.insert(regionalManagerStoreHistory).values(
+        added.map((storeId) => ({ regionalManagerId: userId, storeId, effectiveFrom: at, createdAt: at })),
       );
     }
   }
