@@ -201,7 +201,7 @@ const SalesCommissionRoute = ({ client }: { client: ApiClient }) => {
   return user ? <SalesCommissionDetailRoute actor={user} client={client} /> : null;
 };
 const RegionalCommissionRoute = ({ client }: { client: ApiClient }) => { const { user } = useAuth(); return user ? <RegionalCommissionPage client={client} actor={user} /> : null; };
-const RegionalPersonalOrderRoute = ({ client }: { client: ApiClient }) => <RegionalPersonalOrderPage client={client} />;
+const RegionalPersonalOrderRoute = ({ client }: { client: ApiClient }) => { const { user } = useAuth(); return user ? <RegionalPersonalOrderPage actor={user} client={client} /> : null; };
 
 const OrdersRoute = ({ client }: { client: ApiClient }) => {
   const { user } = useAuth();

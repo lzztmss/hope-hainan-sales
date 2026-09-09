@@ -377,6 +377,9 @@ export const regionalCommissionTemplateAssignments = sqliteTable(
   },
   (table) => [
     index("regional_template_assignments_manager_dates_idx").on(table.regionalManagerId, table.effectiveFrom, table.effectiveTo),
+    uniqueIndex("regional_template_assignments_active_manager_unique")
+      .on(table.regionalManagerId)
+      .where(sql`${table.effectiveTo} IS NULL`),
     check("regional_template_assignment_dates_valid", sql`${table.effectiveTo} IS NULL OR ${table.effectiveTo} >= ${table.effectiveFrom}`),
   ],
 );
@@ -473,7 +476,10 @@ export const regionalCooperationStages = sqliteTable(
     ...timestamps,
   },
   (table) => [
-    uniqueIndex("regional_cooperation_manager_stage_unique").on(table.regionalManagerId, table.stageCode),
+    index("regional_cooperation_manager_stage_date_idx").on(table.regionalManagerId, table.stageCode, table.achievedOn),
+    uniqueIndex("regional_cooperation_manager_stage_confirmed_unique")
+      .on(table.regionalManagerId, table.stageCode)
+      .where(sql`${table.status} = 'confirmed'`),
     check("regional_cooperation_amount_positive", sql`${table.amountFen} > 0`),
   ],
 );

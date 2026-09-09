@@ -14,6 +14,8 @@ import {
 import type { AppDatabase, DbClient, DbTransaction } from "../db/client.js";
 import {
   auditLogs,
+  regionalCommissionTargetPeriods,
+  regionalCommissionTargetPlans,
   regionalManagerStoreHistory,
   regionalManagerStores,
   sessions,
@@ -307,6 +309,24 @@ export class DrizzleAdminRepository implements AdminRepository {
     const created = await this.loadUser(row.id);
     if (!created) throw new Error("账号创建后读取失败");
     return created;
+  }
+
+  async createRegionalTargetPlanDraft(input: Parameters<AdminRepository["createRegionalTargetPlanDraft"]>[0]): Promise<void> {
+    const [created] = await this.executor.insert(regionalCommissionTargetPlans).values({
+      regionalManagerId: input.regionalManagerId,
+      planType: input.plan.planType,
+      periodCount: input.plan.periodCount,
+      startsOn: input.plan.startsOn,
+      endsOn: input.plan.endsOn,
+      isPreset: true,
+      status: "draft",
+      setBy: input.setBy,
+      changeReason: input.changeReason,
+    }).returning({ id: regionalCommissionTargetPlans.id });
+    if (!created) throw new Error("大区经理目标计划草稿创建失败");
+    await this.executor.insert(regionalCommissionTargetPeriods).values(
+      input.plan.periods.map((period) => ({ ...period, planId: created.id })),
+    );
   }
 
   async updateUser(

@@ -10,6 +10,7 @@ import type {
   QuoteInput,
   RoomType,
 } from "../../shared/pricing/types";
+import type { RegionalCommissionRules } from "../../shared/regionalCommission/types";
 import type { MyCommissionDashboard } from "../commissions/MyCommissionPage";
 import type {
   OrderPaymentMode,
@@ -32,17 +33,115 @@ export interface AuthenticatedUser {
   managedStores?: readonly { id: string; name: string }[];
 }
 export interface RegionalCommissionSummaryQuery { managerId?: string; month?: string; }
+export type RegionalVerificationStatus = "pending" | "verified" | "rejected";
+export type RegionalCooperationStatus = "submitted" | "finance_verified" | "confirmed" | "revoked";
+export interface RegionalReceiptDto {
+  id: string;
+  month: string;
+  netReceiptFen: number;
+  evidenceNo: string;
+  note: string | null;
+  verificationStatus: RegionalVerificationStatus;
+  verificationReason: string | null;
+}
+export interface RegionalCooperationDto {
+  id: string;
+  stageCode: string;
+  stageLabel: string;
+  amountFen: number;
+  achievedOn: string;
+  evidenceNo: string;
+  note: string | null;
+  status: RegionalCooperationStatus;
+  revokeReason: string | null;
+  condition?: { label: string; satisfied: boolean };
+}
+export type RegionalTargetPlanType = "quarter" | "half_year" | "year";
+export interface RegionalTargetPlanPeriodDto {
+  id?: string;
+  sequence: number;
+  startsOn: string;
+  endsOn: string;
+  targetOrderCount: number;
+  cumulativeTargetOrderCount: number;
+}
+export interface RegionalTargetPlanDto {
+  id: string;
+  regionalManagerId: string;
+  planType: RegionalTargetPlanType;
+  periodCount: number;
+  startsOn: string;
+  endsOn: string;
+  isPreset: boolean;
+  status: "draft" | "active" | "replaced";
+  replacedByPlanId: string | null;
+  changeReason: string;
+  periods: readonly RegionalTargetPlanPeriodDto[];
+}
+export interface RegionalPersonalOrderLineDto {
+  id: string;
+  sku: string;
+  label: string;
+  quantity: number;
+  returnedQuantity: number;
+  unitCommissionFen: number;
+  subtotalFen: number;
+}
+export interface RegionalPersonalOrderDto {
+  id: string;
+  orderNo: string;
+  regionalManagerId: string;
+  channel: string;
+  orderCount: number;
+  businessDate: string;
+  signedOn: string;
+  effectiveOn: string;
+  evidenceNo: string;
+  note: string | null;
+  status: "active" | "returned" | "voided";
+  voidReason: string | null;
+  returnedOn: string | null;
+  returnReason: string | null;
+  lines: readonly RegionalPersonalOrderLineDto[];
+}
 export interface RegionalCommissionSummary {
-  managerId: string; month: string; templateVersionId: string | null; planId: string | null;
+  managerId: string; month: string; templateVersionId: string | null;
+  templateName: string | null; templateVersionNo: number | null; templateEffectiveFrom: string | null; templateEffectiveTo: string | null;
+  targetPlanId: string | null; targetPlanType: RegionalTargetPlanType | null; targetPlanStartsOn: string | null; targetPlanEndsOn: string | null; targetPlanStatus: RegionalTargetPlanDto["status"] | null;
+  statisticsStartsOn: string | null; statisticsEndsOn: string;
+  employmentStartDate: string | null; employmentEndDate: string | null;
   orderCount: number; managedOrderCount: number; personalOrderCount: number;
   completionFen: number; tieredOrderFen: number; milestoneFen: number; topUpFen: number; revenueAccelerationFen: number; personalProductFen: number; cooperationFen: number; directReturnFen: number; totalFen: number;
-  periods: readonly { sequence: number; startsOn: string; endsOn: string; targetOrderCount: number; orderCount: number; rewardFen: number }[];
-  receipt: null | { id: string; netReceiptFen: number; evidenceNo: string; verificationStatus: "pending" | "verified" | "rejected" };
-  cooperation: readonly { id: string; stageCode: string; stageLabel: string; amountFen: number; achievedOn: string; status: "submitted" | "finance_verified" | "confirmed" | "revoked" }[];
+  settlementPreviewFen: number;
+  settlementEntries: readonly { category: string; accruedFen: number; previouslySettledFen: number; payableFen: number }[];
+  periods: readonly { sequence: number; startsOn: string; endsOn: string; targetOrderCount: number; orderCount: number; cumulativeOrderCount: number; rewardFen: number }[];
+  receipt: RegionalReceiptDto | null;
+  cooperation: readonly RegionalCooperationDto[];
+  revenueAcceleration: { unlockOrderCount: number; currentOrderCount: number; unlocked: boolean; ratePartsPerMillion: number; monthlyCapFen: number };
 }
 export interface RegionalManagerOption { id: string; displayName: string; workNo: string; active: boolean; employmentStartDate: string | null; employmentEndDate: string | null; }
-export interface RegionalTemplateDto { id: string; name: string; templateCode: string; versionNo: number; status: "draft" | "published" | "stopped"; effectiveFrom: string; }
-export interface RegionalStatementDto { id: string; settlementMonth: string; status: "draft" | "confirmed" | "paid"; totalFen: number; }
+export interface RegionalTemplateDto {
+  id: string;
+  name: string;
+  templateCode: string;
+  versionNo: number;
+  status: "draft" | "published" | "stopped";
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  rulesSnapshot: RegionalCommissionRules;
+  changeReason: string;
+}
+export interface RegionalStatementDto {
+  id: string;
+  settlementMonth: string;
+  status: "draft" | "confirmed" | "paid";
+  totalFen: number;
+  templateVersionId: string;
+  targetPlanId: string | null;
+  calculationSnapshot: RegionalCommissionSummary;
+  confirmedAt: string | null;
+  paidAt: string | null;
+}
 
 export interface LoginInput {
   identifier: string;
@@ -497,23 +596,29 @@ export interface ApiClient {
     input: UpdateCommissionRuleInput,
   ): Promise<CommissionPolicyVersionDto>;
   getRegionalCommissionSummary(query?: RegionalCommissionSummaryQuery): Promise<RegionalCommissionSummary>;
-  listRegionalPersonalOrders(managerId: string): Promise<{ items: readonly Record<string, unknown>[] }>;
+  listRegionalTargetPlans(managerId: string): Promise<readonly RegionalTargetPlanDto[]>;
+  createSuggestedRegionalTargetPlan(managerId: string, reason: string): Promise<RegionalTargetPlanDto>;
+  saveRegionalTargetPlan(input: { id?: string; managerId: string; planType: RegionalTargetPlanType; startsOn: string; periodTargets: readonly number[]; reason: string }): Promise<RegionalTargetPlanDto>;
+  activateRegionalTargetPlan(id: string, reason: string): Promise<RegionalTargetPlanDto>;
+  listRegionalPersonalOrders(managerId: string): Promise<{ items: readonly RegionalPersonalOrderDto[] }>;
   createRegionalPersonalOrder(input: Record<string, unknown>): Promise<{ id: string }>;
   returnRegionalPersonalOrder(id: string, input: Record<string, unknown>): Promise<void>;
-  saveRegionalReceipt(input: Record<string, unknown>): Promise<{ id: string }>;
+  voidRegionalPersonalOrder(id: string, reason: string): Promise<void>;
+  saveRegionalReceipt(input: { managerId: string; month: string; netReceiptFen: number; evidenceNo: string; note?: string }): Promise<{ id: string }>;
   listRegionalManagers(): Promise<readonly RegionalManagerOption[]>;
   listRegionalTemplates(): Promise<readonly RegionalTemplateDto[]>;
   createRegionalTemplate(input: { name: string; effectiveFrom: string; reason: string }): Promise<RegionalTemplateDto>;
+  updateRegionalTemplate(id: string, input: { rules: RegionalCommissionRules; reason: string }): Promise<RegionalTemplateDto>;
+  copyRegionalTemplate(id: string, input: { name?: string; effectiveFrom: string; reason: string }): Promise<RegionalTemplateDto>;
   publishRegionalTemplate(id: string, reason: string): Promise<RegionalTemplateDto>;
+  stopRegionalTemplate(id: string, reason: string): Promise<RegionalTemplateDto>;
   assignRegionalTemplate(input: { managerId: string; templateVersionId: string; effectiveFrom: string; reason: string }): Promise<void>;
-  createRegionalTargetPlan(input: { managerId: string; planType: "quarter" | "half_year" | "year"; startsOn: string; targets: readonly number[]; reason: string }): Promise<Record<string, unknown>>;
-  updateRegionalTargetPlan(planId: string, input: { managerId: string; planType: "quarter" | "half_year" | "year"; startsOn: string; targets: readonly number[]; reason: string }): Promise<Record<string, unknown>>;
-  listRegionalCooperation(managerId: string): Promise<readonly Record<string, unknown>[]>;
-  submitRegionalCooperation(input: Record<string, unknown>): Promise<Record<string, unknown>>;
+  listRegionalCooperation(managerId: string): Promise<readonly RegionalCooperationDto[]>;
+  submitRegionalCooperation(input: { managerId: string; stageCode: string; achievedOn: string; evidenceNo: string; note?: string }): Promise<RegionalCooperationDto>;
   transitionRegionalCooperation(id: string, action: "verify" | "confirm" | "revoke", reason?: string): Promise<void>;
   calculateRegionalStatement(managerId: string, month: string): Promise<RegionalStatementDto>;
   listRegionalStatements(managerId: string): Promise<readonly RegionalStatementDto[]>;
-  transitionRegionalStatement(id: string, action: "confirm" | "pay"): Promise<void>;
+  transitionRegionalStatement(id: string, action: "confirm" | "pay"): Promise<RegionalStatementDto>;
   verifyRegionalReceipt(id: string, approved: boolean, reason?: string): Promise<void>;
 }
 
@@ -1050,23 +1155,29 @@ export const createApiClient = ({
       );
     },
     async getRegionalCommissionSummary(query = {}) { const parameters = new URLSearchParams(); if (query.managerId) parameters.set("managerId", query.managerId); if (query.month) parameters.set("month", query.month); return (await request(`/api/regional-commissions/summary?${parameters.toString()}`)) as RegionalCommissionSummary; },
-    async listRegionalPersonalOrders(managerId) { return (await request(`/api/regional-commissions/personal-orders?managerId=${encodeURIComponent(managerId)}`)) as { items: readonly Record<string, unknown>[] }; },
+    async listRegionalTargetPlans(managerId) { return readProperty<readonly RegionalTargetPlanDto[]>(await request(`/api/regional-commissions/target-plans?managerId=${encodeURIComponent(managerId)}`), "items"); },
+    async createSuggestedRegionalTargetPlan(managerId, reason) { return (await request("/api/regional-commissions/target-plans/suggest", { method: "POST", body: JSON.stringify({ managerId, reason }) })) as RegionalTargetPlanDto; },
+    async saveRegionalTargetPlan(input) { return (await request("/api/regional-commissions/target-plans", { method: "POST", body: JSON.stringify(input) })) as RegionalTargetPlanDto; },
+    async activateRegionalTargetPlan(id, reason) { return (await request(`/api/regional-commissions/target-plans/${encodeURIComponent(id)}/activate`, { method: "POST", body: JSON.stringify({ reason }) })) as RegionalTargetPlanDto; },
+    async listRegionalPersonalOrders(managerId) { return (await request(`/api/regional-commissions/personal-orders?managerId=${encodeURIComponent(managerId)}`)) as { items: readonly RegionalPersonalOrderDto[] }; },
     async createRegionalPersonalOrder(input) { return (await request("/api/regional-commissions/personal-orders", { method: "POST", body: JSON.stringify(input) })) as { id: string }; },
     async returnRegionalPersonalOrder(id, input) { await request(`/api/regional-commissions/personal-orders/${encodeURIComponent(id)}/return`, { method: "POST", body: JSON.stringify(input) }); },
+    async voidRegionalPersonalOrder(id, reason) { await request(`/api/regional-commissions/personal-orders/${encodeURIComponent(id)}/void`, { method: "POST", body: JSON.stringify({ reason }) }); },
     async saveRegionalReceipt(input) { return (await request("/api/regional-commissions/receipts", { method: "POST", body: JSON.stringify(input) })) as { id: string }; },
     async listRegionalManagers() { return readProperty<readonly RegionalManagerOption[]>(await request("/api/regional-commissions/managers"), "items"); },
     async listRegionalTemplates() { return readProperty<readonly RegionalTemplateDto[]>(await request("/api/admin/regional-commission-templates"), "items"); },
     async createRegionalTemplate(input) { return (await request("/api/admin/regional-commission-templates", { method: "POST", body: JSON.stringify(input) })) as RegionalTemplateDto; },
+    async updateRegionalTemplate(id, input) { return (await request(`/api/admin/regional-commission-templates/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) })) as RegionalTemplateDto; },
+    async copyRegionalTemplate(id, input) { return (await request(`/api/admin/regional-commission-templates/${encodeURIComponent(id)}/copy`, { method: "POST", body: JSON.stringify(input) })) as RegionalTemplateDto; },
     async publishRegionalTemplate(id, reason) { return (await request(`/api/admin/regional-commission-templates/${encodeURIComponent(id)}/publish`, { method: "POST", body: JSON.stringify({ reason }) })) as RegionalTemplateDto; },
+    async stopRegionalTemplate(id, reason) { return (await request(`/api/admin/regional-commission-templates/${encodeURIComponent(id)}/stop`, { method: "POST", body: JSON.stringify({ reason }) })) as RegionalTemplateDto; },
     async assignRegionalTemplate(input) { await request("/api/admin/regional-commission-assignments", { method: "POST", body: JSON.stringify(input) }); },
-    async createRegionalTargetPlan(input) { return (await request("/api/regional-commissions/target-plans", { method: "POST", body: JSON.stringify(input) })) as Record<string, unknown>; },
-    async updateRegionalTargetPlan(planId, input) { return (await request(`/api/regional-commissions/target-plans/${encodeURIComponent(planId)}`, { method: "PATCH", body: JSON.stringify(input) })) as Record<string, unknown>; },
-    async listRegionalCooperation(managerId) { return readProperty<readonly Record<string, unknown>[]>(await request(`/api/regional-commissions/cooperation?managerId=${encodeURIComponent(managerId)}`), "items"); },
-    async submitRegionalCooperation(input) { return (await request("/api/regional-commissions/cooperation", { method: "POST", body: JSON.stringify(input) })) as Record<string, unknown>; },
+    async listRegionalCooperation(managerId) { return readProperty<readonly RegionalCooperationDto[]>(await request(`/api/regional-commissions/cooperation?managerId=${encodeURIComponent(managerId)}`), "items"); },
+    async submitRegionalCooperation(input) { return (await request("/api/regional-commissions/cooperation", { method: "POST", body: JSON.stringify(input) })) as RegionalCooperationDto; },
     async transitionRegionalCooperation(id, action, reason) { await request(`/api/regional-commissions/cooperation/${encodeURIComponent(id)}/${action}`, { method: "POST", body: JSON.stringify({ reason }) }); },
     async calculateRegionalStatement(managerId, month) { return (await request(`/api/regional-commissions/statements/${encodeURIComponent(managerId)}/${month}/calculate`, { method: "POST" })) as RegionalStatementDto; },
     async listRegionalStatements(managerId) { return readProperty<readonly RegionalStatementDto[]>(await request(`/api/regional-commissions/statements?managerId=${encodeURIComponent(managerId)}`), "items"); },
-    async transitionRegionalStatement(id, action) { await request(`/api/regional-commissions/statements/${encodeURIComponent(id)}/${action}`, { method: "POST" }); },
+    async transitionRegionalStatement(id, action) { return (await request(`/api/regional-commissions/statements/${encodeURIComponent(id)}/${action}`, { method: "POST" })) as RegionalStatementDto; },
     async verifyRegionalReceipt(id, approved, reason) { await request(`/api/regional-commissions/receipts/${encodeURIComponent(id)}/verify`, { method: "POST", body: JSON.stringify({ approved, reason }) }); },
   };
 };

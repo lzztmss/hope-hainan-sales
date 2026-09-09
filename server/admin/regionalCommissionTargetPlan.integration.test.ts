@@ -32,7 +32,7 @@ describe("大区经理首个半年目标计划", () => {
     ]);
   });
 
-  it("创建账号时不替HR生成正式目标计划", async () => {
+  it("创建账号时不再自动生成独立目标计划", async () => {
     const directory = await mkdtemp(join(tmpdir(), "hfttr-regional-plan-"));
     temporaryDirectories.push(directory);
     const sqlitePath = join(directory, "app.sqlite");
@@ -83,7 +83,7 @@ describe("大区经理首个半年目标计划", () => {
       .select()
       .from(regionalCommissionTargetPlans)
       .where(eq(regionalCommissionTargetPlans.regionalManagerId, manager.id));
-    expect(plans).toEqual([]);
+    expect(plans).toHaveLength(0);
     await database.close();
   });
 });

@@ -8,6 +8,27 @@
       "when": 1788425042684,
       "tag": "0000_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788833599308,
+      "tag": "0001_allow_repeated_regional_cooperation",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788837732141,
+      "tag": "0002_fair_golden_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788838000000,
+      "tag": "0003_confirmed_regional_cooperation_unique",
+      "breakpoints": true
     }
   ]
 }

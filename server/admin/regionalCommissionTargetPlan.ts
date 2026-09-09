@@ -16,6 +16,16 @@ export interface PresetHalfYearPlanDraft {
   periods: readonly RegionalCommissionTargetPeriodDraft[];
 }
 
+export type RegionalTargetPlanType = "quarter" | "half_year" | "year";
+
+export interface RegionalTargetPlanDraft {
+  planType: RegionalTargetPlanType;
+  periodCount: 3 | 6 | 12;
+  startsOn: string;
+  endsOn: string;
+  periods: readonly RegionalCommissionTargetPeriodDraft[];
+}
+
 const parseDate = (value: string): { year: number; month: number; day: number } => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) throw new Error("日期格式应为YYYY-MM-DD");
@@ -49,26 +59,47 @@ const subtractDay = (value: string): string => {
   return formatDate(new Date(Date.UTC(year, month - 1, day - 1)));
 };
 
-export const buildPresetHalfYearPlan = (employmentStartDate: string): PresetHalfYearPlanDraft => {
-  parseDate(employmentStartDate);
+export const targetPlanPeriodCount = (planType: RegionalTargetPlanType): 3 | 6 | 12 =>
+  planType === "quarter" ? 3 : planType === "half_year" ? 6 : 12;
+
+export const buildTargetPlan = (
+  startsOn: string,
+  planType: RegionalTargetPlanType,
+  periodTargets: readonly number[],
+): RegionalTargetPlanDraft => {
+  parseDate(startsOn);
+  const periodCount = targetPlanPeriodCount(planType);
+  if (periodTargets.length !== periodCount) {
+    throw new Error(`${planType === "quarter" ? "季度" : planType === "half_year" ? "半年" : "全年"}计划必须包含 ${periodCount} 个目标周期`);
+  }
+  if (periodTargets.some((target) => !Number.isSafeInteger(target) || target <= 0)) {
+    throw new Error("每期订单目标必须是大于 0 的整数");
+  }
   let cumulativeTargetOrderCount = 0;
-  const periods = PRESET_HALF_YEAR_TARGETS.map((targetOrderCount, index) => {
-    const startsOn = addMonths(employmentStartDate, index);
-    const endsOn = subtractDay(addMonths(employmentStartDate, index + 1));
+  const periods = periodTargets.map((targetOrderCount, index) => {
+    const periodStartsOn = addMonths(startsOn, index);
+    const endsOn = subtractDay(addMonths(startsOn, index + 1));
     cumulativeTargetOrderCount += targetOrderCount;
     return {
       sequence: index + 1,
-      startsOn,
+      startsOn: periodStartsOn,
       endsOn,
       targetOrderCount,
       cumulativeTargetOrderCount,
     };
   });
   return {
-    planType: "half_year",
-    periodCount: 6,
-    startsOn: employmentStartDate,
+    planType,
+    periodCount,
+    startsOn,
     endsOn: periods[periods.length - 1]!.endsOn,
     periods,
   };
 };
+
+export const buildPresetHalfYearPlan = (employmentStartDate: string): PresetHalfYearPlanDraft =>
+  buildTargetPlan(
+    employmentStartDate,
+    "half_year",
+    PRESET_HALF_YEAR_TARGETS,
+  ) as PresetHalfYearPlanDraft;

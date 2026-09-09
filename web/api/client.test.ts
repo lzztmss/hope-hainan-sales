@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { DEFAULT_REGIONAL_COMMISSION_RULES } from "../../shared/regionalCommission/types.js";
 import { createApiClient } from "./client.js";
 
 describe("API client order filters", () => {
@@ -52,5 +53,39 @@ describe("API client order filters", () => {
     expect(result.filename).toBe("订单对账明细.xlsx");
     expect(result.orderCount).toBe(45);
     expect(result.blob.size).toBe(4);
+  });
+});
+
+describe("API client regional commission templates", () => {
+  it("sends update, copy and stop requests to the template endpoints", async () => {
+    const requests: Array<{ url: string; init?: RequestInit }> = [];
+    const fetcher: typeof fetch = async (input, init) => {
+      requests.push({ url: String(input), init });
+      return new Response(JSON.stringify({ id: "template" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    };
+    const client = createApiClient({ fetcher });
+
+    await client.updateRegionalTemplate("template/1", {
+      rules: DEFAULT_REGIONAL_COMMISSION_RULES,
+      reason: "调整规则",
+    });
+    await client.copyRegionalTemplate("template/1", {
+      effectiveFrom: "2026-10-01",
+      reason: "复制新版本",
+    });
+    await client.stopRegionalTemplate("template/1", "规则到期");
+
+    expect(requests.map(({ url, init }) => [url, init?.method])).toEqual([
+      ["/api/admin/regional-commission-templates/template%2F1", "PATCH"],
+      ["/api/admin/regional-commission-templates/template%2F1/copy", "POST"],
+      ["/api/admin/regional-commission-templates/template%2F1/stop", "POST"],
+    ]);
+    expect(JSON.parse(String(requests[0]?.init?.body))).toMatchObject({
+      reason: "调整规则",
+      rules: DEFAULT_REGIONAL_COMMISSION_RULES,
+    });
   });
 });
