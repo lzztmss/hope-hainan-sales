@@ -733,6 +733,57 @@
   z-index: 1000;
 }
 
+.regional-action-dialog-backdrop {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(15 35 55 / 0.58);
+  backdrop-filter: blur(3px);
+}
+
+.regional-action-dialog {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  width: min(30rem, 100%);
+  padding: 1.5rem;
+  border: 1px solid #f2c7c3;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 1.5rem 4rem rgb(15 35 55 / 0.24);
+}
+
+.regional-action-dialog h2,
+.regional-action-dialog p {
+  margin: 0;
+}
+
+.regional-action-dialog p {
+  margin-top: 0.5rem;
+  color: #5d6875;
+  line-height: 1.65;
+}
+
+.regional-action-dialog__icon {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  background: #fff0ee;
+  color: #b42318;
+  font-weight: 800;
+}
+
+.regional-action-dialog > button {
+  grid-column: 1 / -1;
+  justify-self: end;
+  min-width: 7rem;
+}
+
 .regional-template-switch-dialog {
   background: var(--app-color-surface);
   border: 1px solid var(--app-color-border);

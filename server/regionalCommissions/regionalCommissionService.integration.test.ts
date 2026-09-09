@@ -185,6 +185,7 @@ describe("大区经理个人渠道提成", () => {
       totalFen: 700,
     });
     await expect(service.summary(hr, "regional", "2025-12")).rejects.toThrow("不能早于大区经理入职月份");
+    await expect(service.summary(hr, "regional", "2026-10")).rejects.toThrow("不能晚于当前月份");
 
     const firstDraft = await service.calculateStatement(hr, "regional", "2026-09");
     expect(firstDraft).toMatchObject({ targetPlanId: targetPlan.id, totalFen: 700 });
@@ -247,6 +248,111 @@ describe("大区经理个人渠道提成", () => {
       cumulativeOrderCount: 3,
     });
     expect(february.periods[1]).toMatchObject({ orderCount: 0, cumulativeOrderCount: 3 });
+    await client.close();
+  });
+
+  it("相同统计起点切换模板版本后，不会重复计入已锁定的历史金额", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "hope-regional-cross-version-settlement-"));
+    directories.push(directory);
+    const path = join(directory, "app.sqlite");
+    await migrateDatabase(path);
+    const client = createDatabaseClient(path);
+    await client.db.insert(users).values([
+      { id: "admin", workNo: "ADMIN", displayName: "管理员", passwordHash: "x", role: "admin", personnelType: "admin", mustChangePassword: false },
+      { id: "hr", workNo: "HR", displayName: "人力", passwordHash: "x", role: "hr", personnelType: "admin", mustChangePassword: false },
+      { id: "regional", workNo: "REGIONAL", displayName: "大区经理", passwordHash: "x", role: "regional_manager", personnelType: "admin", employmentStartDate: "2026-01-01", mustChangePassword: false },
+    ]);
+    const rules = {
+      ...DEFAULT_REGIONAL_COMMISSION_RULES,
+      targetCycle: { startsOn: "2026-01-01", planType: "quarter" as const, periodTargets: [1_000, 1_000, 1_000] },
+    };
+    const [first, second] = await client.db.insert(regionalCommissionTemplateVersions).values([
+      { id: "template-a", templateCode: "A", versionNo: 1, name: "A 版", status: "published", effectiveFrom: "2026-01-01", rulesSnapshot: rules as unknown as Record<string, unknown>, createdBy: "admin", publishedBy: "admin", publishedAt: new Date(), changeReason: "测试" },
+      { id: "template-b", templateCode: "B", versionNo: 1, name: "B 版", status: "published", effectiveFrom: "2026-02-01", rulesSnapshot: rules as unknown as Record<string, unknown>, createdBy: "admin", publishedBy: "admin", publishedAt: new Date(), changeReason: "测试" },
+    ]).returning();
+    await client.db.insert(regionalCommissionTemplateAssignments).values({ regionalManagerId: "regional", templateVersionId: first!.id, effectiveFrom: "2026-01-01", assignedBy: "admin", reason: "首版" });
+    const service = new RegionalCommissionService(client);
+    const hr: AuthenticatedUser = { id: "hr", displayName: "人力", role: "hr", storeId: null, mustChangePassword: false };
+    const admin: AuthenticatedUser = { id: "admin", displayName: "管理员", role: "admin", storeId: null, mustChangePassword: false };
+    await service.createPersonalOrder(hr, { managerId: "regional", orderNo: "JAN-001", channel: "电信", orderCount: 1, businessDate: "2026-01-01", signedOn: "2026-01-01", evidenceNo: "JAN", lines: [{ sku: "GATEWAY", label: "迷你网关", quantity: 1 }] });
+    const januaryStatement = await service.calculateStatement(hr, "regional", "2026-01");
+    await service.transitionStatement(admin, januaryStatement.id, "confirm");
+    await service.assignTemplate(admin, { managerId: "regional", templateVersionId: second!.id, effectiveFrom: "2026-02-01", reason: "2 月切换新版本" });
+
+    const february = await service.summary(hr, "regional", "2026-02");
+    expect(february.templateVersionId).toBe(second!.id);
+    expect(february.statisticsStartsOn).toBe("2026-01-01");
+    expect(february.settlementPreviewFen).toBe(0);
+    expect(february.settlementEntries.find((entry) => entry.category === "tiered_order")).toMatchObject({
+      accruedFen: 100,
+      previouslySettledFen: 100,
+      payableFen: 0,
+    });
+    await client.close();
+  });
+
+  it("后续月份已累计结算时，禁止倒序重复生成前月结算单", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "hope-regional-backdated-settlement-"));
+    directories.push(directory);
+    const path = join(directory, "app.sqlite");
+    await migrateDatabase(path);
+    const client = createDatabaseClient(path);
+    await client.db.insert(users).values([
+      { id: "admin", workNo: "ADMIN", displayName: "管理员", passwordHash: "x", role: "admin", personnelType: "admin", mustChangePassword: false },
+      { id: "hr", workNo: "HR", displayName: "人力", passwordHash: "x", role: "hr", personnelType: "admin", mustChangePassword: false },
+      { id: "regional", workNo: "REGIONAL", displayName: "大区经理", passwordHash: "x", role: "regional_manager", personnelType: "admin", employmentStartDate: "2026-01-15", mustChangePassword: false },
+    ]);
+    const rules = {
+      ...DEFAULT_REGIONAL_COMMISSION_RULES,
+      targetCycle: { startsOn: "2026-01-15", planType: "half_year" as const, periodTargets: [1_000, 4_000, 8_000, 10_000, 13_000, 14_000] },
+    };
+    const [template] = await client.db.insert(regionalCommissionTemplateVersions).values({
+      templateCode: "BACKDATED",
+      versionNo: 1,
+      name: "倒序结算测试",
+      status: "published",
+      effectiveFrom: "2026-01-15",
+      rulesSnapshot: rules as unknown as Record<string, unknown>,
+      createdBy: "admin",
+      publishedBy: "admin",
+      publishedAt: new Date(),
+      changeReason: "测试",
+    }).returning();
+    await client.db.insert(regionalCommissionTemplateAssignments).values({
+      regionalManagerId: "regional",
+      templateVersionId: template!.id,
+      effectiveFrom: "2026-01-15",
+      assignedBy: "admin",
+      reason: "测试",
+    });
+    const service = new RegionalCommissionService(client);
+    const hr: AuthenticatedUser = { id: "hr", displayName: "人力", role: "hr", storeId: null, mustChangePassword: false };
+    const admin: AuthenticatedUser = { id: "admin", displayName: "管理员", role: "admin", storeId: null, mustChangePassword: false };
+    await service.createPersonalOrder(hr, {
+      managerId: "regional",
+      orderNo: "JAN-COVERED",
+      channel: "电信",
+      orderCount: 1,
+      businessDate: "2026-01-15",
+      signedOn: "2026-01-15",
+      evidenceNo: "JAN-COVERED",
+      lines: [{ sku: "GATEWAY", label: "迷你网关", quantity: 1 }],
+    });
+
+    const augustStatement = await service.calculateStatement(hr, "regional", "2026-08");
+    await service.transitionStatement(admin, augustStatement.id, "confirm");
+    await service.transitionStatement(admin, augustStatement.id, "pay");
+
+    const june = await service.summary(hr, "regional", "2026-06");
+    expect(june.settlementCoveredBy).toMatchObject({
+      id: augustStatement.id,
+      settlementMonth: "2026-08",
+      status: "paid",
+    });
+    expect(june.settlementPreviewFen).toBe(0);
+    expect(june.settlementEntries.every((entry) => entry.payableFen === 0)).toBe(true);
+    await expect(service.calculateStatement(hr, "regional", "2026-06"))
+      .rejects.toThrow("2026-06 已包含在 2026-08 已发放的累计结算中");
     await client.close();
   });
 

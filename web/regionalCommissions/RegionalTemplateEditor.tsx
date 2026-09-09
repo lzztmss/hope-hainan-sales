@@ -25,6 +25,7 @@ export interface RegionalTemplateEditorProps {
   assignedTemplateVersionId?: string | null;
   employmentStartDate?: string | null;
   onAssignmentChange?(): void | Promise<void>;
+  onError?(message: string): void;
   onMessage?(message: string): void;
 }
 
@@ -209,6 +210,7 @@ export const RegionalTemplateEditor = ({
   assignedTemplateVersionId = null,
   employmentStartDate = null,
   onAssignmentChange,
+  onError,
   onMessage,
 }: RegionalTemplateEditorProps) => {
   const [templates, setTemplates] = useState<readonly RegionalTemplateDto[]>([]);
@@ -321,6 +323,7 @@ export const RegionalTemplateEditor = ({
       } else {
         setError(message);
       }
+      onError?.(message);
       return false;
     } finally {
       setBusy(false);
@@ -330,7 +333,9 @@ export const RegionalTemplateEditor = ({
   const createTemplate = (event: FormEvent) => {
     event.preventDefault();
     if (!createForm.name.trim() || !createForm.effectiveFrom || !createForm.reason.trim()) {
-      setError("请填写模板名称、版本最早可用日期和创建原因");
+      const message = "请填写模板名称、版本最早可用日期和创建原因";
+      setError(message);
+      onError?.(message);
       return;
     }
     void run(
@@ -349,10 +354,9 @@ export const RegionalTemplateEditor = ({
   const requireReason = (): string | null => {
     const reason = changeReason.trim();
     if (!reason) {
-      setOperationFeedback({
-        kind: "error",
-        message: "操作没有执行：请先填写修改或版本操作原因。",
-      });
+      const message = "操作没有执行：请先填写修改或版本操作原因。";
+      setOperationFeedback({ kind: "error", message });
+      onError?.(message);
       changeReasonInput.current?.focus();
       changeReasonInput.current?.scrollIntoView?.({ block: "center" });
     }
@@ -361,19 +365,17 @@ export const RegionalTemplateEditor = ({
 
   const requireSavedRules = (nextAction: string): boolean => {
     if (!hasUnsavedChanges) return true;
+    let message: string;
     if (!changeReason.trim()) {
-      setOperationFeedback({
-        kind: "error",
-        message: `当前规则尚未保存。请填写操作原因，点击“保存规则”，保存成功后再${nextAction}。`,
-      });
+      message = `当前规则尚未保存。请填写操作原因，点击“保存规则”，保存成功后再${nextAction}。`;
+      setOperationFeedback({ kind: "error", message });
       changeReasonInput.current?.focus();
       changeReasonInput.current?.scrollIntoView?.({ block: "center" });
     } else {
-      setOperationFeedback({
-        kind: "error",
-        message: `当前规则尚未保存。请先点击“保存规则”，保存成功后再${nextAction}。`,
-      });
+      message = `当前规则尚未保存。请先点击“保存规则”，保存成功后再${nextAction}。`;
+      setOperationFeedback({ kind: "error", message });
     }
+    onError?.(message);
     return false;
   };
 
@@ -383,7 +385,9 @@ export const RegionalTemplateEditor = ({
     if (!reason) return;
     const validationError = validateRegionalCommissionRules(draftRules);
     if (validationError) {
-      setOperationFeedback({ kind: "error", message: `操作没有执行：${validationError}` });
+      const message = `操作没有执行：${validationError}`;
+      setOperationFeedback({ kind: "error", message });
+      onError?.(message);
       return;
     }
     void run(

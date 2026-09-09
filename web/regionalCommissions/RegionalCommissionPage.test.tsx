@@ -175,7 +175,62 @@ describe("大区经理目标周期", () => {
     await waitFor(() => expect(client.verifyRegionalReceipt).toHaveBeenCalledWith("receipt-1", true, undefined));
     expect(await screen.findByText("已核验")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("净回款已核验");
-    expect(screen.getByRole("button", { name: "保存更正" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "保存更正" }));
+    expect(screen.getByRole("alertdialog")).toHaveTextContent("请先执行“退回更正”");
+  });
+
+  it("不允许选择未来月份，并在当前视口说明原因", async () => {
+    const client = {
+      listRegionalManagers: vi.fn().mockResolvedValue([{ id: "regional", displayName: "大区经理", workNo: "REGIONAL", active: true, employmentStartDate: "2026-01-15", employmentEndDate: null }]),
+      getRegionalCommissionSummary: vi.fn().mockResolvedValue(summary),
+      listRegionalStatements: vi.fn().mockResolvedValue([]),
+    } as unknown as ApiClient;
+    const actor: AuthenticatedUser = { id: "admin", displayName: "管理员", role: "admin", storeId: null, mustChangePassword: false };
+    render(<MemoryRouter><RegionalCommissionPage actor={actor} client={client} /></MemoryRouter>);
+
+    const monthInput = await screen.findByLabelText(/提成数据统计截止月份/);
+    fireEvent.change(monthInput, { target: { value: "2026-10" } });
+
+    expect(screen.getByRole("alertdialog")).toHaveTextContent("未来月份不能提前生成结算单");
+    expect(monthInput).toHaveValue("2026-09");
+    expect(client.getRegionalCommissionSummary).not.toHaveBeenCalledWith({ managerId: "regional", month: "2026-10" });
+  });
+
+  it("后月已累计发放时，前月显示为已覆盖并禁止重复生成", async () => {
+    const coveredSummary: RegionalCommissionSummary = {
+      ...summary,
+      month: "2026-06",
+      statisticsEndsOn: "2026-06-30",
+      settlementPreviewFen: 0,
+      settlementCoveredBy: {
+        id: "statement-august",
+        settlementMonth: "2026-08",
+        status: "paid",
+        totalFen: 12_200_000,
+      },
+      settlementEntries: [
+        { category: "tiered_order", accruedFen: 9_000_000, previouslySettledFen: 9_000_000, payableFen: 0 },
+      ],
+    };
+    const client = {
+      listRegionalManagers: vi.fn().mockResolvedValue([{ id: "regional", displayName: "大区经理", workNo: "REGIONAL", active: true, employmentStartDate: "2026-01-15", employmentEndDate: null }]),
+      getRegionalCommissionSummary: vi.fn().mockResolvedValue(coveredSummary),
+      listRegionalStatements: vi.fn().mockResolvedValue([]),
+      calculateRegionalStatement: vi.fn(),
+    } as unknown as ApiClient;
+    const actor: AuthenticatedUser = { id: "admin", displayName: "管理员", role: "admin", storeId: null, mustChangePassword: false };
+    render(<MemoryRouter><RegionalCommissionPage actor={actor} client={client} /></MemoryRouter>);
+
+    const monthInput = await screen.findByLabelText(/提成数据统计截止月份/);
+    fireEvent.change(monthInput, { target: { value: "2026-06" } });
+    fireEvent.click(await screen.findByRole("button", { name: "月度提成结算" }));
+
+    expect(await screen.findByText(/2026-06 已包含在 2026-08 已发放的累计结算中/)).toBeVisible();
+    expect(within(screen.getByLabelText("本月结算试算")).getByText("¥0.00")).toBeVisible();
+    const coveredButton = screen.getByRole("button", { name: "已由08月结算覆盖" });
+    fireEvent.click(coveredButton);
+    expect(screen.getByRole("alertdialog")).toHaveTextContent("不能再重复生成或确认结算单");
+    expect(client.calculateRegionalStatement).not.toHaveBeenCalled();
   });
 
   it("退回回款和撤销合作奖都强制填写原因", async () => {
@@ -245,6 +300,38 @@ describe("大区经理目标周期", () => {
     await waitFor(() => expect(client.transitionRegionalCooperation).toHaveBeenCalledWith("stage-1", "revoke", "立项已取消"));
   });
 
+  it("合作奖确认条件不满足时弹窗显示服务端具体原因", async () => {
+    const withScale: RegionalCommissionSummary = {
+      ...summary,
+      cooperation: [{
+        id: "stage-scale",
+        stageCode: "SCALE",
+        stageLabel: "规模验证",
+        amountFen: 1_000_000,
+        achievedOn: "2026-09-01",
+        evidenceNo: "SCALE-001",
+        note: null,
+        status: "finance_verified",
+        revokeReason: null,
+        condition: { label: "累计达到 1,000 笔并核验回款", satisfied: false },
+      }],
+    };
+    const client = {
+      listRegionalManagers: vi.fn().mockResolvedValue([{ id: "regional", displayName: "大区经理", workNo: "REGIONAL", active: true, employmentStartDate: "2026-01-15", employmentEndDate: null }]),
+      getRegionalCommissionSummary: vi.fn().mockResolvedValue(withScale),
+      listRegionalStatements: vi.fn().mockResolvedValue([]),
+      transitionRegionalCooperation: vi.fn().mockRejectedValue(new Error("合作阶段条件尚未满足：累计达到 1,000 笔并核验回款")),
+    } as unknown as ApiClient;
+    const actor: AuthenticatedUser = { id: "admin", displayName: "管理员", role: "admin", storeId: null, mustChangePassword: false };
+    render(<MemoryRouter><RegionalCommissionPage actor={actor} client={client} /></MemoryRouter>);
+
+    await screen.findByRole("option", { name: "大区经理（REGIONAL）" });
+    fireEvent.click(await screen.findByRole("button", { name: "合作奖" }));
+    fireEvent.click(await screen.findByRole("button", { name: "确认奖励" }));
+
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent("累计达到 1,000 笔并核验回款");
+  });
+
   it("结算状态操作直接采用服务端返回值，不重复计算 5 万笔汇总", async () => {
     const confirmed = {
       id: "statement-september",
@@ -272,7 +359,7 @@ describe("大区经理目标周期", () => {
     render(<MemoryRouter><RegionalCommissionPage actor={actor} client={client} /></MemoryRouter>);
 
     await screen.findByRole("option", { name: "大区经理（REGIONAL）" });
-    fireEvent.click(screen.getByRole("button", { name: "月度提成结算" }));
+    fireEvent.click(await screen.findByRole("button", { name: "月度提成结算" }));
     fireEvent.click(await screen.findByRole("button", { name: "确认已发放" }));
 
     await waitFor(() => expect(client.transitionRegionalStatement).toHaveBeenCalledWith("statement-september", "pay"));

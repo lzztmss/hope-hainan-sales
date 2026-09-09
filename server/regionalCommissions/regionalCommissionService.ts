@@ -44,6 +44,11 @@ import {
 const DAY_MS = 86_400_000;
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+const currentShanghaiMonth = () => new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Shanghai",
+  year: "numeric",
+  month: "2-digit",
+}).format(new Date());
 const dateOnly = (value: Date) => value.toISOString().slice(0, 10);
 const addDays = (value: string, days: number) =>
   dateOnly(new Date(new Date(`${value}T00:00:00Z`).getTime() + days * DAY_MS));
@@ -464,6 +469,7 @@ export class RegionalCommissionService {
   async summary(actor: AuthenticatedUser, managerId: string, month = new Date().toISOString().slice(0, 7)) {
     assertManagerAccess(actor, managerId);
     if (!MONTH_PATTERN.test(month)) throw new Error("统计截止月份格式不正确");
+    if (month > currentShanghaiMonth()) throw new Error("统计截止月份不能晚于当前月份");
     const asOf = monthEnd(month);
     const asOfDate = dateOnly(asOf);
     const manager = (await this.client.db.select({ employmentStartDate: users.employmentStartDate, employmentEndDate: users.employmentEndDate }).from(users).where(and(eq(users.id, managerId), eq(users.role, "regional_manager"))))[0];
@@ -658,21 +664,42 @@ export class RegionalCommissionService {
       .orderBy(desc(regionalCooperationStages.achievedOn), desc(regionalCooperationStages.createdAt));
     const [currentStatement] = await this.client.db.select({
       id: regionalCommissionStatements.id,
+      status: regionalCommissionStatements.status,
     }).from(regionalCommissionStatements).where(and(
       eq(regionalCommissionStatements.regionalManagerId, managerId),
       eq(regionalCommissionStatements.settlementMonth, month),
     )).limit(1);
     const allLedger = await this.client.db.select().from(regionalCommissionLedger)
       .where(eq(regionalCommissionLedger.regionalManagerId, managerId));
-    const priorStatements = summaryRules.templateVersionId
-      ? await this.client.db.select({ id: regionalCommissionStatements.id }).from(regionalCommissionStatements).where(and(
+    const finalizedStatements = await this.client.db.select({
+      id: regionalCommissionStatements.id,
+      settlementMonth: regionalCommissionStatements.settlementMonth,
+      status: regionalCommissionStatements.status,
+      totalFen: regionalCommissionStatements.totalFen,
+      calculationSnapshot: regionalCommissionStatements.calculationSnapshot,
+    }).from(regionalCommissionStatements).where(and(
         eq(regionalCommissionStatements.regionalManagerId, managerId),
-        eq(regionalCommissionStatements.templateVersionId, summaryRules.templateVersionId),
         inArray(regionalCommissionStatements.status, ["confirmed", "paid"]),
-        lt(regionalCommissionStatements.settlementMonth, month),
-      ))
-      : [];
-    const priorStatementIds = new Set(priorStatements.map((row) => row.id));
+      ));
+    const finalizedStatementsInCycle = finalizedStatements.filter((row) => {
+      const snapshot = row.calculationSnapshot ?? {};
+      const priorStartsOn = typeof snapshot.statisticsStartsOn === "string"
+        ? snapshot.statisticsStartsOn
+        : typeof snapshot.targetPlanStartsOn === "string"
+          ? snapshot.targetPlanStartsOn
+          : typeof snapshot.templateEffectiveFrom === "string"
+            ? snapshot.templateEffectiveFrom
+            : formalStartsOn;
+      return priorStartsOn === calculationStartsOn;
+    });
+    const priorStatementIds = new Set(finalizedStatementsInCycle
+      .filter((row) => row.settlementMonth < month)
+      .map((row) => row.id));
+    const settlementCoveredBy = currentStatement && currentStatement.status !== "draft"
+      ? null
+      : finalizedStatementsInCycle
+          .filter((row) => row.settlementMonth > month)
+          .sort((left, right) => left.settlementMonth.localeCompare(right.settlementMonth))[0] ?? null;
     const cooperationLedger = allLedger.filter((row) =>
       row.sourceType === "cooperation" && row.occurredOn <= asOfDate);
     const cooperationFen = cooperationLedger.reduce((sum, row) => sum + row.amountFen, 0);
@@ -719,10 +746,17 @@ export class RegionalCommissionService {
       previouslySettledFen: 0,
       payableFen: revenueAccelerationFen,
     });
-    const settlementPreviewFen = settlementEntries.reduce(
+    const rawSettlementPreviewFen = settlementEntries.reduce(
       (sum, entry) => sum + entry.payableFen,
       0,
     );
+    if (settlementCoveredBy) {
+      settlementEntries.forEach((entry) => {
+        entry.previouslySettledFen = entry.accruedFen;
+        entry.payableFen = 0;
+      });
+    }
+    const settlementPreviewFen = settlementCoveredBy ? 0 : rawSettlementPreviewFen;
     const cooperationWithConditions: Array<(typeof cooperation)[number] & { condition: { label: string; satisfied: boolean } }> = await Promise.all(cooperation.map(async (row) => ({
       ...row,
       condition: await this.cooperationPrerequisites(managerId, row.stageCode, row.achievedOn, orderCount),
@@ -746,7 +780,14 @@ export class RegionalCommissionService {
       completionFen, tieredOrderFen, milestoneFen, topUpFen, revenueAccelerationFen, personalProductFen: productFen,
       cooperationFen, directReturnFen,
       totalFen: completionFen + tieredOrderFen + milestoneFen + topUpFen + revenueAccelerationFen + productFen + cooperationFen - directReturnFen,
-      settlementPreviewFen, settlementEntries,
+      settlementPreviewFen,
+      settlementCoveredBy: settlementCoveredBy ? {
+        id: settlementCoveredBy.id,
+        settlementMonth: settlementCoveredBy.settlementMonth,
+        status: settlementCoveredBy.status,
+        totalFen: settlementCoveredBy.totalFen,
+      } : null,
+      settlementEntries,
       revenueAcceleration: {
         unlockOrderCount: resolved.rules.revenueAcceleration.unlockOrderCount,
         currentOrderCount: orderCount,
@@ -1029,6 +1070,9 @@ export class RegionalCommissionService {
     requireRole(actor, "hr", "admin");
     const summary = await this.summary(actor, managerId, month);
     if (!summary.templateVersionId) throw new Error("请先为大区经理分配已发布的提成模板");
+    if (summary.settlementCoveredBy) {
+      throw new Error(`${month} 已包含在 ${summary.settlementCoveredBy.settlementMonth} ${summary.settlementCoveredBy.status === "paid" ? "已发放" : "已确认"}的累计结算中，不能重复生成结算单`);
+    }
     const existing = (await this.client.db.select().from(regionalCommissionStatements).where(and(eq(regionalCommissionStatements.regionalManagerId, managerId), eq(regionalCommissionStatements.settlementMonth, month))))[0];
     if (existing && existing.status !== "draft") throw new Error("已确认的提成单不能重算");
     const entries = summary.settlementEntries
@@ -1067,6 +1111,9 @@ export class RegionalCommissionService {
       )))[0];
       if (!current) throw new Error("只有草稿提成单可以确认");
       const latest = await this.summary(actor, current.regionalManagerId, current.settlementMonth);
+      if (latest.settlementCoveredBy) {
+        throw new Error(`${current.settlementMonth} 已包含在 ${latest.settlementCoveredBy.settlementMonth} ${latest.settlementCoveredBy.status === "paid" ? "已发放" : "已确认"}的累计结算中，不能再确认`);
+      }
       if (latest.settlementPreviewFen !== current.totalFen) {
         throw new Error("草稿金额已与当前数据不一致，请先更新草稿再确认");
       }

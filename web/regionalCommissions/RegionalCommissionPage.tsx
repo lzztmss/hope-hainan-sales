@@ -11,10 +11,16 @@ import type {
   RegionalVerificationStatus,
 } from "../api/client";
 import { PageLayout } from "../components/layout";
+import { RegionalActionErrorDialog } from "./RegionalActionErrorDialog";
 import { RegionalTemplateEditor } from "./RegionalTemplateEditor";
 import "./regionalCommission.css";
 
 const yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
+const currentShanghaiMonth = () => new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Shanghai",
+  year: "numeric",
+  month: "2-digit",
+}).format(new Date());
 const dateTime = (value: string | null) => value
   ? new Intl.DateTimeFormat("zh-CN", {
       timeZone: "Asia/Shanghai",
@@ -62,14 +68,20 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
   const [managers, setManagers] = useState<readonly RegionalManagerOption[]>([]);
   const [managerId, setManagerId] = useState(actor.role === "regional_manager" ? actor.id : "");
   const [summary, setSummary] = useState<RegionalCommissionSummary | null>(null);
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(currentShanghaiMonth);
   const [message, setMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [statements, setStatements] = useState<readonly RegionalStatementDto[]>([]);
   const [receiptForm, setReceiptForm] = useState({ amountYuan: "", evidenceNo: "", note: "" });
   const [receiptReviewReason, setReceiptReviewReason] = useState("");
   const [cooperationForm, setCooperationForm] = useState({ stageCode: "PROJECT", achievedOn: "", evidenceNo: "", note: "" });
   const [cooperationReasons, setCooperationReasons] = useState<Record<string, string>>({});
   const [pendingStatementAction, setPendingStatementAction] = useState<string | null>(null);
+  const showError = (value: unknown, fallback = "操作失败") => {
+    const errorMessage = value instanceof Error ? value.message : typeof value === "string" ? value : fallback;
+    setMessage(errorMessage);
+    setActionError(errorMessage);
+  };
 
   const load = useCallback(async () => {
     if (!managerId) {
@@ -97,12 +109,12 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
     void client.listRegionalManagers().then((loaded) => {
       setManagers(loaded);
       setManagerId((current) => current || loaded.find((manager) => manager.active)?.id || loaded[0]?.id || "");
-    }).catch(() => setMessage("大区经理列表加载失败"));
+    }).catch((error) => showError(error, "大区经理列表加载失败"));
   }, [actor.role, client]);
 
   useEffect(() => {
     setMessage(null);
-    void load().catch((error) => setMessage(error instanceof Error ? error.message : "加载失败"));
+    void load().catch((error) => showError(error, "加载失败"));
   }, [load]);
 
   const canEdit = actor.role === "hr" || actor.role === "admin";
@@ -120,6 +132,10 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
     && summary
     && currentStatement.totalFen !== summary.settlementPreviewFen,
   );
+  const settlementCoveredBy = summary?.settlementCoveredBy ?? null;
+  const settlementCoveredReason = settlementCoveredBy
+    ? `${month} 已包含在 ${settlementCoveredBy.settlementMonth} ${settlementCoveredBy.status === "paid" ? "已发放" : "已确认"}的累计结算中，该月份不能再重复生成或确认结算单。`
+    : null;
   const targetPlanEnded = Boolean(
     summary?.targetPlanEndsOn && summary.targetPlanEndsOn < summary.statisticsEndsOn,
   );
@@ -130,7 +146,7 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
       await load();
       setMessage(success);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "操作失败");
+      showError(error);
     }
   };
 
@@ -152,7 +168,7 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
       }
       setMessage(success);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "操作失败");
+      showError(error);
     } finally {
       setPendingStatementAction(null);
     }
@@ -161,11 +177,11 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
   const saveReceipt = () => {
     const amount = Number(receiptForm.amountYuan);
     if (!Number.isFinite(amount)) {
-      setMessage("净回款金额必须是有效数字；跨月退款可以填写负数");
+      showError("净回款金额必须是有效数字；跨月退款可以填写负数");
       return;
     }
     if (!receiptForm.evidenceNo.trim()) {
-      setMessage("请填写可追溯的凭据或文件编号");
+      showError("请填写可追溯的凭据或文件编号");
       return;
     }
     void run(
@@ -184,7 +200,7 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
     if (!summary?.receipt) return;
     const reason = receiptReviewReason.trim();
     if (!approved && !reason) {
-      setMessage("退回更正时必须填写原因");
+      showError("退回更正时必须填写原因");
       return;
     }
     const success = approved ? "净回款已核验" : "净回款已退回更正";
@@ -196,11 +212,11 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
 
   const submitCooperation = () => {
     if (!cooperationForm.achievedOn) {
-      setMessage("请选择合作阶段达成日期");
+      showError("请选择合作阶段达成日期");
       return;
     }
     if (!cooperationForm.evidenceNo.trim()) {
-      setMessage("请填写可追溯的凭据或文件编号");
+      showError("请填写可追溯的凭据或文件编号");
       return;
     }
     void run(
@@ -217,7 +233,7 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
   const transitionCooperation = (id: string, action: "verify" | "confirm" | "revoke") => {
     const reason = cooperationReasons[id]?.trim();
     if (action === "revoke" && !reason) {
-      setMessage("撤销合作奖必须填写原因");
+      showError("撤销合作奖必须填写原因");
       return;
     }
     const success = action === "verify" ? "合作阶段已通过财务核验" : action === "confirm" ? "合作阶段奖励已确认" : "合作阶段已撤销";
@@ -231,6 +247,7 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
     description="按签收满 7 天的有效订单和已核验业务数据计算。"
     actions={(canEdit || actor.role === "regional_manager") ? <Link className="regional-primary-action" to="/commissions/regional/personal-orders">{canEdit ? "管理个人渠道订单" : "查看个人渠道订单"}</Link> : undefined}
   >
+    <RegionalActionErrorDialog message={actionError} onClose={() => setActionError(null)} />
     {actor.role !== "regional_manager" ? <label className="regional-manager-select">
       <span>大区经理</span>
       <select value={managerId} onChange={(event) => setManagerId(event.currentTarget.value)}>
@@ -242,12 +259,20 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
     <div className="regional-toolbar">
       <label>
         <span>提成数据统计截止月份</span>
-        <input aria-describedby="regional-month-help" min={summary?.employmentStartDate?.slice(0, 7)} type="month" value={month} onChange={(event) => setMonth(event.currentTarget.value)} />
+        <input aria-describedby="regional-month-help" max={currentShanghaiMonth()} min={summary?.employmentStartDate?.slice(0, 7)} type="month" value={month} onChange={(event) => {
+          const nextMonth = event.currentTarget.value;
+          if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(nextMonth)) return;
+          if (nextMonth > currentShanghaiMonth()) {
+            showError("统计截止月份不能晚于当前月份，未来月份不能提前生成结算单。");
+            return;
+          }
+          setMonth(nextMonth);
+        }} />
         <small id="regional-month-help">{summary?.statisticsStartsOn
           ? `当前月份从匹配版本的统计起点 ${summary.statisticsStartsOn} 累计至 ${summary.statisticsEndsOn}；原始订单不会被删除。`
           : "按所选月份最后一天统计，不会修改已确认的提成单。"}</small>
       </label>
-      <button type="button" onClick={() => void load().catch((error) => setMessage(error instanceof Error ? error.message : "加载失败"))}>重新加载本月数据</button>
+      <button type="button" onClick={() => void load().catch((error) => showError(error, "加载失败"))}>重新加载本月数据</button>
     </div>
 
     {message ? <div className="system-notice" role="status">{message}</div> : null}
@@ -255,7 +280,7 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
     {actor.role === "admin" && !summary ? <nav className="ops-tabs regional-workspaces" aria-label="提成业务区域">
       <button type="button" aria-pressed={workspace === "templates"} onClick={() => setWorkspace("templates")}>提成模板</button>
     </nav> : null}
-    {actor.role === "admin" && !summary && workspace === "templates" ? <section className="regional-section regional-section--wide"><RegionalTemplateEditor assignedTemplateVersionId={null} client={client} managerId={managerId} onAssignmentChange={load} onMessage={setMessage} /></section> : null}
+    {actor.role === "admin" && !summary && workspace === "templates" ? <section className="regional-section regional-section--wide"><RegionalTemplateEditor assignedTemplateVersionId={null} client={client} managerId={managerId} onAssignmentChange={load} onError={showError} onMessage={setMessage} /></section> : null}
 
     {summary ? <>
       <nav className="ops-tabs regional-workspaces" aria-label="提成业务区域">
@@ -307,7 +332,7 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
           <label><span>本月不含税净回款（元）</span><input type="number" step="0.01" disabled={summary.receipt?.verificationStatus === "verified"} value={receiptForm.amountYuan} onChange={(event) => { const amountYuan = event.currentTarget.value; setReceiptForm((value) => ({ ...value, amountYuan })); }} /></label>
           <label><span>凭据/文件编号</span><input disabled={summary.receipt?.verificationStatus === "verified"} value={receiptForm.evidenceNo} onChange={(event) => { const evidenceNo = event.currentTarget.value; setReceiptForm((value) => ({ ...value, evidenceNo })); }} /></label>
           <label><span>备注（选填）</span><input disabled={summary.receipt?.verificationStatus === "verified"} value={receiptForm.note} onChange={(event) => { const note = event.currentTarget.value; setReceiptForm((value) => ({ ...value, note })); }} /></label>
-          <button type="button" disabled={summary.receipt?.verificationStatus === "verified"} onClick={saveReceipt}>{summary.receipt ? "保存更正" : "保存回款"}</button>
+          <button type="button" onClick={() => summary.receipt?.verificationStatus === "verified" ? showError("本月净回款已通过财务核验。如需修改，请先执行“退回更正”。") : saveReceipt()}>{summary.receipt ? "保存更正" : "保存回款"}</button>
         </div>
         {summary.receipt ? <div className="regional-record-details">
           <strong>当前记录</strong>
@@ -367,9 +392,9 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
         </div>
         <div className="regional-settlement-preview" aria-label="本月结算试算">
           <div className="regional-settlement-preview__total">
-            <span>{currentStatement && currentStatement.status !== "draft" ? "本月已锁定结算金额" : "按当前数据试算，本月待结算"}</span>
+            <span>{settlementCoveredBy ? "所选月份已被后续累计结算覆盖" : currentStatement && currentStatement.status !== "draft" ? "本月已锁定结算金额" : "按当前数据试算，本月待结算"}</span>
             <strong>{yuan(currentStatement && currentStatement.status !== "draft" ? currentStatement.totalFen : summary.settlementPreviewFen)}</strong>
-            <small>统计截止 {month} 月末</small>
+            <small>{settlementCoveredBy ? `已由 ${settlementCoveredBy.settlementMonth} 结算单包含` : `统计截止 ${month} 月末`}</small>
           </div>
           <div className="regional-settlement-preview__source">
             <strong>所选月份匹配的规则版本</strong>
@@ -385,7 +410,8 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
             <li>“本月应结算”是截止本月累计结果减去以前月份已结算金额；生成草稿时会保存这份计算快照。</li>
           </ul>
         </div>
-        <div className="regional-table-wrap regional-settlement-breakdown"><table><thead><tr><th>提成组成</th><th>当前统计结果</th><th>以前月份已结算</th><th>本月应结算</th></tr></thead><tbody>
+        {settlementCoveredReason ? <div className="system-notice">{settlementCoveredReason}</div> : null}
+        <div className="regional-table-wrap regional-settlement-breakdown"><table><thead><tr><th>提成组成</th><th>当前统计结果</th><th>{settlementCoveredBy ? "已结算/已覆盖" : "以前月份已结算"}</th><th>{settlementCoveredBy ? "本月可结算" : "本月应结算"}</th></tr></thead><tbody>
           {summary.settlementEntries.map((entry) => <tr key={entry.category}>
             <td>{settlementCategoryLabel[entry.category] ?? entry.category}</td>
             <td>{yuan(entry.accruedFen)}</td>
@@ -399,7 +425,7 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
             <td>{yuan(summary.settlementPreviewFen)}</td>
             <td><span className="regional-status">未生成</span></td>
             <td>—</td>
-            <td>{canEdit ? <button disabled={pendingStatementAction !== null} type="button" onClick={() => void runStatementAction(`calculate:${month}`, () => client.calculateRegionalStatement(managerId, month), `${month} 结算草稿已生成`)}>{pendingStatementAction === `calculate:${month}` ? "生成中…" : `生成${month.slice(5)}月结算单`}</button> : null}</td>
+            <td>{canEdit ? <button disabled={pendingStatementAction !== null} type="button" onClick={() => settlementCoveredReason ? showError(settlementCoveredReason) : void runStatementAction(`calculate:${month}`, () => client.calculateRegionalStatement(managerId, month), `${month} 结算草稿已生成`)}>{pendingStatementAction === `calculate:${month}` ? "生成中…" : settlementCoveredBy ? `已由${settlementCoveredBy.settlementMonth.slice(5)}月结算覆盖` : `生成${month.slice(5)}月结算单`}</button> : null}</td>
           </tr> : null}
           {visibleStatements.map((statement) => {
             const stale = statement.id === currentStatement?.id && draftIsStale;
@@ -409,8 +435,8 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
               <td><span className={`regional-status regional-status--${statement.status}`}>{stale ? "草稿待更新" : statementStatusLabel[statement.status]}</span></td>
               <td>{statement.status === "paid" ? `发放 ${dateTime(statement.paidAt)}` : statement.status === "confirmed" ? `确认 ${dateTime(statement.confirmedAt)}` : "—"}</td>
               <td><div className="regional-row-actions">
-                {canEdit && statement.status === "draft" ? <button disabled={pendingStatementAction !== null} type="button" onClick={() => void runStatementAction(`calculate:${statement.id}`, () => client.calculateRegionalStatement(managerId, statement.settlementMonth), `${statement.settlementMonth} 结算草稿已更新`)}>{pendingStatementAction === `calculate:${statement.id}` ? "更新中…" : "更新草稿"}</button> : null}
-                {actor.role === "admin" && statement.status === "draft" ? <button disabled={stale || pendingStatementAction !== null} title={stale ? "请先按当前数据更新草稿" : undefined} type="button" onClick={() => void runStatementAction(`confirm:${statement.id}`, () => client.transitionRegionalStatement(statement.id, "confirm"), "月度结算单已确认并锁定")}>{pendingStatementAction === `confirm:${statement.id}` ? "确认中…" : "确认金额并锁定"}</button> : null}
+                {canEdit && statement.status === "draft" ? <button disabled={pendingStatementAction !== null} type="button" onClick={() => settlementCoveredReason ? showError(settlementCoveredReason) : void runStatementAction(`calculate:${statement.id}`, () => client.calculateRegionalStatement(managerId, statement.settlementMonth), `${statement.settlementMonth} 结算草稿已更新`)}>{pendingStatementAction === `calculate:${statement.id}` ? "更新中…" : "更新草稿"}</button> : null}
+                {actor.role === "admin" && statement.status === "draft" ? <button aria-disabled={Boolean(settlementCoveredBy) || stale || pendingStatementAction !== null} disabled={pendingStatementAction !== null} title={settlementCoveredReason ?? (stale ? "请先按当前数据更新草稿" : undefined)} type="button" onClick={() => settlementCoveredReason ? showError(settlementCoveredReason) : stale ? showError("草稿金额已与当前数据不一致，请先点击“更新草稿”，再确认金额。") : void runStatementAction(`confirm:${statement.id}`, () => client.transitionRegionalStatement(statement.id, "confirm"), "月度结算单已确认并锁定")}>{pendingStatementAction === `confirm:${statement.id}` ? "确认中…" : "确认金额并锁定"}</button> : null}
                 {(actor.role === "admin" || actor.role === "finance") && statement.status === "confirmed" ? <button disabled={pendingStatementAction !== null} type="button" onClick={() => void runStatementAction(`pay:${statement.id}`, () => client.transitionRegionalStatement(statement.id, "pay"), "月度结算单已标记发放")}>{pendingStatementAction === `pay:${statement.id}` ? "发放中…" : "确认已发放"}</button> : null}
               </div></td>
             </tr>;
@@ -419,7 +445,7 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
         {visibleStatements.length === 0 && currentStatement ? <p className="regional-empty">当前还没有更早月份的结算记录。</p> : null}
       </section>
 
-      {actor.role === "admin" ? <section className="regional-section regional-section--wide" hidden={workspace !== "templates"}><RegionalTemplateEditor assignedTemplateVersionId={summary.templateVersionId} client={client} employmentStartDate={summary.employmentStartDate} managerId={managerId} onAssignmentChange={load} onMessage={setMessage} /></section> : null}
+      {actor.role === "admin" ? <section className="regional-section regional-section--wide" hidden={workspace !== "templates"}><RegionalTemplateEditor assignedTemplateVersionId={summary.templateVersionId} client={client} employmentStartDate={summary.employmentStartDate} managerId={managerId} onAssignmentChange={load} onError={showError} onMessage={setMessage} /></section> : null}
     </> : <div className="system-notice">{managerId ? "正在加载大区提成…" : "请选择大区经理"}</div>}
   </PageLayout>;
 };

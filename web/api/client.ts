@@ -113,6 +113,7 @@ export interface RegionalCommissionSummary {
   orderCount: number; managedOrderCount: number; personalOrderCount: number;
   completionFen: number; tieredOrderFen: number; milestoneFen: number; topUpFen: number; revenueAccelerationFen: number; personalProductFen: number; cooperationFen: number; directReturnFen: number; totalFen: number;
   settlementPreviewFen: number;
+  settlementCoveredBy?: { id: string; settlementMonth: string; status: "confirmed" | "paid"; totalFen: number } | null;
   settlementEntries: readonly { category: string; accruedFen: number; previouslySettledFen: number; payableFen: number }[];
   periods: readonly { sequence: number; startsOn: string; endsOn: string; targetOrderCount: number; orderCount: number; cumulativeOrderCount: number; rewardFen: number }[];
   receipt: RegionalReceiptDto | null;

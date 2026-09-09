@@ -8,6 +8,7 @@ import type {
   RegionalPersonalOrderDto,
 } from "../api/client";
 import { PageLayout } from "../components/layout";
+import { RegionalActionErrorDialog } from "./RegionalActionErrorDialog";
 import "./regionalCommission.css";
 
 const PRODUCTS = [
@@ -55,9 +56,15 @@ export const RegionalPersonalOrderPage = ({
   const [lines, setLines] = useState<ProductLineForm[]>([{ key: 1, sku: "GATEWAY", quantity: "1" }]);
   const [nextLineKey, setNextLineKey] = useState(2);
   const [message, setMessage] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [voidReasons, setVoidReasons] = useState<Record<string, string>>({});
   const [returnForms, setReturnForms] = useState<Record<string, ReturnForm>>({});
+  const showError = (value: unknown, fallback: string) => {
+    const errorMessage = value instanceof Error ? value.message : typeof value === "string" ? value : fallback;
+    setMessage(errorMessage);
+    setActionError(errorMessage);
+  };
 
   const loadOrders = useCallback(async () => {
     if (!managerId) {
@@ -74,11 +81,11 @@ export const RegionalPersonalOrderPage = ({
       if (actor.role !== "regional_manager") {
         setManagerId((current) => current || loaded.find((manager) => manager.active)?.id || loaded[0]?.id || "");
       }
-    }).catch((error) => setMessage(error instanceof Error ? error.message : "大区经理加载失败，请刷新重试"));
+    }).catch((error) => showError(error, "大区经理加载失败，请刷新重试"));
   }, [actor.role, client]);
 
   useEffect(() => {
-    void loadOrders().catch((error) => setMessage(error instanceof Error ? error.message : "个人渠道订单加载失败"));
+    void loadOrders().catch((error) => showError(error, "个人渠道订单加载失败"));
   }, [loadOrders]);
 
   const update = (key: keyof typeof form, value: string) => {
@@ -88,7 +95,7 @@ export const RegionalPersonalOrderPage = ({
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!managerId) {
-      setMessage("请选择大区经理");
+      showError("请选择大区经理", "请选择大区经理");
       return;
     }
     const productLines = lines.map((line) => ({
@@ -97,7 +104,7 @@ export const RegionalPersonalOrderPage = ({
       quantity: Number(line.quantity),
     }));
     if (productLines.some((line) => !Number.isSafeInteger(line.quantity) || line.quantity <= 0)) {
-      setMessage("每个商品数量必须是大于 0 的整数");
+      showError("每个商品数量必须是大于 0 的整数", "商品数量不正确");
       return;
     }
     setMessage(null);
@@ -120,7 +127,7 @@ export const RegionalPersonalOrderPage = ({
       await loadOrders();
       setMessage("个人渠道订单及逐件提成快照已保存。");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "订单保存失败，请检查后重试");
+      showError(error, "订单保存失败，请检查后重试");
     } finally {
       setBusy(false);
     }
@@ -129,7 +136,7 @@ export const RegionalPersonalOrderPage = ({
   const voidOrder = async (order: RegionalPersonalOrderDto) => {
     const reason = voidReasons[order.id]?.trim();
     if (!reason) {
-      setMessage("作废订单必须填写原因");
+      showError("作废订单必须填写原因", "作废失败");
       return;
     }
     setBusy(true);
@@ -138,7 +145,7 @@ export const RegionalPersonalOrderPage = ({
       await loadOrders();
       setMessage(`订单 ${order.orderNo} 已作废，原记录和原因已保留。`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "作废失败");
+      showError(error, "作废失败");
     } finally {
       setBusy(false);
     }
@@ -159,7 +166,7 @@ export const RegionalPersonalOrderPage = ({
   const returnOrder = async (order: RegionalPersonalOrderDto) => {
     const current = returnFormFor(order);
     if (!current.completedOn || !current.reason.trim()) {
-      setMessage("登记退货必须填写完成日期和原因");
+      showError("登记退货必须填写完成日期和原因", "退货登记失败");
       return;
     }
     const returnedLines = order.lines.map((line) => ({
@@ -170,7 +177,7 @@ export const RegionalPersonalOrderPage = ({
       !Number.isSafeInteger(line.returnedQuantity)
       || line.returnedQuantity < 0
       || line.returnedQuantity > order.lines[index]!.quantity)) {
-      setMessage("退货数量必须在 0 和原商品数量之间");
+      showError("退货数量必须在 0 和原商品数量之间", "退货数量不正确");
       return;
     }
     setBusy(true);
@@ -183,7 +190,7 @@ export const RegionalPersonalOrderPage = ({
       await loadOrders();
       setMessage(`订单 ${order.orderNo} 的退货已登记，将按退货完成月份进入调整。`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "退货登记失败");
+      showError(error, "退货登记失败");
     } finally {
       setBusy(false);
     }
@@ -195,6 +202,7 @@ export const RegionalPersonalOrderPage = ({
     eyebrow="大区经理提成"
     title={canEdit ? "个人渠道订单管理" : "我的个人渠道订单"}
   >
+    <RegionalActionErrorDialog message={actionError} onClose={() => setActionError(null)} />
     {message ? <div className="regional-notice" role="status">{message}</div> : null}
 
     {actor.role !== "regional_manager" ? <label className="regional-manager-select">
@@ -230,7 +238,7 @@ export const RegionalPersonalOrderPage = ({
           {lines.map((line, index) => <div className="regional-order-line" key={line.key}>
             <label className="regional-field"><span>商品 {index + 1}</span><select value={line.sku} onChange={(event) => setLines((current) => current.map((item) => item.key === line.key ? { ...item, sku: event.currentTarget.value as ProductSku } : item))}>{PRODUCTS.map(([sku, label]) => <option key={sku} value={sku}>{label}</option>)}</select></label>
             <label className="regional-field"><span>数量</span><input min="1" required step="1" type="number" value={line.quantity} onChange={(event) => setLines((current) => current.map((item) => item.key === line.key ? { ...item, quantity: event.currentTarget.value } : item))} /></label>
-            <button className="regional-danger-action" disabled={lines.length === 1} type="button" onClick={() => setLines((current) => current.filter((item) => item.key !== line.key))}>删除本行</button>
+            <button className="regional-danger-action" aria-disabled={lines.length === 1} type="button" onClick={() => lines.length === 1 ? showError("至少需要保留一行商品明细。", "不能删除最后一行") : setLines((current) => current.filter((item) => item.key !== line.key))}>删除本行</button>
           </div>)}
         </div>
       </section>
