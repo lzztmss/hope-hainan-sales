@@ -21,10 +21,6 @@ type RuleRow = typeof commissionRules.$inferSelect;
 
 const POLICY_CODE = "HAINAN_FTTR_HEARTLINK";
 const PACKAGE_SKUS = new Set([
-  "FULL_FAMILY",
-  "WATCH_MATTRESS",
-  "WATCH_STANDARD",
-  "MATTRESS_STANDARD",
   "STANDARD_BUNDLE",
   "ONE_KEY",
   "HOME_DUAL",

@@ -1,0 +1,359 @@
+.commission-route-state,
+.commission-order-empty {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--muted-foreground);
+}
+
+.commission-route-state button {
+  min-height: 44px;
+  padding-inline: 16px;
+}
+
+.my-commission-page {
+  color: var(--color-text, var(--foreground));
+  display: grid;
+  gap: 20px;
+  width: 100%;
+  padding: 0;
+}
+
+.my-commission-page h1,
+.my-commission-page h2,
+.my-commission-page h3,
+.my-commission-page p {
+  margin: 0;
+}
+
+.my-commission-page__header p {
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.my-commission-page__header h1 {
+  font-size: 25px;
+  margin-top: 4px;
+}
+
+.my-commission-page__header span,
+.commission-order-section__heading p {
+  color: var(--muted-foreground);
+  display: block;
+  line-height: 1.6;
+  margin-top: 6px;
+}
+
+.commission-summary-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.commission-summary-note {
+  padding: 12px 16px;
+  border-left: 4px solid var(--primary);
+  border-radius: 8px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.commission-summary-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  padding: 16px;
+  position: relative;
+}
+
+.commission-summary-card span {
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.commission-summary-card strong {
+  font-size: 25px;
+  font-variant-numeric: tabular-nums;
+}
+
+.commission-summary-card__deduction {
+  color: #b42318;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.3;
+  position: absolute;
+  right: 14px;
+  top: 14px;
+}
+
+.commission-summary-card.is-primary {
+  background: var(--card);
+  border-color: var(--border);
+  color: var(--foreground);
+}
+
+.commission-summary-card.is-primary span {
+  color: var(--muted-foreground);
+}
+
+.commission-summary-card.is-warning {
+  background: #fffbef;
+  border-color: #f1d994;
+}
+
+.commission-summary-card.is-success {
+  background: #effaf4;
+  border-color: #bfe4cf;
+}
+
+.commission-unconfigured {
+  align-items: flex-start;
+  background: #fff7e6;
+  border: 1px solid #f2d495;
+  border-radius: 8px;
+  color: #714c0c;
+  display: flex;
+  gap: 12px;
+  line-height: 1.55;
+  padding: 13px 16px;
+}
+
+.commission-order-section {
+  display: grid;
+  gap: 14px;
+}
+
+.commission-order-list {
+  display: grid;
+  gap: 12px;
+}
+
+.commission-order-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--primary);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.commission-order-card.is-reversed {
+  border-left-color: #c24136;
+}
+
+.commission-order-card.is-exception {
+  border-left-color: #d97706;
+}
+
+.commission-order-card > header {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 16px;
+}
+
+.commission-order-card > header span,
+.commission-order-card time {
+  color: var(--muted-foreground);
+  display: block;
+  font-size: 13px;
+}
+
+.commission-order-card h3 {
+  font-size: 17px;
+  margin: 5px 0;
+}
+
+.commission-order-card__amount {
+  text-align: right;
+}
+
+.commission-order-card__amount strong {
+  display: block;
+  font-size: 24px;
+  margin-top: 5px;
+}
+
+.commission-order-card.is-reversed .commission-order-card__amount strong {
+  color: #b42318;
+}
+
+.commission-order-card.is-exception .commission-order-card__amount span,
+.commission-order-card.is-exception .commission-order-card__amount strong {
+  color: #9a5b08;
+}
+
+.commission-order-card__exception {
+  color: #714c0c;
+  margin: 0;
+  padding: 12px 0;
+}
+
+.commission-order-card__breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 0 16px 16px;
+}
+
+.commission-order-card__breakdown > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  background: var(--muted);
+}
+
+.commission-order-card__breakdown > div:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+.commission-order-card__breakdown > div:last-child {
+  border-radius: 0 8px 8px 0;
+}
+
+.commission-order-card__breakdown dt {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.commission-order-card__breakdown dd {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.commission-order-card__breakdown .has-deduction dd {
+  color: #b42318;
+}
+
+.commission-order-card__lines {
+  background: var(--muted);
+  border-top: 1px solid #e7ebf1;
+  display: grid;
+  padding: 4px 16px;
+}
+
+.commission-order-line-group {
+  display: grid;
+}
+
+.commission-order-line-group + .commission-order-line-group {
+  border-top: 1px solid var(--border);
+}
+
+.commission-order-line-group h4 {
+  margin: 0;
+  padding: 10px 0 4px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.commission-order-line-group.is-deduction h4,
+.commission-order-line-group.is-deduction .commission-order-line > strong {
+  color: #b42318;
+}
+
+.commission-order-line {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  min-height: 44px;
+}
+
+.commission-order-line > span:first-child {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.commission-order-line > span:first-child strong {
+  overflow-wrap: anywhere;
+}
+
+.commission-order-line > span:first-child small {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #e8f1fa;
+  color: var(--primary);
+  font-size: 11px;
+}
+
+.commission-order-line-group.is-deduction .commission-order-line > span:first-child small {
+  background: #fcebea;
+  color: #9f2d24;
+}
+
+.commission-order-line > span:nth-child(2) {
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+@media (max-width: 850px) {
+  .commission-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .commission-summary-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .commission-summary-card {
+    padding: 14px 12px;
+  }
+
+  .commission-unconfigured,
+  .commission-order-card > header {
+    flex-direction: column;
+  }
+
+  .commission-order-card__amount {
+    text-align: left;
+  }
+
+  .commission-order-card__breakdown {
+    grid-template-columns: 1fr;
+  }
+
+  .commission-order-card__breakdown > div:first-child,
+  .commission-order-card__breakdown > div:last-child {
+    border-radius: 0;
+  }
+
+  .commission-order-card__breakdown > div:first-child {
+    border-radius: 8px 8px 0 0;
+  }
+
+  .commission-order-card__breakdown > div:last-child {
+    border-radius: 0 0 8px 8px;
+  }
+
+  .commission-order-line {
+    align-items: start;
+    gap: 4px;
+    grid-template-columns: 1fr auto;
+    padding: 9px 0;
+  }
+
+  .commission-order-line > span:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

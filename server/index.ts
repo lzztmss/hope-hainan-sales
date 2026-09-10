@@ -24,6 +24,7 @@ import { createPiiProtector } from "./security/pii.js";
 import { DrizzleCustomerRepository } from "./customers/customerRepository.js";
 import { createCustomerService } from "./customers/customerService.js";
 import { ACTIVE_CATALOG } from "../shared/pricing/catalog.js";
+import { RegionalCommissionService } from "./regionalCommissions/regionalCommissionService.js";
 
 const requiredEnvironment = (name: string): string => {
   const value = process.env[name]?.trim();
@@ -100,6 +101,7 @@ const app = buildApp({
   adminService,
   salesReportService,
   customerService,
+  regionalCommissionService: new RegionalCommissionService(databaseClient),
   appOrigin: requiredEnvironment("APP_ORIGIN"),
   secureCookies: process.env.NODE_ENV === "production",
   onClose: () => databaseClient.close(),

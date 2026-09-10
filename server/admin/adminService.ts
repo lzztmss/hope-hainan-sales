@@ -9,8 +9,10 @@ import {
   normalizeMainlandPhone,
   type PiiProtector,
 } from "../security/pii.js";
+import { buildPresetHalfYearPlan } from "./regionalCommissionTargetPlan.js";
 
 export type PersonnelType = "unicom" | "auxiliary" | "admin";
+
 
 export interface AdminStoreRecord {
   id: string;
@@ -140,6 +142,7 @@ export interface AdminUserPatch {
   updatedAt: Date;
 }
 
+
 export interface AdminAuditInput {
   actorUserId: string;
   storeId: string | null;
@@ -169,6 +172,12 @@ export interface AdminRepository {
   listUsers(filters: AdminUserFilters): Promise<{ items: readonly AdminUserRecord[]; total: number; activeTotal: number; mustChangePasswordTotal: number }>;
   findUserForUpdate(id: string): Promise<AdminUserRecord | null>;
   createUser(input: AdminUserWrite): Promise<AdminUserRecord>;
+  createRegionalTargetPlanDraft(input: {
+    regionalManagerId: string;
+    setBy: string;
+    changeReason: string;
+    plan: ReturnType<typeof buildPresetHalfYearPlan>;
+  }): Promise<void>;
   updateUser(id: string, patch: AdminUserPatch): Promise<AdminUserRecord | null>;
   replaceRegionalManagerStores(userId: string, storeIds: readonly string[], at: Date): Promise<void>;
   listActiveAdminsForUpdate(): Promise<readonly string[]>;
@@ -701,6 +710,9 @@ export const createAdminService = (options: AdminServiceOptions) => {
               if (!managedStore?.active) throw new AdminServiceError("大区经理只能管理启用的营业厅", 400);
             }
             await repository.replaceRegionalManagerStores(created.id, managedStoreIds, at);
+            if (!created.employmentStartDate) {
+              throw new AdminServiceError("大区经理必须填写入职日期", 400);
+            }
           }
           const completeCreated = await repository.findUserForUpdate(created.id);
           if (!completeCreated) throw new AdminServiceError("账号创建后读取失败", 500);

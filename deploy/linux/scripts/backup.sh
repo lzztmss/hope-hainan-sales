@@ -2,8 +2,8 @@
 
 set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=common-v2.sh
-source "${SCRIPT_DIR}/common-v2.sh"
+# shellcheck source=common.sh
+source "${SCRIPT_DIR}/common.sh"
 
 ENV_FILE="${DEFAULT_ENV_FILE}"
 if [[ "${1:-}" == "--env-file" ]]; then

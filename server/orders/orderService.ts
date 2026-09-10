@@ -79,6 +79,12 @@ export interface OrderLineRecord extends SourceOrderLine {
   lineSnapshot: Record<string, unknown>;
 }
 
+export interface OrderLifecycleEventRecord {
+  action: string;
+  actorName: string;
+  at: Date;
+}
+
 export interface OrderWriteRecord {
   orderNo: string;
   idempotencyKey: string;
@@ -117,7 +123,6 @@ export interface OrderRecord extends OrderWriteRecord {
   reconciledBy: string | null;
   paidAt: Date | null;
   paidBy: string | null;
-  completedAt: Date | null;
   cancelledAt: Date | null;
   deletedAt: Date | null;
   version: number;
@@ -130,6 +135,7 @@ export interface OrderRecord extends OrderWriteRecord {
   commissionNetFen?: number;
   commissionPaidFen?: number;
   commissionReversedFen?: number;
+  lifecycleEvents?: OrderLifecycleEventRecord[];
 }
 
 export interface OrderListFilters {
@@ -290,6 +296,21 @@ const isUniqueViolation = (error: unknown): boolean =>
   "code" in error &&
   (error.code === "23505" || String(error.code).startsWith("SQLITE_CONSTRAINT"));
 
+const shanghaiCalendarDay = (value: Date): number => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((entry) => entry.type === type)?.value ?? "";
+  return Date.parse(`${part("year")}-${part("month")}-${part("day")}T00:00:00Z`);
+};
+
+const hasElapsedShanghaiDays = (from: Date, to: Date, days: number): boolean =>
+  shanghaiCalendarDay(to) - shanghaiCalendarDay(from) >= days * 86_400_000;
+
 const presentOrder = (
   order: OrderRecord,
   decryptPii?: (value: string) => string,
@@ -346,7 +367,7 @@ const presentOrder = (
     reconciledBy: order.reconciledBy,
     paidAt: order.paidAt,
     paidBy: order.paidBy,
-    completedAt: order.completedAt,
+    lifecycleEvents: order.lifecycleEvents ?? [],
     cancelledAt: order.cancelledAt,
     deletedAt: order.deletedAt,
     version: order.version,
@@ -593,6 +614,7 @@ export const createOrderService = (options: OrderServiceOptions) => {
       orderId: string,
       command: OrderCommand,
       expectedVersion: number,
+      actualSignedAt?: Date,
     ): Promise<OrderRecord> {
       if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
         throw new OrderServiceError("订单版本号无效", 400);
@@ -623,7 +645,19 @@ export const createOrderService = (options: OrderServiceOptions) => {
           400,
         );
       }
-      const changedAt = now();
+      const operationAt = now();
+      const changedAt = command === "SIGN" && actualSignedAt ? actualSignedAt : operationAt;
+      if (command === "SIGN") {
+        if (shanghaiCalendarDay(changedAt) > shanghaiCalendarDay(operationAt)) {
+          throw new OrderServiceError("实际收货日期不能晚于当前日期", 400);
+        }
+        if (order.activatedAt && shanghaiCalendarDay(changedAt) < shanghaiCalendarDay(order.activatedAt)) {
+          throw new OrderServiceError("实际收货日期不能早于订单生效日期", 400);
+        }
+      }
+      if (command === "RECONCILE" && order.signedAt && !hasElapsedShanghaiDays(order.signedAt, operationAt, 7)) {
+        throw new OrderServiceError("订单签收未满 7 天，暂不能转为待结算", 400);
+      }
       if (nextStatus === "activated") {
         try {
           await options.commissionAccrual.validateActivation(order.id, changedAt);
@@ -687,6 +721,9 @@ export const createOrderService = (options: OrderServiceOptions) => {
             throw new OrderServiceError(`${order.orderNo} 当前状态不能执行此操作`, 400);
           }
           const changedAt = now();
+          if (command === "RECONCILE" && order.signedAt && !hasElapsedShanghaiDays(order.signedAt, changedAt, 7)) {
+            throw new OrderServiceError(`${order.orderNo} 签收未满 7 天，暂不能转为待结算`, 400);
+          }
           const updated = await repository.transition(order.id, order.version, nextStatus, changedAt, user.id);
           if (!updated) throw new OrderServiceError(`${order.orderNo} 已被更新，请刷新后重试`, 409);
           await repository.writeAudit({

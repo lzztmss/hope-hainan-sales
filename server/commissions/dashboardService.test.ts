@@ -77,6 +77,61 @@ describe("提成按订单资金阶段汇总", () => {
     expect(dashboard.orders.find((order) => order.orderId === "order-PAID")?.statusLabel).toBe("已收款 · 待发放");
   });
 
+  it("签收未满 7 个上海自然日时不计入待结算", async () => {
+    const rows = [ledger("WAITING", 20_000, {
+      orderStatus: "signed",
+      signedAt: new Date("2026-08-20T04:00:00.000Z"),
+    })];
+    const service = createCommissionDashboardService({
+      now: () => new Date("2026-08-26T02:00:00.000Z"),
+      repository: {
+        listLedger: async () => rows,
+        listEstimatedOrders: async () => [],
+        listMissingAccrualOrders: async () => [],
+        findEffectivePolicy: async () => null,
+      },
+    });
+
+    const dashboard = await service.getDashboard(sales, { month: "2026-08" });
+    expect(dashboard.summary.pendingSettlementFen).toBe(0);
+    expect(dashboard.orders[0]?.statusLabel).toBe("已签收 · 观察期还需 1 天");
+  });
+
+  it("部分退单按退回商品展开负数提成明细", async () => {
+    const row: DashboardLedgerRecord = {
+      ...ledger("RETURN", -2_000, { orderStatus: "partially_returned", signedAt: new Date("2026-08-01T02:00:00.000Z") }),
+      entryType: "return_reversal",
+      eventKey: "return:return-1",
+      calculationSnapshot: {
+        calculation: {
+          items: [{ sku: "WATCH", label: "AI 健康智能手表", quantity: 2, ruleId: "rule-1", unitAmountFen: 2_000, subtotalFen: 4_000 }],
+        },
+      },
+      returnItems: [{ id: "return-item-1", sku: "WATCH", label: "AI 健康智能手表", quantity: 1 }],
+    };
+    const service = createCommissionDashboardService({
+      now: () => new Date("2026-08-26T02:00:00.000Z"),
+      repository: {
+        listLedger: async () => [row],
+        listEstimatedOrders: async () => [],
+        listMissingAccrualOrders: async () => [],
+        findEffectivePolicy: async () => null,
+      },
+    });
+
+    const dashboard = await service.getDashboard(sales, { month: "2026-08" });
+    expect(dashboard.orders[0]?.lines).toEqual([
+      expect.objectContaining({
+        label: "AI 健康智能手表（退单扣回）",
+        quantity: 1,
+        subtotalFen: -2_000,
+        entryType: "return_reversal",
+        settlementStatus: "unsettled",
+      }),
+    ]);
+    expect(dashboard.orders[0]?.payoutStatus).toBe("deduction");
+  });
+
   it("单笔订单缺少激活时间时标记异常而不是导致整页失败", async () => {
     const referenceAt = new Date("2026-08-20T02:00:00.000Z");
     const service = createCommissionDashboardService({

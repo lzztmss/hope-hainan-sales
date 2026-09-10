@@ -2,8 +2,8 @@
 
 set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=common-v2.sh
-source "${SCRIPT_DIR}/common-v2.sh"
+# shellcheck source=common.sh
+source "${SCRIPT_DIR}/common.sh"
 
 ENV_FILE="${DEFAULT_ENV_FILE}"
 BACKUP_PATH=""
@@ -48,4 +48,4 @@ set -e
 compose up -d --no-build api web
 ((restore_status == 0)) || die "恢复失败；服务已尝试重新启动"
 local_url="http://127.0.0.1:$(env_value "${ENV_FILE}" HTTP_PORT)"
-bash "${SCRIPT_DIR}/verify-v2.sh" --env-file "${ENV_FILE}" "${local_url}"
+bash "${SCRIPT_DIR}/verify.sh" --env-file "${ENV_FILE}" "${local_url}"

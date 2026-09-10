@@ -1,0 +1,40 @@
+.sales-commission-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: var(--hfttr-space-3);
+  align-items: end;
+}
+
+.sales-commission-filters label {
+  display: grid;
+  min-width: 0;
+  gap: var(--hfttr-space-2);
+}
+
+.sales-commission-filters label > span,
+.sales-commission-actor {
+  color: var(--app-color-text-muted);
+  font-size: var(--hfttr-font-size-sm);
+}
+
+.sales-commission-filters input,
+.sales-commission-filters select,
+.sales-commission-filters button {
+  min-height: 2.75rem;
+  padding-inline: var(--hfttr-space-3);
+  border: var(--app-border-width) solid var(--app-color-border);
+  border-radius: var(--app-radius-control);
+  background: var(--app-color-surface);
+  color: var(--app-color-text);
+}
+
+.sales-commission-actor {
+  margin: 0;
+  text-align: end;
+}
+
+@media (max-width: 48rem) {
+  .sales-commission-filters {
+    grid-template-columns: 1fr;
+  }
+}
