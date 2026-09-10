@@ -28,6 +28,129 @@ afterEach(async () => {
   );
 });
 
+describe("已签收订单趋势数据", () => {
+  it("按上海自然日聚合，忽略未签收、回收站和窗口外的订单", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "hfttr-signed-trend-"));
+    temporaryDirectories.push(directory);
+    const databasePath = join(directory, "app.sqlite");
+    await migrateDatabase(databasePath);
+    const client = createDatabaseClient(databasePath);
+    const storeId = "00000000-0000-4000-8000-000000000601";
+    const sellerId = "00000000-0000-4000-8000-000000000602";
+    const customerId = "00000000-0000-4000-8000-000000000603";
+    const at = new Date("2026-08-01T02:00:00.000Z");
+
+    await client.db.insert(stores).values({ id: storeId, code: "TREND01", name: "趋势测试营业厅" });
+    await client.db.insert(users).values({
+      id: sellerId,
+      workNo: "TREND01",
+      displayName: "趋势销售",
+      role: "sales",
+      personnelType: "unicom",
+      storeId,
+      passwordHash: "test",
+      passwordSalt: "test",
+      mustChangePassword: false,
+      active: true,
+    });
+    await client.db.insert(customers).values({
+      id: customerId,
+      storeId,
+      ownerUserId: sellerId,
+      nameEncrypted: "test",
+      phoneEncrypted: "test",
+      phoneLookupHash: "trend-phone",
+      phoneTail: "8001",
+      elderCount: 1,
+      createdBy: sellerId,
+    });
+
+    const makeOrder = async (
+      suffix: string,
+      status: "signed" | "activated",
+      signedAt: Date | null,
+      deletedAt: Date | null = null,
+    ) => {
+      const quoteId = `00000000-0000-4000-8000-00000000061${suffix}`;
+      const orderId = `00000000-0000-4000-8000-00000000062${suffix}`;
+      await client.db.insert(quotes).values({
+        id: quoteId,
+        quoteNo: `XLX-TREND-${suffix}`,
+        idempotencyKey: `quote-trend-${suffix}`,
+        customerId,
+        storeId,
+        sellerId,
+        status: "converted",
+        paymentMode: "one_time",
+        fttrKind: "none",
+        fttrPlan: null,
+        fttrMonthlyFen: 0,
+        heartMonthlyFen: 0,
+        oneTimeFen: 10_000,
+        monthlyTotalFen: 0,
+        contract36Fen: 0,
+        catalogVersion: "test",
+        customerSnapshot: {},
+        quoteSnapshot: {},
+        confirmedAt: at,
+        createdAt: at,
+      });
+      await client.db.insert(orders).values({
+        id: orderId,
+        orderNo: `XLXDD-TREND-${suffix}`,
+        quoteId,
+        customerId,
+        idempotencyKey: `order-trend-${suffix}`,
+        storeId,
+        sellerId,
+        status,
+        salesChannel: "offline",
+        paymentMode: "one_time",
+        fttrKind: "none",
+        fttrPlan: null,
+        fttrMonthlyFen: 0,
+        heartMonthlyFen: 0,
+        oneTimeFen: 10_000,
+        monthlyTotalFen: 0,
+        contract36Fen: 0,
+        catalogVersion: "test",
+        catalogSnapshot: {},
+        customerSnapshot: {},
+        quoteSnapshot: {},
+        storeSnapshot: {},
+        sellerSnapshot: {},
+        createdBy: sellerId,
+        activatedAt: at,
+        signedAt,
+        deletedAt,
+        createdAt: at,
+      });
+    };
+
+    // 上海时间 08-10 00:30 与 08-10 23:30：同属 08-10
+    await makeOrder("1", "signed", new Date("2026-08-09T16:30:00.000Z"));
+    await makeOrder("2", "signed", new Date("2026-08-10T15:30:00.000Z"));
+    // 窗口外（09-01）与未签收
+    await makeOrder("3", "signed", new Date("2026-09-01T02:00:00.000Z"));
+    await makeOrder("4", "activated", null);
+    // 回收站订单不计入
+    await makeOrder("5", "signed", new Date("2026-08-10T03:00:00.000Z"), new Date("2026-08-11T03:00:00.000Z"));
+
+    const counts = await new DrizzleSalesReportRepository(client).loadSignedOrderCounts(
+      { kind: "global" },
+      {
+        from: "2026-08-10",
+        to: "2026-08-11",
+        start: new Date("2026-08-10T00:00:00+08:00"),
+        endExclusive: new Date("2026-08-12T00:00:00+08:00"),
+      },
+    );
+
+    expect(counts).toEqual([{ date: "2026-08-10", count: 2 }]);
+    await client.close();
+  });
+});
+
 describe("销售报表退货后的月费口径", () => {
   it("部分退货保留FTTR并扣减心连心月增费，整单退货将月费归零", async () => {
     const directory = await mkdtemp(join(tmpdir(), "hfttr-sales-report-"));

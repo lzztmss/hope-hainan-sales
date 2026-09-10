@@ -5,6 +5,7 @@ import { ACTIVE_CATALOG } from "../../shared/pricing/catalog";
 import type { ComponentId } from "../../shared/pricing/types";
 
 import { formatOrderMoney, formatOrderPrice } from "./formatters";
+import { availableTransitions } from "./orderTransitions";
 import {
   ORDER_STATUS_LABELS,
   RETURN_STATUS_LABELS,
@@ -286,49 +287,6 @@ const ReturnCompletion = ({
       </div>
     </section>
   );
-};
-
-export const availableTransitions = (
-  order: OrderDetail,
-  viewer: OrderViewer,
-): Array<{ command: OrderTransitionCommand; label: string; tone: string }> => {
-  if (order.deletedAt) return [];
-  if (order.status === "pending") {
-    if (viewer.role === "hr" || viewer.role === "finance" || viewer.role === "regional_manager") return [];
-    return [
-      { command: "ACCEPT", label: "受理订单", tone: "order-primary-action" },
-      { command: "CANCEL", label: "取消订单", tone: "order-danger-action" },
-    ];
-  }
-  if (order.status === "accepted") {
-    const transitions: Array<{
-      command: OrderTransitionCommand;
-      label: string;
-      tone: string;
-    }> = viewer.role === "sales" || viewer.role === "store_manager" || viewer.role === "admin"
-      ? [{ command: "CANCEL", label: "取消订单", tone: "order-danger-action" }]
-      : [];
-    if (viewer.role === "store_manager" || viewer.role === "regional_manager" || viewer.role === "admin") {
-      transitions.unshift({
-        command: "ACTIVATE",
-        label: "激活订单",
-        tone: "order-primary-action",
-      });
-    }
-    return transitions;
-  }
-  if (order.status === "activated") {
-    return [
-      { command: "SIGN", label: "确认签收", tone: "order-primary-action" },
-    ];
-  }
-  if (order.status === "signed" && (viewer.role === "hr" || viewer.role === "admin")) {
-    return [{ command: "RECONCILE", label: "确认对账", tone: "order-primary-action" }];
-  }
-  if (order.status === "reconciled" && (viewer.role === "finance" || viewer.role === "admin")) {
-    return [{ command: "MARK_PAID", label: "确认收款", tone: "order-primary-action" }];
-  }
-  return [];
 };
 
 export const OrderDetailPage = ({

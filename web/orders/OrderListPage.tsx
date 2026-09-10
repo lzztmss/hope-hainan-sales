@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { formatOrderMoney, formatOrderPrice } from "./formatters";
 import { usePageAutoRefresh } from "../hooks/usePageAutoRefresh";
@@ -34,6 +35,7 @@ const EMPTY_FILTERS: OrderListFilters = {
   status: "",
   paymentMode: "",
   recycleBin: false,
+  todoOnly: false,
 };
 
 const ROLE_TITLES: Readonly<Record<OrderViewer["role"], string>> = {
@@ -71,6 +73,7 @@ const normaliseFilters = (filters: OrderListFilters): OrderListFilters => {
     status: filters.status,
     paymentMode: filters.paymentMode,
     recycleBin: filters.recycleBin,
+    todoOnly: filters.todoOnly,
   };
   if (filters.storeQuery?.trim()) normalised.storeQuery = filters.storeQuery.trim();
   if (filters.sellerQuery?.trim()) normalised.sellerQuery = filters.sellerQuery.trim();
@@ -99,9 +102,13 @@ export const OrderListPage = ({
   storeOptions = [],
   viewer,
 }: OrderListPageProps) => {
-  const [draftFilters, setDraftFilters] = useState<OrderListFilters>(EMPTY_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<OrderListFilters>(EMPTY_FILTERS);
-  const [filterOpen, setFilterOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const todoFromQuery = searchParams.get("todo") === "1";
+  const [draftFilters, setDraftFilters] = useState<OrderListFilters>(() =>
+    todoFromQuery ? { ...EMPTY_FILTERS, todoOnly: true } : EMPTY_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<OrderListFilters>(() =>
+    todoFromQuery ? { ...EMPTY_FILTERS, todoOnly: true } : EMPTY_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(todoFromQuery);
   const [items, setItems] = useState<OrderSummary[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -197,8 +204,9 @@ export const OrderListPage = ({
 
   const pageDescription = useMemo(() => {
     if (appliedFilters.recycleBin) return `回收站内共 ${total} 笔订单`;
+    if (appliedFilters.todoOnly) return `只看待办订单 · 共 ${total} 笔`;
     return `共 ${total} 笔可见订单`;
-  }, [appliedFilters.recycleBin, total]);
+  }, [appliedFilters.recycleBin, appliedFilters.todoOnly, total]);
 
   const canExport = viewer.role === "admin" || viewer.role === "hr" || viewer.role === "finance";
 
@@ -238,6 +246,7 @@ export const OrderListPage = ({
     if (seller) next.sellerQuery = seller.id;
     setPage(1);
     setSelectedOrders(new Map());
+    setSearchParams(next.todoOnly ? { todo: "1" } : {}, { replace: true });
     setAppliedFilters(next);
     setFilterOpen(false);
   };
@@ -401,7 +410,6 @@ export const OrderListPage = ({
         <header>
           <div>
             <strong>筛选订单</strong>
-            <span>按客户、状态、付款方式和归属快速查找</span>
           </div>
           <div className="order-filter-header-actions">
             {canExport && !appliedFilters.recycleBin ? (
@@ -434,9 +442,28 @@ export const OrderListPage = ({
               value={draftFilters.search}
             />
           </label>
+          <label className="order-filter-todo">
+            <span>订单范围</span>
+            <span className="order-filter-todo__option">
+              <input
+                checked={draftFilters.todoOnly}
+                onChange={(event) => {
+                  const todoOnly = event.currentTarget.checked;
+                  setDraftFilters((current) => ({
+                    ...current,
+                    todoOnly,
+                    ...(todoOnly ? { status: "" } : {}),
+                  }));
+                }}
+                type="checkbox"
+              />
+              只看待办订单
+            </span>
+          </label>
           <label>
             <span>订单状态</span>
             <select
+              disabled={draftFilters.todoOnly}
               onChange={(event) => setFilter("status", event.currentTarget.value as OrderStatus | "")}
               value={draftFilters.status}
             >
@@ -572,6 +599,7 @@ export const OrderListPage = ({
             onClick={() => {
               setDraftFilters(EMPTY_FILTERS);
               setPage(1);
+              setSearchParams({}, { replace: true });
               setAppliedFilters(EMPTY_FILTERS);
             }}
             type="button"

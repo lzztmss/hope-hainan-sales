@@ -145,6 +145,7 @@ export interface OrderListFilters {
   storeQuery?: string;
   sellerQuery?: string;
   status?: OrderStatus;
+  statuses?: readonly OrderStatus[];
   paymentMode?: PaymentMode;
   fttrKind?: FttrKind;
   fttrPlan?: number;

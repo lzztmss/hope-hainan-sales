@@ -357,7 +357,7 @@
 
 .operations-trend__bars {
   display: grid;
-  height: 9rem;
+  height: 10rem;
   align-items: end;
   gap: 0.5rem;
   grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -368,9 +368,17 @@
 .operations-trend__bar {
   display: grid;
   height: 100%;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   align-items: end;
   justify-items: center;
   gap: 0.4375rem;
+}
+
+.operations-trend__count {
+  color: var(--foreground);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 .operations-trend__bar > span {

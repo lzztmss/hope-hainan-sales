@@ -89,6 +89,31 @@ const allocateCommission = (
   return result;
 };
 
+const scopeClause = (
+  scope: SalesReportScope,
+  tableAlias: string,
+  sellerColumn: "seller_id" | "beneficiary_id",
+): { clause: string; params: string[] } => {
+  const clauses: string[] = [];
+  const params: string[] = [];
+  if (scope.kind === "region" && !scope.storeId) {
+    if (scope.storeIds.length === 0) clauses.push("AND 1 = 0");
+    else {
+      clauses.push(`AND ${tableAlias}.store_id IN (${scope.storeIds.map(() => "?").join(", ")})`);
+      params.push(...scope.storeIds);
+    }
+  }
+  if (scope.storeId) {
+    clauses.push(`AND ${tableAlias}.store_id = ?`);
+    params.push(scope.storeId);
+  }
+  if (scope.sellerId) {
+    clauses.push(`AND ${tableAlias}.${sellerColumn} = ?`);
+    params.push(scope.sellerId);
+  }
+  return { clause: clauses.join(" "), params };
+};
+
 export const allocateEstimatedCommission = (
   calculation: CommissionCalculation,
   attributions: readonly EstimatedCommissionAttribution[],
@@ -130,38 +155,37 @@ export class DrizzleSalesReportRepository implements SalesReportRepository {
     `).all(...(storeId ? [storeId] : [])) as Array<{ id: string; name: string }>;
   }
 
+  async loadSignedOrderCounts(
+    scope: SalesReportScope,
+    period: ReportPeriod,
+  ): Promise<readonly { date: string; count: number }[]> {
+    const orderScope = scopeClause(scope, "o", "seller_id");
+    return this.client.raw.prepare(`
+      SELECT strftime('%Y-%m-%d', o.signed_at / 1000, 'unixepoch', '+8 hours') AS date,
+             COUNT(*) AS count
+      FROM orders o
+      WHERE o.signed_at >= ? AND o.signed_at < ?
+        AND o.deleted_at IS NULL
+        AND o.status NOT IN ('cancelled', 'voided')
+        ${orderScope.clause}
+      GROUP BY date
+      ORDER BY date ASC
+    `).all(
+      period.start.getTime(),
+      period.endExclusive.getTime(),
+      ...orderScope.params,
+    ) as Array<{ date: string; count: number }>;
+  }
+
   async loadFacts(
     scope: SalesReportScope,
     period: ReportPeriod,
   ): Promise<readonly SalesReportFact[]> {
     const periodStart = period.start.getTime();
     const periodEnd = period.endExclusive.getTime();
-    const makeScope = (
-      tableAlias: string,
-      sellerColumn: "seller_id" | "beneficiary_id",
-    ): { clause: string; params: string[] } => {
-      const clauses: string[] = [];
-      const params: string[] = [];
-      if (scope.kind === "region" && !scope.storeId) {
-        if (scope.storeIds.length === 0) clauses.push("AND 1 = 0");
-        else {
-          clauses.push(`AND ${tableAlias}.store_id IN (${scope.storeIds.map(() => "?").join(", ")})`);
-          params.push(...scope.storeIds);
-        }
-      }
-      if (scope.storeId) {
-        clauses.push(`AND ${tableAlias}.store_id = ?`);
-        params.push(scope.storeId);
-      }
-      if (scope.sellerId) {
-        clauses.push(`AND ${tableAlias}.${sellerColumn} = ?`);
-        params.push(scope.sellerId);
-      }
-      return { clause: clauses.join(" "), params };
-    };
-    const quoteScope = makeScope("q", "seller_id");
-    const orderScope = makeScope("o", "seller_id");
-    const ledgerScope = makeScope("cl", "beneficiary_id");
+    const quoteScope = scopeClause(scope, "q", "seller_id");
+    const orderScope = scopeClause(scope, "o", "seller_id");
+    const ledgerScope = scopeClause(scope, "cl", "beneficiary_id");
     const all = <T>(query: string, params: readonly unknown[]): T[] =>
       this.client.raw.prepare(query).all(...params) as T[];
 

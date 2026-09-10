@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  availableTransitions,
   describeReturnAvailability,
   monthlyAmountAfterCompletedReturns,
 } from "./OrderDetailPage";
+import { availableTransitions } from "./orderTransitions";
 import type { OrderDetail, OrderViewer } from "./types";
 
 const order = (overrides: Partial<OrderDetail> = {}): OrderDetail => ({

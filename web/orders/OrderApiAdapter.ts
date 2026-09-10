@@ -18,6 +18,7 @@ import type {
 import { createClientKey } from "../utils/clientKey";
 import { refundableUnitFenFor } from "../../shared/pricing/returnPolicy";
 import type { PaymentMode } from "../../shared/pricing/types";
+import { todoOrderStatuses } from "./orderTransitions";
 
 export type OrderApiClient = Pick<
   ApiClient,
@@ -291,12 +292,21 @@ const mapDetail = (
   };
 };
 
-const listQueryFor = (filters: OrderListFilters, page = 1, pageSize = 20) => {
+const listQueryFor = (
+  filters: OrderListFilters,
+  viewer: OrderViewer,
+  page = 1,
+  pageSize = 20,
+) => {
   const search = filters.search.trim();
   return {
     recycleBin: filters.recycleBin,
     ...(search ? { query: search } : {}),
-    ...(filters.status ? { status: filters.status } : {}),
+    ...(filters.todoOnly
+      ? { statuses: todoOrderStatuses(viewer) }
+      : filters.status
+        ? { status: filters.status }
+        : {}),
     ...(filters.paymentMode ? { paymentMode: filters.paymentMode } : {}),
     ...(filters.storeQuery ? { storeQuery: filters.storeQuery.trim() } : {}),
     ...(filters.sellerQuery ? { sellerQuery: filters.sellerQuery.trim() } : {}),
@@ -333,12 +343,12 @@ export const createOrderManagementAdapter = (
 
   return {
     async listOrders(filters, page, pageSize) {
-      const response = await client.listOrders(listQueryFor(filters, page, pageSize));
+      const response = await client.listOrders(listQueryFor(filters, viewer, page, pageSize));
       const items = response.items.map((order) => mapSummary(order, viewer));
       return { items, total: response.total };
     },
     async exportOrders(filters) {
-      return client.exportOrders(listQueryFor(filters, 1, 100));
+      return client.exportOrders(listQueryFor(filters, viewer, 1, 100));
     },
     async getOrder(orderId) {
       const [order, returns] = await Promise.all([

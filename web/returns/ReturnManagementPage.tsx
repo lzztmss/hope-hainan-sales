@@ -12,6 +12,7 @@ import type {
   CompleteManagedReturnInput,
   DecideManagedReturnInput,
 } from "./returnManagementApi";
+import { reviewerRole } from "./returnRoles";
 import "./returns.css";
 
 export interface ReturnManagementPageProps {
@@ -78,9 +79,6 @@ const yuanToFen = (value: string): number | null => {
   const fen = yuan * 100 + cents;
   return Number.isSafeInteger(fen) ? fen : null;
 };
-
-const reviewerRole = (actor: AuthenticatedUser): boolean =>
-  actor.role === "store_manager" || actor.role === "regional_manager" || actor.role === "admin";
 
 const globalDataRole = (actor: AuthenticatedUser): boolean =>
   actor.role === "admin" || actor.role === "hr" || actor.role === "finance";
@@ -420,7 +418,6 @@ export const ReturnManagementPage = ({
           刷新数据
         </button>
       ) : null}
-      description={globalDataRole(actor) ? "查看全部营业厅退货退款；人力资源和财务仅查看，审批和完成仍由业务管理人员处理。" : actor.role === "regional_manager" ? "查看所管营业厅退货退款，并处理审批。" : "查看本营业厅退货退款并处理审批。"}
       eyebrow="订单管理"
       title="售后管理"
     >
