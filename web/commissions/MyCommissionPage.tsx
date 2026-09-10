@@ -216,11 +216,11 @@ export const MyCommissionPage = ({
                     aria-label={`选择订单 ${order.orderNo}`}
                     checked={selected.has(order.orderId)}
                     disabled={payoutBusy || order.payoutStatus !== "pending"}
-                    onChange={(event) => setSelected((current) => {
+                    onChange={(event) => { const checked = event.currentTarget.checked; setSelected((current) => {
                       const next = new Set(current);
-                      if (event.currentTarget.checked) next.add(order.orderId); else next.delete(order.orderId);
+                      if (checked) next.add(order.orderId); else next.delete(order.orderId);
                       return next;
-                    })}
+                    }); }}
                     title={order.payoutStatus === "deduction" ? "该订单为待扣回提成" : order.payoutStatus === "paid" ? "提成已发放" : order.payoutStatus !== "pending" ? "尚未到发放条件" : "选择发放"}
                     type="checkbox"
                   />

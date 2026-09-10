@@ -236,8 +236,8 @@ export const RegionalPersonalOrderPage = ({
         </div>
         <div className="regional-order-line-list">
           {lines.map((line, index) => <div className="regional-order-line" key={line.key}>
-            <label className="regional-field"><span>商品 {index + 1}</span><select value={line.sku} onChange={(event) => setLines((current) => current.map((item) => item.key === line.key ? { ...item, sku: event.currentTarget.value as ProductSku } : item))}>{PRODUCTS.map(([sku, label]) => <option key={sku} value={sku}>{label}</option>)}</select></label>
-            <label className="regional-field"><span>数量</span><input min="1" required step="1" type="number" value={line.quantity} onChange={(event) => setLines((current) => current.map((item) => item.key === line.key ? { ...item, quantity: event.currentTarget.value } : item))} /></label>
+            <label className="regional-field"><span>商品 {index + 1}</span><select value={line.sku} onChange={(event) => { const sku = event.currentTarget.value as ProductSku; setLines((current) => current.map((item) => item.key === line.key ? { ...item, sku } : item)); }}>{PRODUCTS.map(([sku, label]) => <option key={sku} value={sku}>{label}</option>)}</select></label>
+            <label className="regional-field"><span>数量</span><input min="1" required step="1" type="number" value={line.quantity} onChange={(event) => { const quantity = event.currentTarget.value; setLines((current) => current.map((item) => item.key === line.key ? { ...item, quantity } : item)); }} /></label>
             <button className="regional-danger-action" aria-disabled={lines.length === 1} type="button" onClick={() => lines.length === 1 ? showError("至少需要保留一行商品明细。", "不能删除最后一行") : setLines((current) => current.filter((item) => item.key !== line.key))}>删除本行</button>
           </div>)}
         </div>
@@ -263,7 +263,7 @@ export const RegionalPersonalOrderPage = ({
                 {order.lines.map((line) => <label key={line.id}><span>{line.label}累计退货数量（最多 {line.quantity}）</span><input min="0" max={line.quantity} step="1" type="number" value={orderReturn.quantities[line.id] ?? line.returnedQuantity} onChange={(event) => updateReturnForm(order, { quantities: { ...orderReturn.quantities, [line.id]: event.currentTarget.value } })} /></label>)}
                 <button disabled={busy} type="button" onClick={() => void returnOrder(order)}>保存退货记录</button>
               </div>
-              <div className="regional-void-row"><input aria-label={`${order.orderNo}作废原因`} placeholder="作废原因（必填）" value={voidReasons[order.id] ?? ""} onChange={(event) => setVoidReasons((current) => ({ ...current, [order.id]: event.currentTarget.value }))} /><button className="regional-danger-action" disabled={busy} type="button" onClick={() => void voidOrder(order)}>作废订单</button></div>
+              <div className="regional-void-row"><input aria-label={`${order.orderNo}作废原因`} placeholder="作废原因（必填）" value={voidReasons[order.id] ?? ""} onChange={(event) => { const reason = event.currentTarget.value; setVoidReasons((current) => ({ ...current, [order.id]: reason })); }} /><button className="regional-danger-action" disabled={busy} type="button" onClick={() => void voidOrder(order)}>作废订单</button></div>
             </details> : null}
           </article>;
         })}
