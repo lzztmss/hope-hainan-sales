@@ -48,9 +48,9 @@ export const SalesCommissionDetailRoute = ({ client, actor }: { client: ApiClien
   return (
     <PageLayout title="销售提成详情">
       <form className="sales-commission-filters" onSubmit={submit}>
-        <label><span>统计月份</span><input onChange={(event) => setDraft((value) => ({ ...value, month: event.currentTarget.value }))} required type="month" value={draft.month} /></label>
-        <label><span>营业厅</span><select onChange={(event) => setDraft((value) => ({ ...value, storeId: event.currentTarget.value, beneficiaryId: "" }))} value={draft.storeId}><option value="">全部营业厅</option>{options.stores.map((store) => <option key={store.id} value={store.id}>{store.label}</option>)}</select></label>
-        <label><span>销售员</span><select onChange={(event) => setDraft((value) => ({ ...value, beneficiaryId: event.currentTarget.value }))} value={draft.beneficiaryId}><option value="">全部销售员</option>{sellers.map((seller) => <option key={seller.id} value={seller.id}>{seller.label}</option>)}</select></label>
+        <label><span>统计月份</span><input onChange={(event) => { const month = event.currentTarget.value; setDraft((value) => ({ ...value, month })); }} required type="month" value={draft.month} /></label>
+        <label><span>营业厅</span><select onChange={(event) => { const storeId = event.currentTarget.value; setDraft((value) => ({ ...value, storeId, beneficiaryId: "" })); }} value={draft.storeId}><option value="">全部营业厅</option>{options.stores.map((store) => <option key={store.id} value={store.id}>{store.label}</option>)}</select></label>
+        <label><span>销售员</span><select onChange={(event) => { const beneficiaryId = event.currentTarget.value; setDraft((value) => ({ ...value, beneficiaryId })); }} value={draft.beneficiaryId}><option value="">全部销售员</option>{sellers.map((seller) => <option key={seller.id} value={seller.id}>{seller.label}</option>)}</select></label>
         <button type="submit">查询</button>
       </form>
       {error ? <div className="system-notice" role="alert">{error}</div> : null}
