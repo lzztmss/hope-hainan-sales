@@ -53,7 +53,8 @@ grep -Fq '"status":"ok"' "${tmp_root}/health.json" || die "API 健康响应不�
 grep -Eqi '^Cache-Control:[[:space:]]*no-store' "${tmp_root}/api-headers" || die "API 未禁止敏感响应缓存"
 
 printf '==> 检查 SQLite 完整性与迁移记录\n'
-database_check="$(compose exec -T api node -e \"const D=require('better-sqlite3');const d=new D(process.env.SQLITE_PATH,{readonly:true});const ok=d.pragma('integrity_check')[0]?.integrity_check;const n=d.prepare('SELECT COUNT(*) n FROM __drizzle_migrations').get().n;d.close();process.stdout.write(ok+':'+n)\")"
+sqlite_probe='const D=require("better-sqlite3");const d=new D(process.env.SQLITE_PATH,{readonly:true});const ok=d.pragma("integrity_check")[0]?.integrity_check;const n=d.prepare("SELECT COUNT(*) n FROM __drizzle_migrations").get().n;d.close();process.stdout.write(ok+":"+n)'
+database_check="$(compose exec -T api node -e "${sqlite_probe}")"
 [[ "${database_check}" =~ ^ok:[1-9][0-9]*$ ]] || die "SQLite 完整性或迁移记录检查失败"
 
 printf 'PASS: Web、API、安全头、SQLite 和迁移记录验证通过\n'
