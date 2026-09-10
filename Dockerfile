@@ -6,6 +6,10 @@ ARG NGINX_IMAGE=nginx:1.28.0-alpine3.21
 FROM ${NODE_IMAGE} AS node-base
 ENV PNPM_HOME=/pnpm
 ENV PATH=${PNPM_HOME}:${PATH}
+RUN sed -i 's|http://deb.debian.org|http://mirrors.aliyun.com|g; s|https://deb.debian.org|http://mirrors.aliyun.com|g' /etc/apt/sources.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 RUN npm install --global pnpm@11.9.0
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
