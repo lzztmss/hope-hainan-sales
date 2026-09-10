@@ -11,12 +11,12 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
-const pgEnum = <const Values extends readonly [string, ...string[]]>(
+const sqliteEnum = <const Values extends readonly [string, ...string[]]>(
   _name: string,
   values: Values,
 ) => (columnName: string) => text(columnName, { enum: values });
 
-export const userRoleEnum = pgEnum("user_role", [
+export const userRoleEnum = sqliteEnum("user_role", [
   "sales",
   "store_manager",
   "regional_manager",
@@ -24,37 +24,37 @@ export const userRoleEnum = pgEnum("user_role", [
   "finance",
   "admin",
 ]);
-export const personnelTypeEnum = pgEnum("personnel_type", [
+export const personnelTypeEnum = sqliteEnum("personnel_type", [
   "unicom",
   "auxiliary",
   "admin",
 ]);
-export const quoteStatusEnum = pgEnum("quote_status", [
+export const quoteStatusEnum = sqliteEnum("quote_status", [
   "confirmed",
   "converted",
   "expired",
   "lost",
   "voided",
 ]);
-export const paymentModeEnum = pgEnum("payment_mode", [
+export const paymentModeEnum = sqliteEnum("payment_mode", [
   "one_time",
   "contract_36",
 ]);
-export const salesChannelEnum = pgEnum("sales_channel", ["online", "offline"]);
-export const fttrKindEnum = pgEnum("fttr_kind", [
+export const salesChannelEnum = sqliteEnum("sales_channel", ["online", "offline"]);
+export const fttrKindEnum = sqliteEnum("fttr_kind", [
   "none",
   "standard",
   "custom",
 ]);
-export const quoteLineTypeEnum = pgEnum("quote_line_type", [
+export const quoteLineTypeEnum = sqliteEnum("quote_line_type", [
   "charge",
   "component",
 ]);
-export const printEventTypeEnum = pgEnum("print_event_type", [
+export const printEventTypeEnum = sqliteEnum("print_event_type", [
   "initial",
   "reprint",
 ]);
-export const orderStatusEnum = pgEnum("order_status", [
+export const orderStatusEnum = sqliteEnum("order_status", [
   "pending",
   "accepted",
   "activated",
@@ -67,63 +67,63 @@ export const orderStatusEnum = pgEnum("order_status", [
   "returned",
   "voided",
 ]);
-export const orderAttributionRoleEnum = pgEnum("order_attribution_role", [
+export const orderAttributionRoleEnum = sqliteEnum("order_attribution_role", [
   "primary",
   "collaborator",
 ]);
-export const returnTypeEnum = pgEnum("return_type", ["full", "partial"]);
-export const afterSalesServiceTypeEnum = pgEnum("after_sales_service_type", [
+export const returnTypeEnum = sqliteEnum("return_type", ["full", "partial"]);
+export const afterSalesServiceTypeEnum = sqliteEnum("after_sales_service_type", [
   "refund",
   "exchange",
 ]);
-export const returnKindEnum = pgEnum("return_kind", ["normal", "special"]);
-export const returnReasonCategoryEnum = pgEnum("return_reason_category", [
+export const returnKindEnum = sqliteEnum("return_kind", ["normal", "special"]);
+export const returnReasonCategoryEnum = sqliteEnum("return_reason_category", [
   "no_reason",
   "quality",
   "order_mismatch",
   "service_issue",
   "other",
 ]);
-export const returnStatusEnum = pgEnum("return_status", [
+export const returnStatusEnum = sqliteEnum("return_status", [
   "requested",
   "approved",
   "rejected",
   "completed",
 ]);
-export const commissionPolicyStatusEnum = pgEnum(
+export const commissionPolicyStatusEnum = sqliteEnum(
   "commission_policy_status",
   ["draft", "published", "stopped"],
 );
-export const commissionRuleStatusEnum = pgEnum("commission_rule_status", [
+export const commissionRuleStatusEnum = sqliteEnum("commission_rule_status", [
   "active",
   "inactive",
 ]);
-export const commissionBusinessDomainEnum = pgEnum(
+export const commissionBusinessDomainEnum = sqliteEnum(
   "commission_business_domain",
   ["fttr", "heartlink"],
 );
-export const commissionTargetTypeEnum = pgEnum("commission_target_type", [
+export const commissionTargetTypeEnum = sqliteEnum("commission_target_type", [
   "product",
   "package",
   "fttr_plan",
 ]);
-export const commissionPaymentModeScopeEnum = pgEnum(
+export const commissionPaymentModeScopeEnum = sqliteEnum(
   "commission_payment_mode_scope",
   ["all", "one_time", "contract_36"],
 );
-export const commissionCalculationBasisEnum = pgEnum(
+export const commissionCalculationBasisEnum = sqliteEnum(
   "commission_calculation_basis",
   ["per_order", "per_unit"],
 );
-export const commissionPackageModeEnum = pgEnum("commission_package_mode", [
+export const commissionPackageModeEnum = sqliteEnum("commission_package_mode", [
   "additive",
   "fixed_override",
 ]);
-export const commissionAttributionScopeEnum = pgEnum(
+export const commissionAttributionScopeEnum = sqliteEnum(
   "commission_attribution_scope",
   ["all", "primary", "collaborator"],
 );
-export const commissionLedgerEntryTypeEnum = pgEnum(
+export const commissionLedgerEntryTypeEnum = sqliteEnum(
   "commission_ledger_entry_type",
   [
     "accrual",
@@ -134,9 +134,40 @@ export const commissionLedgerEntryTypeEnum = pgEnum(
     "settlement_reversal",
   ],
 );
-export const settlementBatchStatusEnum = pgEnum("settlement_batch_status", [
+export const settlementBatchStatusEnum = sqliteEnum("settlement_batch_status", [
   "draft",
   "approved",
+  "paid",
+]);
+export const regionalTemplateStatusEnum = sqliteEnum("regional_template_status", [
+  "draft",
+  "published",
+  "stopped",
+]);
+export const regionalPlanStatusEnum = sqliteEnum("regional_plan_status", [
+  "draft",
+  "active",
+  "replaced",
+]);
+export const regionalFactStatusEnum = sqliteEnum("regional_fact_status", [
+  "active",
+  "returned",
+  "voided",
+]);
+export const regionalVerificationStatusEnum = sqliteEnum("regional_verification_status", [
+  "pending",
+  "verified",
+  "rejected",
+]);
+export const regionalCooperationStatusEnum = sqliteEnum("regional_cooperation_status", [
+  "submitted",
+  "finance_verified",
+  "confirmed",
+  "revoked",
+]);
+export const regionalStatementStatusEnum = sqliteEnum("regional_statement_status", [
+  "draft",
+  "confirmed",
   "paid",
 ]);
 
@@ -219,6 +250,287 @@ export const regionalManagerStores = sqliteTable(
       table.storeId,
     ),
     index("regional_manager_stores_manager_idx").on(table.regionalManagerId),
+  ],
+);
+
+export const regionalManagerStoreHistory = sqliteTable(
+  "regional_manager_store_history",
+  {
+    id: text("id").$defaultFn(() => randomUUID()).primaryKey(),
+    regionalManagerId: text("regional_manager_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    storeId: text("store_id")
+      .notNull()
+      .references(() => stores.id, { onDelete: "restrict" }),
+    effectiveFrom: integer("effective_from", { mode: "timestamp_ms" }).notNull(),
+    effectiveTo: integer("effective_to", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("regional_manager_store_history_manager_period_idx").on(table.regionalManagerId, table.effectiveFrom, table.effectiveTo),
+    index("regional_manager_store_history_store_period_idx").on(table.storeId, table.effectiveFrom, table.effectiveTo),
+    uniqueIndex("regional_manager_store_history_active_store_unique")
+      .on(table.storeId)
+      .where(sql`${table.effectiveTo} IS NULL`),
+    check("regional_manager_store_history_period_valid", sql`${table.effectiveTo} IS NULL OR ${table.effectiveTo} > ${table.effectiveFrom}`),
+  ],
+);
+
+export const regionalCommissionPlanTypeEnum = sqliteEnum("regional_commission_plan_type", [
+  "quarter",
+  "half_year",
+  "year",
+]);
+
+export const regionalCommissionTargetPlans = sqliteTable(
+  "regional_commission_target_plans",
+  {
+    id: text("id").$defaultFn(() => randomUUID()).primaryKey(),
+    regionalManagerId: text("regional_manager_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    planType: regionalCommissionPlanTypeEnum("plan_type").notNull(),
+    periodCount: integer("period_count").notNull(),
+    startsOn: text("starts_on").notNull(),
+    endsOn: text("ends_on").notNull(),
+    isPreset: integer("is_preset", { mode: "boolean" }).default(false).notNull(),
+    status: regionalPlanStatusEnum("status").default("active").notNull(),
+    replacedByPlanId: text("replaced_by_plan_id"),
+    setBy: text("set_by").references(() => users.id, { onDelete: "restrict" }),
+    changeReason: text("change_reason").default("系统创建").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index("regional_commission_target_plans_manager_idx").on(table.regionalManagerId, table.startsOn),
+    uniqueIndex("regional_commission_target_plans_manager_preset_unique")
+      .on(table.regionalManagerId)
+      .where(sql`${table.isPreset} = 1`),
+    check("regional_commission_target_plans_type_periods_valid", sql`(${table.planType} = 'quarter' AND ${table.periodCount} = 3) OR (${table.planType} = 'half_year' AND ${table.periodCount} = 6) OR (${table.planType} = 'year' AND ${table.periodCount} = 12)`),
+    check("regional_commission_target_plans_date_order_valid", sql`${table.endsOn} >= ${table.startsOn}`),
+  ],
+);
+
+export const regionalCommissionTargetPeriods = sqliteTable(
+  "regional_commission_target_periods",
+  {
+    id: text("id").$defaultFn(() => randomUUID()).primaryKey(),
+    planId: text("plan_id")
+      .notNull()
+      .references(() => regionalCommissionTargetPlans.id, { onDelete: "cascade" }),
+    sequence: integer("sequence").notNull(),
+    startsOn: text("starts_on").notNull(),
+    endsOn: text("ends_on").notNull(),
+    targetOrderCount: integer("target_order_count").notNull(),
+    cumulativeTargetOrderCount: integer("cumulative_target_order_count").notNull(),
+  },
+  (table) => [
+    uniqueIndex("regional_commission_target_periods_plan_sequence_unique").on(table.planId, table.sequence),
+    index("regional_commission_target_periods_plan_idx").on(table.planId, table.startsOn),
+    check("regional_commission_target_periods_target_positive", sql`${table.targetOrderCount} > 0`),
+    check("regional_commission_target_periods_date_order_valid", sql`${table.endsOn} >= ${table.startsOn}`),
+  ],
+);
+
+export const regionalCommissionTemplateVersions = sqliteTable(
+  "regional_commission_template_versions",
+  {
+    id: text("id").$defaultFn(() => randomUUID()).primaryKey(),
+    templateCode: text("template_code").notNull(),
+    versionNo: integer("version_no").notNull(),
+    name: text("name").notNull(),
+    status: regionalTemplateStatusEnum("status").default("draft").notNull(),
+    effectiveFrom: text("effective_from").notNull(),
+    effectiveTo: text("effective_to"),
+    sourceVersionId: text("source_version_id"),
+    rulesSnapshot: text("rules_snapshot", { mode: "json" })
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    createdBy: text("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    publishedBy: text("published_by").references(() => users.id, { onDelete: "restrict" }),
+    publishedAt: integer("published_at", { mode: "timestamp_ms" }),
+    stoppedBy: text("stopped_by").references(() => users.id, { onDelete: "restrict" }),
+    stoppedAt: integer("stopped_at", { mode: "timestamp_ms" }),
+    changeReason: text("change_reason").notNull(),
+    version: integer("version").default(1).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("regional_template_code_version_unique").on(table.templateCode, table.versionNo),
+    index("regional_template_status_dates_idx").on(table.status, table.effectiveFrom, table.effectiveTo),
+    check("regional_template_version_positive", sql`${table.versionNo} > 0 AND ${table.version} > 0`),
+    check("regional_template_dates_valid", sql`${table.effectiveTo} IS NULL OR ${table.effectiveTo} >= ${table.effectiveFrom}`),
+  ],
+);
+
+export const regionalCommissionTemplateAssignments = sqliteTable(
+  "regional_commission_template_assignments",
+  {
+    id: text("id").$defaultFn(() => randomUUID()).primaryKey(),
+    regionalManagerId: text("regional_manager_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    templateVersionId: text("template_version_id").notNull().references(() => regionalCommissionTemplateVersions.id, { onDelete: "restrict" }),
+    effectiveFrom: text("effective_from").notNull(),
+    effectiveTo: text("effective_to"),
+    assignedBy: text("assigned_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    reason: text("reason").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    index("regional_template_assignments_manager_dates_idx").on(table.regionalManagerId, table.effectiveFrom, table.effectiveTo),
+    uniqueIndex("regional_template_assignments_active_manager_unique")
+      .on(table.regionalManagerId)
+      .where(sql`${table.effectiveTo} IS NULL`),
+    check("regional_template_assignment_dates_valid", sql`${table.effectiveTo} IS NULL OR ${table.effectiveTo} >= ${table.effectiveFrom}`),
+  ],
+);
+
+export const regionalPersonalChannelOrders = sqliteTable(
+  "regional_personal_channel_orders",
+  {
+    id: text("id").$defaultFn(() => randomUUID()).primaryKey(),
+    orderNo: text("order_no").notNull(),
+    regionalManagerId: text("regional_manager_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    channel: text("channel").notNull(),
+    orderCount: integer("order_count").default(1).notNull(),
+    businessDate: text("business_date").notNull(),
+    signedOn: text("signed_on").notNull(),
+    effectiveOn: text("effective_on").notNull(),
+    evidenceNo: text("evidence_no").notNull(),
+    note: text("note"),
+    status: regionalFactStatusEnum("status").default("active").notNull(),
+    createdBy: text("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    voidedBy: text("voided_by").references(() => users.id, { onDelete: "restrict" }),
+    voidedAt: integer("voided_at", { mode: "timestamp_ms" }),
+    voidReason: text("void_reason"),
+    returnedOn: text("returned_on"),
+    returnReason: text("return_reason"),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("regional_personal_orders_no_unique").on(table.orderNo),
+    index("regional_personal_orders_manager_effective_idx").on(table.regionalManagerId, table.effectiveOn),
+    check("regional_personal_orders_count_positive", sql`${table.orderCount} > 0`),
+  ],
+);
+
+export const regionalPersonalChannelOrderLines = sqliteTable(
+  "regional_personal_channel_order_lines",
+  {
+    id: text("id").$defaultFn(() => randomUUID()).primaryKey(),
+    orderId: text("order_id").notNull().references(() => regionalPersonalChannelOrders.id, { onDelete: "cascade" }),
+    sku: text("sku").notNull(),
+    label: text("label").notNull(),
+    quantity: integer("quantity").notNull(),
+    unitCommissionFen: integer("unit_commission_fen").notNull(),
+    subtotalFen: integer("subtotal_fen").notNull(),
+    returnedQuantity: integer("returned_quantity").default(0).notNull(),
+  },
+  (table) => [
+    index("regional_personal_order_lines_order_idx").on(table.orderId),
+    check("regional_personal_order_lines_values_valid", sql`${table.quantity} > 0 AND ${table.returnedQuantity} BETWEEN 0 AND ${table.quantity} AND ${table.unitCommissionFen} >= 0 AND ${table.subtotalFen} >= 0`),
+  ],
+);
+
+export const regionalNetReceipts = sqliteTable(
+  "regional_net_receipts",
+  {
+    id: text("id").$defaultFn(() => randomUUID()).primaryKey(),
+    regionalManagerId: text("regional_manager_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    month: text("month").notNull(),
+    netReceiptFen: integer("net_receipt_fen").notNull(),
+    evidenceNo: text("evidence_no").notNull(),
+    note: text("note"),
+    verificationStatus: regionalVerificationStatusEnum("verification_status").default("pending").notNull(),
+    enteredBy: text("entered_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    verifiedBy: text("verified_by").references(() => users.id, { onDelete: "restrict" }),
+    verifiedAt: integer("verified_at", { mode: "timestamp_ms" }),
+    verificationReason: text("verification_reason"),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("regional_net_receipts_manager_month_unique").on(table.regionalManagerId, table.month),
+    index("regional_net_receipts_month_status_idx").on(table.month, table.verificationStatus),
+  ],
+);
+
+export const regionalCooperationStages = sqliteTable(
+  "regional_cooperation_stages",
+  {
+    id: text("id").$defaultFn(() => randomUUID()).primaryKey(),
+    regionalManagerId: text("regional_manager_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    stageCode: text("stage_code").notNull(),
+    stageLabel: text("stage_label").notNull(),
+    amountFen: integer("amount_fen").notNull(),
+    achievedOn: text("achieved_on").notNull(),
+    evidenceNo: text("evidence_no").notNull(),
+    note: text("note"),
+    status: regionalCooperationStatusEnum("status").default("submitted").notNull(),
+    submittedBy: text("submitted_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    financeVerifiedBy: text("finance_verified_by").references(() => users.id, { onDelete: "restrict" }),
+    financeVerifiedAt: integer("finance_verified_at", { mode: "timestamp_ms" }),
+    confirmedBy: text("confirmed_by").references(() => users.id, { onDelete: "restrict" }),
+    confirmedAt: integer("confirmed_at", { mode: "timestamp_ms" }),
+    revokedBy: text("revoked_by").references(() => users.id, { onDelete: "restrict" }),
+    revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+    revokeReason: text("revoke_reason"),
+    ...timestamps,
+  },
+  (table) => [
+    index("regional_cooperation_manager_stage_date_idx").on(table.regionalManagerId, table.stageCode, table.achievedOn),
+    uniqueIndex("regional_cooperation_manager_stage_confirmed_unique")
+      .on(table.regionalManagerId, table.stageCode)
+      .where(sql`${table.status} = 'confirmed'`),
+    check("regional_cooperation_amount_positive", sql`${table.amountFen} > 0`),
+  ],
+);
+
+export const regionalCommissionStatements = sqliteTable(
+  "regional_commission_statements",
+  {
+    id: text("id").$defaultFn(() => randomUUID()).primaryKey(),
+    regionalManagerId: text("regional_manager_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    settlementMonth: text("settlement_month").notNull(),
+    templateVersionId: text("template_version_id").notNull().references(() => regionalCommissionTemplateVersions.id, { onDelete: "restrict" }),
+    targetPlanId: text("target_plan_id").references(() => regionalCommissionTargetPlans.id, { onDelete: "restrict" }),
+    status: regionalStatementStatusEnum("status").default("draft").notNull(),
+    totalFen: integer("total_fen").notNull(),
+    calculationSnapshot: text("calculation_snapshot", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+    calculatedBy: text("calculated_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+    confirmedBy: text("confirmed_by").references(() => users.id, { onDelete: "restrict" }),
+    confirmedAt: integer("confirmed_at", { mode: "timestamp_ms" }),
+    paidBy: text("paid_by").references(() => users.id, { onDelete: "restrict" }),
+    paidAt: integer("paid_at", { mode: "timestamp_ms" }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("regional_statements_manager_month_unique").on(table.regionalManagerId, table.settlementMonth),
+    index("regional_statements_month_status_idx").on(table.settlementMonth, table.status),
+  ],
+);
+
+export const regionalCommissionLedger = sqliteTable(
+  "regional_commission_ledger",
+  {
+    id: text("id").$defaultFn(() => randomUUID()).primaryKey(),
+    regionalManagerId: text("regional_manager_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    statementId: text("statement_id").references(() => regionalCommissionStatements.id, { onDelete: "restrict" }),
+    eventKey: text("event_key").notNull(),
+    category: text("category").notNull(),
+    sourceType: text("source_type").notNull(),
+    sourceId: text("source_id"),
+    amountFen: integer("amount_fen").notNull(),
+    occurredOn: text("occurred_on").notNull(),
+    settlementMonth: text("settlement_month").notNull(),
+    detailSnapshot: text("detail_snapshot", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+    createdBy: text("created_by").references(() => users.id, { onDelete: "restrict" }),
+    paidAt: integer("paid_at", { mode: "timestamp_ms" }),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("regional_ledger_event_key_unique").on(table.eventKey),
+    index("regional_ledger_manager_month_idx").on(table.regionalManagerId, table.settlementMonth),
+    index("regional_ledger_source_idx").on(table.sourceType, table.sourceId),
+    check("regional_ledger_nonzero", sql`${table.amountFen} <> 0`),
   ],
 );
 
@@ -486,8 +798,6 @@ export const orders = sqliteTable(
     reconciledBy: text("reconciled_by").references(() => users.id, { onDelete: "restrict" }),
     paidAt: integer("paid_at", { mode: "timestamp_ms" }),
     paidBy: text("paid_by").references(() => users.id, { onDelete: "restrict" }),
-    // 兼容历史迁移；新流程不再写入 completed_at。
-    completedAt: integer("completed_at", { mode: "timestamp_ms" }),
     cancelledAt: integer("cancelled_at", { mode: "timestamp_ms" }),
     deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
     version: integer("version").default(1).notNull(),

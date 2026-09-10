@@ -6,8 +6,8 @@ const sqlitePath = process.env.SQLITE_PATH?.trim();
 if (!sqlitePath) throw new Error("请先配置 SQLITE_PATH，例如 ./data/acceptance.sqlite");
 
 const absolutePath = resolve(sqlitePath.replace(/^file:/, ""));
-if (!/^(?:acceptance|order-v2)(?:[.-]|$)/i.test(basename(absolutePath))) {
-  throw new Error(`为避免误删正式数据，此脚本只允许操作 acceptance.sqlite 或 order-v2.sqlite：${absolutePath}`);
+if (!/^acceptance(?:[.-]|$)/i.test(basename(absolutePath))) {
+  throw new Error(`为避免误删正式数据，此脚本只允许操作 acceptance 测试库：${absolutePath}`);
 }
 
 const args = process.argv.slice(2).filter((argument) => argument !== "--");

@@ -13,6 +13,7 @@
     "noUncheckedIndexedAccess": true,
     "noEmit": true,
     "skipLibCheck": true
+    ,"paths": { "@/*": ["./web/*"] }
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["web", "vite.config.ts"]
 }

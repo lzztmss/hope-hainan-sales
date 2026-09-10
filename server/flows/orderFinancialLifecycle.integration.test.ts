@@ -245,6 +245,9 @@ describe("订单、售后、收款与提成全流程", () => {
       const signed = await orderService.transitionOrder(seller, orderId, "SIGN", activated.version);
       expect(signed.status).toBe("signed");
     }
+    expect((await reload(normal.orderId)).lifecycleEvents).toContainEqual(
+      expect.objectContaining({ action: "order.sign", actorName: seller.displayName }),
+    );
 
     // 普通退货先完成，再进入批量对账、批量收款和批量提成发放。
     clock = new Date("2026-08-03T02:00:00.000Z");
@@ -261,6 +264,10 @@ describe("订单、售后、收款与提成全流程", () => {
 
     clock = new Date("2026-08-04T02:00:00.000Z");
     let normalOrder = await reload(normal.orderId);
+    await expect(
+      orderService.batchTransitionOrders(hr, [{ orderId: normal.orderId, expectedVersion: normalOrder.version }], "RECONCILE"),
+    ).rejects.toThrow("签收未满 7 天");
+    clock = new Date("2026-08-08T02:00:00.000Z");
     await orderService.batchTransitionOrders(hr, [{ orderId: normal.orderId, expectedVersion: normalOrder.version }], "RECONCILE");
     normalOrder = await reload(normal.orderId);
     await orderService.batchTransitionOrders(finance, [{ orderId: normal.orderId, expectedVersion: normalOrder.version }], "MARK_PAID");

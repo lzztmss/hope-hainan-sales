@@ -1,0 +1,25 @@
+.ops-list { min-width: 0; background: var(--card); border-block: 1px solid var(--border); }
+.ops-list__heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+.ops-list__heading h2 { margin: 0; font-size: 15px; }
+.ops-list__heading span { font-size: 12px; color: var(--muted-foreground); }
+.ops-list > form { margin: 0; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; box-shadow: none; background: var(--muted); padding: 14px 18px; }
+.ops-list > p, .ops-list > [role="status"] { margin: 0; padding: 14px 18px; }
+.ops-list [data-slot="table"] { min-width: 760px; }
+.ops-list [data-slot="table-head"] { height: 40px; padding: 10px 18px; background: var(--muted); color: var(--muted-foreground); font-size: 11px; }
+.ops-list [data-slot="table-cell"] { padding: 13px 18px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.ops-list td strong, .ops-list td small { display: block; }
+.ops-list td strong { font-weight: 600; }
+.ops-list td small { color: var(--muted-foreground); font-size: 11px; margin-top: 2px; }
+.ops-list td a { display: inline-flex; align-items: center; min-height: 36px; color: var(--primary); text-decoration: none; font-weight: 600; }
+.ops-list td a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ops-list > nav { padding: 12px 18px; border-top: 1px solid var(--border); }
+.ops-tabs { display: flex; gap: 4px; min-width: 0; overflow-x: auto; border-bottom: 1px solid var(--border); }
+.ops-tabs button { flex: 0 0 auto; min-height: 44px; padding: 10px 16px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted-foreground); font-size: 13px; }
+.ops-tabs button[aria-pressed="true"] { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+.ops-tabs button:hover { background: var(--muted); }
+@media (pointer: coarse) {
+  .ops-list td a { min-height: 44px; }
+}
+@media (max-width: 640px) {
+  .ops-list__heading, .ops-list > form { padding: 14px; }
+}

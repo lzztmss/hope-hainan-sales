@@ -5,57 +5,29 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1786528786881,
-      "tag": "0000_rainy_firebird",
+      "when": 1788425042684,
+      "tag": "0000_baseline",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "6",
-      "when": 1786534823223,
-      "tag": "0001_giant_jane_foster",
+      "when": 1788833599308,
+      "tag": "0001_allow_repeated_regional_cooperation",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "6",
-      "when": 1787120570000,
-      "tag": "0002_monthly_return_refund_cap",
+      "when": 1788837732141,
+      "tag": "0002_fair_golden_guardian",
       "breakpoints": true
     },
     {
       "idx": 3,
       "version": "6",
-      "when": 1787280000000,
-      "tag": "0003_regional_managers",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1787709600000,
-      "tag": "0004_order_v2",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1787716800000,
-      "tag": "0005_after_sales",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1787731200000,
-      "tag": "0006_order_sales_channel",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "6",
-      "when": 1787882400000,
-      "tag": "0007_regional_manager_employment_dates",
+      "when": 1788838000000,
+      "tag": "0003_confirmed_regional_cooperation_unique",
       "breakpoints": true
     }
   ]

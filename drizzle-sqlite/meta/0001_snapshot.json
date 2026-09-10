@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "8dbce184-ca54-4ac2-acdc-d86504847f01",
-  "prevId": "3e2f950b-7f70-467a-95f0-194717d7493c",
+  "id": "b1650643-c876-405f-ad4c-8ca5556ff3a9",
+  "prevId": "160c497b-64f4-412a-8d68-3aa96cfe6d35",
   "tables": {
     "audit_logs": {
       "name": "audit_logs",
@@ -1581,6 +1581,14 @@
           "notNull": true,
           "autoincrement": false
         },
+        "sales_channel": {
+          "name": "sales_channel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'offline'"
+        },
         "payment_mode": {
           "name": "payment_mode",
           "type": "text",
@@ -1715,9 +1723,44 @@
           "notNull": false,
           "autoincrement": false
         },
-        "completed_at": {
-          "name": "completed_at",
+        "signed_at": {
+          "name": "signed_at",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "signed_by": {
+          "name": "signed_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reconciled_at": {
+          "name": "reconciled_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reconciled_by": {
+          "name": "reconciled_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "paid_at": {
+          "name": "paid_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "paid_by": {
+          "name": "paid_by",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1867,6 +1910,45 @@
           "tableTo": "users",
           "columnsFrom": [
             "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "orders_signed_by_users_id_fk": {
+          "name": "orders_signed_by_users_id_fk",
+          "tableFrom": "orders",
+          "tableTo": "users",
+          "columnsFrom": [
+            "signed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "orders_reconciled_by_users_id_fk": {
+          "name": "orders_reconciled_by_users_id_fk",
+          "tableFrom": "orders",
+          "tableTo": "users",
+          "columnsFrom": [
+            "reconciled_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "orders_paid_by_users_id_fk": {
+          "name": "orders_paid_by_users_id_fk",
+          "tableFrom": "orders",
+          "tableTo": "users",
+          "columnsFrom": [
+            "paid_by"
           ],
           "columnsTo": [
             "id"
@@ -2389,6 +2471,1885 @@
         }
       }
     },
+    "regional_commission_ledger": {
+      "name": "regional_commission_ledger",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "regional_manager_id": {
+          "name": "regional_manager_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "statement_id": {
+          "name": "statement_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "event_key": {
+          "name": "event_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_type": {
+          "name": "source_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_id": {
+          "name": "source_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "amount_fen": {
+          "name": "amount_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "occurred_on": {
+          "name": "occurred_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "settlement_month": {
+          "name": "settlement_month",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "detail_snapshot": {
+          "name": "detail_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "paid_at": {
+          "name": "paid_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "regional_ledger_event_key_unique": {
+          "name": "regional_ledger_event_key_unique",
+          "columns": [
+            "event_key"
+          ],
+          "isUnique": true
+        },
+        "regional_ledger_manager_month_idx": {
+          "name": "regional_ledger_manager_month_idx",
+          "columns": [
+            "regional_manager_id",
+            "settlement_month"
+          ],
+          "isUnique": false
+        },
+        "regional_ledger_source_idx": {
+          "name": "regional_ledger_source_idx",
+          "columns": [
+            "source_type",
+            "source_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "regional_commission_ledger_regional_manager_id_users_id_fk": {
+          "name": "regional_commission_ledger_regional_manager_id_users_id_fk",
+          "tableFrom": "regional_commission_ledger",
+          "tableTo": "users",
+          "columnsFrom": [
+            "regional_manager_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_commission_ledger_statement_id_regional_commission_statements_id_fk": {
+          "name": "regional_commission_ledger_statement_id_regional_commission_statements_id_fk",
+          "tableFrom": "regional_commission_ledger",
+          "tableTo": "regional_commission_statements",
+          "columnsFrom": [
+            "statement_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_commission_ledger_created_by_users_id_fk": {
+          "name": "regional_commission_ledger_created_by_users_id_fk",
+          "tableFrom": "regional_commission_ledger",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "regional_ledger_nonzero": {
+          "name": "regional_ledger_nonzero",
+          "value": "\"regional_commission_ledger\".\"amount_fen\" <> 0"
+        }
+      }
+    },
+    "regional_commission_statements": {
+      "name": "regional_commission_statements",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "regional_manager_id": {
+          "name": "regional_manager_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "settlement_month": {
+          "name": "settlement_month",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "template_version_id": {
+          "name": "template_version_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_plan_id": {
+          "name": "target_plan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'draft'"
+        },
+        "total_fen": {
+          "name": "total_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "calculation_snapshot": {
+          "name": "calculation_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "calculated_by": {
+          "name": "calculated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "confirmed_by": {
+          "name": "confirmed_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "confirmed_at": {
+          "name": "confirmed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "paid_by": {
+          "name": "paid_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "paid_at": {
+          "name": "paid_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "regional_statements_manager_month_unique": {
+          "name": "regional_statements_manager_month_unique",
+          "columns": [
+            "regional_manager_id",
+            "settlement_month"
+          ],
+          "isUnique": true
+        },
+        "regional_statements_month_status_idx": {
+          "name": "regional_statements_month_status_idx",
+          "columns": [
+            "settlement_month",
+            "status"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "regional_commission_statements_regional_manager_id_users_id_fk": {
+          "name": "regional_commission_statements_regional_manager_id_users_id_fk",
+          "tableFrom": "regional_commission_statements",
+          "tableTo": "users",
+          "columnsFrom": [
+            "regional_manager_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_commission_statements_template_version_id_regional_commission_template_versions_id_fk": {
+          "name": "regional_commission_statements_template_version_id_regional_commission_template_versions_id_fk",
+          "tableFrom": "regional_commission_statements",
+          "tableTo": "regional_commission_template_versions",
+          "columnsFrom": [
+            "template_version_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_commission_statements_target_plan_id_regional_commission_target_plans_id_fk": {
+          "name": "regional_commission_statements_target_plan_id_regional_commission_target_plans_id_fk",
+          "tableFrom": "regional_commission_statements",
+          "tableTo": "regional_commission_target_plans",
+          "columnsFrom": [
+            "target_plan_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_commission_statements_calculated_by_users_id_fk": {
+          "name": "regional_commission_statements_calculated_by_users_id_fk",
+          "tableFrom": "regional_commission_statements",
+          "tableTo": "users",
+          "columnsFrom": [
+            "calculated_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_commission_statements_confirmed_by_users_id_fk": {
+          "name": "regional_commission_statements_confirmed_by_users_id_fk",
+          "tableFrom": "regional_commission_statements",
+          "tableTo": "users",
+          "columnsFrom": [
+            "confirmed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_commission_statements_paid_by_users_id_fk": {
+          "name": "regional_commission_statements_paid_by_users_id_fk",
+          "tableFrom": "regional_commission_statements",
+          "tableTo": "users",
+          "columnsFrom": [
+            "paid_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "regional_commission_target_periods": {
+      "name": "regional_commission_target_periods",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "plan_id": {
+          "name": "plan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "starts_on": {
+          "name": "starts_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ends_on": {
+          "name": "ends_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_order_count": {
+          "name": "target_order_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "cumulative_target_order_count": {
+          "name": "cumulative_target_order_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "regional_commission_target_periods_plan_sequence_unique": {
+          "name": "regional_commission_target_periods_plan_sequence_unique",
+          "columns": [
+            "plan_id",
+            "sequence"
+          ],
+          "isUnique": true
+        },
+        "regional_commission_target_periods_plan_idx": {
+          "name": "regional_commission_target_periods_plan_idx",
+          "columns": [
+            "plan_id",
+            "starts_on"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "regional_commission_target_periods_plan_id_regional_commission_target_plans_id_fk": {
+          "name": "regional_commission_target_periods_plan_id_regional_commission_target_plans_id_fk",
+          "tableFrom": "regional_commission_target_periods",
+          "tableTo": "regional_commission_target_plans",
+          "columnsFrom": [
+            "plan_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "regional_commission_target_periods_target_positive": {
+          "name": "regional_commission_target_periods_target_positive",
+          "value": "\"regional_commission_target_periods\".\"target_order_count\" > 0"
+        },
+        "regional_commission_target_periods_date_order_valid": {
+          "name": "regional_commission_target_periods_date_order_valid",
+          "value": "\"regional_commission_target_periods\".\"ends_on\" >= \"regional_commission_target_periods\".\"starts_on\""
+        }
+      }
+    },
+    "regional_commission_target_plans": {
+      "name": "regional_commission_target_plans",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "regional_manager_id": {
+          "name": "regional_manager_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "plan_type": {
+          "name": "plan_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "period_count": {
+          "name": "period_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "starts_on": {
+          "name": "starts_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ends_on": {
+          "name": "ends_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "is_preset": {
+          "name": "is_preset",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'active'"
+        },
+        "replaced_by_plan_id": {
+          "name": "replaced_by_plan_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "set_by": {
+          "name": "set_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "change_reason": {
+          "name": "change_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'系统创建'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "regional_commission_target_plans_manager_idx": {
+          "name": "regional_commission_target_plans_manager_idx",
+          "columns": [
+            "regional_manager_id",
+            "starts_on"
+          ],
+          "isUnique": false
+        },
+        "regional_commission_target_plans_manager_preset_unique": {
+          "name": "regional_commission_target_plans_manager_preset_unique",
+          "columns": [
+            "regional_manager_id"
+          ],
+          "isUnique": true,
+          "where": "\"regional_commission_target_plans\".\"is_preset\" = 1"
+        }
+      },
+      "foreignKeys": {
+        "regional_commission_target_plans_regional_manager_id_users_id_fk": {
+          "name": "regional_commission_target_plans_regional_manager_id_users_id_fk",
+          "tableFrom": "regional_commission_target_plans",
+          "tableTo": "users",
+          "columnsFrom": [
+            "regional_manager_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_commission_target_plans_set_by_users_id_fk": {
+          "name": "regional_commission_target_plans_set_by_users_id_fk",
+          "tableFrom": "regional_commission_target_plans",
+          "tableTo": "users",
+          "columnsFrom": [
+            "set_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "regional_commission_target_plans_type_periods_valid": {
+          "name": "regional_commission_target_plans_type_periods_valid",
+          "value": "(\"regional_commission_target_plans\".\"plan_type\" = 'quarter' AND \"regional_commission_target_plans\".\"period_count\" = 3) OR (\"regional_commission_target_plans\".\"plan_type\" = 'half_year' AND \"regional_commission_target_plans\".\"period_count\" = 6) OR (\"regional_commission_target_plans\".\"plan_type\" = 'year' AND \"regional_commission_target_plans\".\"period_count\" = 12)"
+        },
+        "regional_commission_target_plans_date_order_valid": {
+          "name": "regional_commission_target_plans_date_order_valid",
+          "value": "\"regional_commission_target_plans\".\"ends_on\" >= \"regional_commission_target_plans\".\"starts_on\""
+        }
+      }
+    },
+    "regional_commission_template_assignments": {
+      "name": "regional_commission_template_assignments",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "regional_manager_id": {
+          "name": "regional_manager_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "template_version_id": {
+          "name": "template_version_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "effective_from": {
+          "name": "effective_from",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "effective_to": {
+          "name": "effective_to",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "assigned_by": {
+          "name": "assigned_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "regional_template_assignments_manager_dates_idx": {
+          "name": "regional_template_assignments_manager_dates_idx",
+          "columns": [
+            "regional_manager_id",
+            "effective_from",
+            "effective_to"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "regional_commission_template_assignments_regional_manager_id_users_id_fk": {
+          "name": "regional_commission_template_assignments_regional_manager_id_users_id_fk",
+          "tableFrom": "regional_commission_template_assignments",
+          "tableTo": "users",
+          "columnsFrom": [
+            "regional_manager_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_commission_template_assignments_template_version_id_regional_commission_template_versions_id_fk": {
+          "name": "regional_commission_template_assignments_template_version_id_regional_commission_template_versions_id_fk",
+          "tableFrom": "regional_commission_template_assignments",
+          "tableTo": "regional_commission_template_versions",
+          "columnsFrom": [
+            "template_version_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_commission_template_assignments_assigned_by_users_id_fk": {
+          "name": "regional_commission_template_assignments_assigned_by_users_id_fk",
+          "tableFrom": "regional_commission_template_assignments",
+          "tableTo": "users",
+          "columnsFrom": [
+            "assigned_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "regional_template_assignment_dates_valid": {
+          "name": "regional_template_assignment_dates_valid",
+          "value": "\"regional_commission_template_assignments\".\"effective_to\" IS NULL OR \"regional_commission_template_assignments\".\"effective_to\" >= \"regional_commission_template_assignments\".\"effective_from\""
+        }
+      }
+    },
+    "regional_commission_template_versions": {
+      "name": "regional_commission_template_versions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "template_code": {
+          "name": "template_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version_no": {
+          "name": "version_no",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'draft'"
+        },
+        "effective_from": {
+          "name": "effective_from",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "effective_to": {
+          "name": "effective_to",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "source_version_id": {
+          "name": "source_version_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "rules_snapshot": {
+          "name": "rules_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "published_by": {
+          "name": "published_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "stopped_by": {
+          "name": "stopped_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "stopped_at": {
+          "name": "stopped_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "change_reason": {
+          "name": "change_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "regional_template_code_version_unique": {
+          "name": "regional_template_code_version_unique",
+          "columns": [
+            "template_code",
+            "version_no"
+          ],
+          "isUnique": true
+        },
+        "regional_template_status_dates_idx": {
+          "name": "regional_template_status_dates_idx",
+          "columns": [
+            "status",
+            "effective_from",
+            "effective_to"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "regional_commission_template_versions_created_by_users_id_fk": {
+          "name": "regional_commission_template_versions_created_by_users_id_fk",
+          "tableFrom": "regional_commission_template_versions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_commission_template_versions_published_by_users_id_fk": {
+          "name": "regional_commission_template_versions_published_by_users_id_fk",
+          "tableFrom": "regional_commission_template_versions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "published_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_commission_template_versions_stopped_by_users_id_fk": {
+          "name": "regional_commission_template_versions_stopped_by_users_id_fk",
+          "tableFrom": "regional_commission_template_versions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "stopped_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "regional_template_version_positive": {
+          "name": "regional_template_version_positive",
+          "value": "\"regional_commission_template_versions\".\"version_no\" > 0 AND \"regional_commission_template_versions\".\"version\" > 0"
+        },
+        "regional_template_dates_valid": {
+          "name": "regional_template_dates_valid",
+          "value": "\"regional_commission_template_versions\".\"effective_to\" IS NULL OR \"regional_commission_template_versions\".\"effective_to\" >= \"regional_commission_template_versions\".\"effective_from\""
+        }
+      }
+    },
+    "regional_cooperation_stages": {
+      "name": "regional_cooperation_stages",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "regional_manager_id": {
+          "name": "regional_manager_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "stage_code": {
+          "name": "stage_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "stage_label": {
+          "name": "stage_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "amount_fen": {
+          "name": "amount_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "achieved_on": {
+          "name": "achieved_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "evidence_no": {
+          "name": "evidence_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'submitted'"
+        },
+        "submitted_by": {
+          "name": "submitted_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "finance_verified_by": {
+          "name": "finance_verified_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "finance_verified_at": {
+          "name": "finance_verified_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "confirmed_by": {
+          "name": "confirmed_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "confirmed_at": {
+          "name": "confirmed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "revoked_by": {
+          "name": "revoked_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "revoke_reason": {
+          "name": "revoke_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "regional_cooperation_manager_stage_date_idx": {
+          "name": "regional_cooperation_manager_stage_date_idx",
+          "columns": [
+            "regional_manager_id",
+            "stage_code",
+            "achieved_on"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "regional_cooperation_stages_regional_manager_id_users_id_fk": {
+          "name": "regional_cooperation_stages_regional_manager_id_users_id_fk",
+          "tableFrom": "regional_cooperation_stages",
+          "tableTo": "users",
+          "columnsFrom": [
+            "regional_manager_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_cooperation_stages_submitted_by_users_id_fk": {
+          "name": "regional_cooperation_stages_submitted_by_users_id_fk",
+          "tableFrom": "regional_cooperation_stages",
+          "tableTo": "users",
+          "columnsFrom": [
+            "submitted_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_cooperation_stages_finance_verified_by_users_id_fk": {
+          "name": "regional_cooperation_stages_finance_verified_by_users_id_fk",
+          "tableFrom": "regional_cooperation_stages",
+          "tableTo": "users",
+          "columnsFrom": [
+            "finance_verified_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_cooperation_stages_confirmed_by_users_id_fk": {
+          "name": "regional_cooperation_stages_confirmed_by_users_id_fk",
+          "tableFrom": "regional_cooperation_stages",
+          "tableTo": "users",
+          "columnsFrom": [
+            "confirmed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_cooperation_stages_revoked_by_users_id_fk": {
+          "name": "regional_cooperation_stages_revoked_by_users_id_fk",
+          "tableFrom": "regional_cooperation_stages",
+          "tableTo": "users",
+          "columnsFrom": [
+            "revoked_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "regional_cooperation_amount_positive": {
+          "name": "regional_cooperation_amount_positive",
+          "value": "\"regional_cooperation_stages\".\"amount_fen\" > 0"
+        }
+      }
+    },
+    "regional_manager_store_history": {
+      "name": "regional_manager_store_history",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "regional_manager_id": {
+          "name": "regional_manager_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "store_id": {
+          "name": "store_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "effective_from": {
+          "name": "effective_from",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "effective_to": {
+          "name": "effective_to",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "regional_manager_store_history_manager_period_idx": {
+          "name": "regional_manager_store_history_manager_period_idx",
+          "columns": [
+            "regional_manager_id",
+            "effective_from",
+            "effective_to"
+          ],
+          "isUnique": false
+        },
+        "regional_manager_store_history_store_period_idx": {
+          "name": "regional_manager_store_history_store_period_idx",
+          "columns": [
+            "store_id",
+            "effective_from",
+            "effective_to"
+          ],
+          "isUnique": false
+        },
+        "regional_manager_store_history_active_store_unique": {
+          "name": "regional_manager_store_history_active_store_unique",
+          "columns": [
+            "store_id"
+          ],
+          "isUnique": true,
+          "where": "\"regional_manager_store_history\".\"effective_to\" IS NULL"
+        }
+      },
+      "foreignKeys": {
+        "regional_manager_store_history_regional_manager_id_users_id_fk": {
+          "name": "regional_manager_store_history_regional_manager_id_users_id_fk",
+          "tableFrom": "regional_manager_store_history",
+          "tableTo": "users",
+          "columnsFrom": [
+            "regional_manager_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_manager_store_history_store_id_stores_id_fk": {
+          "name": "regional_manager_store_history_store_id_stores_id_fk",
+          "tableFrom": "regional_manager_store_history",
+          "tableTo": "stores",
+          "columnsFrom": [
+            "store_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "regional_manager_store_history_period_valid": {
+          "name": "regional_manager_store_history_period_valid",
+          "value": "\"regional_manager_store_history\".\"effective_to\" IS NULL OR \"regional_manager_store_history\".\"effective_to\" > \"regional_manager_store_history\".\"effective_from\""
+        }
+      }
+    },
+    "regional_manager_stores": {
+      "name": "regional_manager_stores",
+      "columns": {
+        "regional_manager_id": {
+          "name": "regional_manager_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "store_id": {
+          "name": "store_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "regional_manager_stores_store_unique": {
+          "name": "regional_manager_stores_store_unique",
+          "columns": [
+            "store_id"
+          ],
+          "isUnique": true
+        },
+        "regional_manager_stores_manager_store_unique": {
+          "name": "regional_manager_stores_manager_store_unique",
+          "columns": [
+            "regional_manager_id",
+            "store_id"
+          ],
+          "isUnique": true
+        },
+        "regional_manager_stores_manager_idx": {
+          "name": "regional_manager_stores_manager_idx",
+          "columns": [
+            "regional_manager_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "regional_manager_stores_regional_manager_id_users_id_fk": {
+          "name": "regional_manager_stores_regional_manager_id_users_id_fk",
+          "tableFrom": "regional_manager_stores",
+          "tableTo": "users",
+          "columnsFrom": [
+            "regional_manager_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "regional_manager_stores_store_id_stores_id_fk": {
+          "name": "regional_manager_stores_store_id_stores_id_fk",
+          "tableFrom": "regional_manager_stores",
+          "tableTo": "stores",
+          "columnsFrom": [
+            "store_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "regional_net_receipts": {
+      "name": "regional_net_receipts",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "regional_manager_id": {
+          "name": "regional_manager_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "month": {
+          "name": "month",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "net_receipt_fen": {
+          "name": "net_receipt_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "evidence_no": {
+          "name": "evidence_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "verification_status": {
+          "name": "verification_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'pending'"
+        },
+        "entered_by": {
+          "name": "entered_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "verified_by": {
+          "name": "verified_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "verified_at": {
+          "name": "verified_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "verification_reason": {
+          "name": "verification_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "regional_net_receipts_manager_month_unique": {
+          "name": "regional_net_receipts_manager_month_unique",
+          "columns": [
+            "regional_manager_id",
+            "month"
+          ],
+          "isUnique": true
+        },
+        "regional_net_receipts_month_status_idx": {
+          "name": "regional_net_receipts_month_status_idx",
+          "columns": [
+            "month",
+            "verification_status"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "regional_net_receipts_regional_manager_id_users_id_fk": {
+          "name": "regional_net_receipts_regional_manager_id_users_id_fk",
+          "tableFrom": "regional_net_receipts",
+          "tableTo": "users",
+          "columnsFrom": [
+            "regional_manager_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_net_receipts_entered_by_users_id_fk": {
+          "name": "regional_net_receipts_entered_by_users_id_fk",
+          "tableFrom": "regional_net_receipts",
+          "tableTo": "users",
+          "columnsFrom": [
+            "entered_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_net_receipts_verified_by_users_id_fk": {
+          "name": "regional_net_receipts_verified_by_users_id_fk",
+          "tableFrom": "regional_net_receipts",
+          "tableTo": "users",
+          "columnsFrom": [
+            "verified_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "regional_personal_channel_order_lines": {
+      "name": "regional_personal_channel_order_lines",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "order_id": {
+          "name": "order_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sku": {
+          "name": "sku",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "unit_commission_fen": {
+          "name": "unit_commission_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "subtotal_fen": {
+          "name": "subtotal_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "returned_quantity": {
+          "name": "returned_quantity",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {
+        "regional_personal_order_lines_order_idx": {
+          "name": "regional_personal_order_lines_order_idx",
+          "columns": [
+            "order_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "regional_personal_channel_order_lines_order_id_regional_personal_channel_orders_id_fk": {
+          "name": "regional_personal_channel_order_lines_order_id_regional_personal_channel_orders_id_fk",
+          "tableFrom": "regional_personal_channel_order_lines",
+          "tableTo": "regional_personal_channel_orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "regional_personal_order_lines_values_valid": {
+          "name": "regional_personal_order_lines_values_valid",
+          "value": "\"regional_personal_channel_order_lines\".\"quantity\" > 0 AND \"regional_personal_channel_order_lines\".\"returned_quantity\" BETWEEN 0 AND \"regional_personal_channel_order_lines\".\"quantity\" AND \"regional_personal_channel_order_lines\".\"unit_commission_fen\" >= 0 AND \"regional_personal_channel_order_lines\".\"subtotal_fen\" >= 0"
+        }
+      }
+    },
+    "regional_personal_channel_orders": {
+      "name": "regional_personal_channel_orders",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "order_no": {
+          "name": "order_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "regional_manager_id": {
+          "name": "regional_manager_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "channel": {
+          "name": "channel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "order_count": {
+          "name": "order_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "business_date": {
+          "name": "business_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "signed_on": {
+          "name": "signed_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "effective_on": {
+          "name": "effective_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "evidence_no": {
+          "name": "evidence_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'active'"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "voided_by": {
+          "name": "voided_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "voided_at": {
+          "name": "voided_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "void_reason": {
+          "name": "void_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "returned_on": {
+          "name": "returned_on",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "return_reason": {
+          "name": "return_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(cast((julianday('now') - 2440587.5)*86400000 as integer))"
+        }
+      },
+      "indexes": {
+        "regional_personal_orders_no_unique": {
+          "name": "regional_personal_orders_no_unique",
+          "columns": [
+            "order_no"
+          ],
+          "isUnique": true
+        },
+        "regional_personal_orders_manager_effective_idx": {
+          "name": "regional_personal_orders_manager_effective_idx",
+          "columns": [
+            "regional_manager_id",
+            "effective_on"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "regional_personal_channel_orders_regional_manager_id_users_id_fk": {
+          "name": "regional_personal_channel_orders_regional_manager_id_users_id_fk",
+          "tableFrom": "regional_personal_channel_orders",
+          "tableTo": "users",
+          "columnsFrom": [
+            "regional_manager_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_personal_channel_orders_created_by_users_id_fk": {
+          "name": "regional_personal_channel_orders_created_by_users_id_fk",
+          "tableFrom": "regional_personal_channel_orders",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "regional_personal_channel_orders_voided_by_users_id_fk": {
+          "name": "regional_personal_channel_orders_voided_by_users_id_fk",
+          "tableFrom": "regional_personal_channel_orders",
+          "tableTo": "users",
+          "columnsFrom": [
+            "voided_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "regional_personal_orders_count_positive": {
+          "name": "regional_personal_orders_count_positive",
+          "value": "\"regional_personal_channel_orders\".\"order_count\" > 0"
+        }
+      }
+    },
     "return_items": {
       "name": "return_items",
       "columns": {
@@ -2564,11 +4525,42 @@
           "notNull": true,
           "autoincrement": false
         },
+        "service_type": {
+          "name": "service_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'refund'"
+        },
         "return_type": {
           "name": "return_type",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "return_kind": {
+          "name": "return_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'normal'"
+        },
+        "reason_category": {
+          "name": "reason_category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'other'"
+        },
+        "order_status_before": {
+          "name": "order_status_before",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "status": {
@@ -2633,6 +4625,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "requested_refund_fen": {
+          "name": "requested_refund_fen",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         },
         "refund_fen": {
           "name": "refund_fen",
@@ -2770,6 +4770,10 @@
         "returns_refund_nonnegative": {
           "name": "returns_refund_nonnegative",
           "value": "\"returns\".\"refund_fen\" >= 0"
+        },
+        "returns_requested_refund_nonnegative": {
+          "name": "returns_requested_refund_nonnegative",
+          "value": "\"returns\".\"requested_refund_fen\" >= 0"
         },
         "returns_version_positive": {
           "name": "returns_version_positive",
@@ -3407,6 +5411,20 @@
         "last_login_at": {
           "name": "last_login_at",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "employment_start_date": {
+          "name": "employment_start_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "employment_end_date": {
+          "name": "employment_end_date",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false

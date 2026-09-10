@@ -86,6 +86,17 @@ const decodeCursor = (
   }
 };
 
+const startOfShanghaiMonth = (value: Date): Date => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((entry) => entry.type === type)?.value ?? "";
+  return new Date(`${part("year")}-${part("month")}-01T00:00:00+08:00`);
+};
+
 const baseOrder = (row: OrderRow): Omit<OrderRecord, "lines" | "attributions"> => ({
   id: row.id,
   orderNo: row.orderNo,
@@ -121,7 +132,6 @@ const baseOrder = (row: OrderRow): Omit<OrderRecord, "lines" | "attributions"> =
   reconciledBy: row.reconciledBy,
   paidAt: row.paidAt,
   paidBy: row.paidBy,
-  completedAt: row.completedAt,
   cancelledAt: row.cancelledAt,
   deletedAt: row.deletedAt,
   version: row.version,
@@ -146,7 +156,7 @@ export class DrizzleOrderRepository implements OrderRepository {
   }
 
   private async hydrate(row: OrderRow): Promise<OrderRecord> {
-    const [lineRows, attributionRows, returnRows, commissionRows] = await Promise.all([
+    const [lineRows, attributionRows, returnRows, commissionRows, lifecycleRows] = await Promise.all([
       this.executor
         .select()
         .from(orderLines)
@@ -173,6 +183,12 @@ export class DrizzleOrderRepository implements OrderRepository {
         .leftJoin(settlementItems, eq(settlementItems.ledgerEntryId, commissionLedger.id))
         .leftJoin(settlementBatches, eq(settlementBatches.id, settlementItems.batchId))
         .where(eq(commissionLedger.orderId, row.id)),
+      this.executor
+        .select({ action: auditLogs.action, actorName: users.displayName, at: auditLogs.createdAt })
+        .from(auditLogs)
+        .leftJoin(users, eq(users.id, auditLogs.actorUserId))
+        .where(and(eq(auditLogs.entityType, "order"), eq(auditLogs.entityId, row.id)))
+        .orderBy(auditLogs.createdAt, auditLogs.id),
     ]);
     const commissionNetFen = commissionRows.reduce((total, entry) => total + entry.amountFen, 0);
     const commissionPaidFen = commissionRows.reduce(
@@ -219,6 +235,11 @@ export class DrizzleOrderRepository implements OrderRepository {
       commissionNetFen,
       commissionPaidFen,
       commissionReversedFen,
+      lifecycleEvents: lifecycleRows.map((event) => ({
+        action: event.action,
+        actorName: event.actorName?.trim() || "系统操作",
+        at: event.at,
+      })),
     };
   }
 
@@ -724,6 +745,7 @@ export class DrizzleOrderRepository implements OrderRepository {
           .where(and(
             inArray(commissionLedger.beneficiaryId, beneficiaryIds),
             lt(commissionLedger.amountFen, 0),
+            lt(commissionLedger.occurredAt, startOfShanghaiMonth(at)),
             isNull(settlementItems.id),
           )))
         .filter((entry) => !selectedEntryIds.has(entry.id));

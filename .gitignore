@@ -1,27 +1,50 @@
+# Dependencies and package-manager caches
 node_modules/
+.pnpm-store/
+
+# Build and compiler output
 dist/
 dist-server/
-backups/
+*.tsbuildinfo
+.vite/
+
+# Tests and coverage
 coverage/
 playwright-report/
 test-results/
-outputs/
 
+# Runtime data and generated exports
+.local/
+data/
+backups/
+deploy/linux/backups/
+deploy/linux/state/
+output/
+outputs/
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.dump
+*.enc
+
+# Local environment files
 .env
 .env.*
 !.env.example
 !deploy/linux/.env.example
 
-*.sqlite
-*.sqlite-shm
-*.sqlite-wal
-*.sqlite3
-*.db
-*.db-shm
-*.db-wal
-
-deploy/linux/backups/
-deploy/linux/state/
-
-.DS_Store
+# Logs and temporary files
 *.log
+*.pid
+*.tmp
+*.swp
+*~
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
