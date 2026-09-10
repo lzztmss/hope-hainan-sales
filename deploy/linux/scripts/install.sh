@@ -116,7 +116,7 @@ mkdir -p "${DEPLOY_ROOT}/backups" "${DEPLOY_ROOT}/state"
 chmod 0700 "${DEPLOY_ROOT}/backups" "${DEPLOY_ROOT}/state"
 
 printf '==> 从当前源码构建镜像\n'
-compose build --pull api web
+compose build api web
 printf '==> 初始化数据库结构\n'
 compose run --rm migrate
 printf '==> 初始化管理员与默认提成规则\n'
