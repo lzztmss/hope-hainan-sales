@@ -106,7 +106,6 @@ export const AppShell = ({
           <span>{isNavigationOpen ? "关闭" : "菜单"}</span>
         </Button>
         <div className="sales-shell__identity">
-          <span className="sales-shell__avatar" aria-hidden="true">{user.displayName.slice(0, 1)}</span>
           <span className="sales-shell__identity-copy"><strong>{user.displayName}</strong><small>{ROLE_LABELS[user.role]} · {departmentName}</small></span>
           {onLogout ? (
             <Button

@@ -211,19 +211,6 @@
   color: var(--muted-foreground);
 }
 
-.sales-shell__avatar {
-  display: grid;
-  flex: 0 0 auto;
-  width: 1.875rem;
-  height: 1.875rem;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--primary);
-  font-size: 0.75rem;
-  font-weight: 750;
-}
-
 .sales-shell__identity-copy strong {
   overflow: hidden;
   color: var(--foreground);
