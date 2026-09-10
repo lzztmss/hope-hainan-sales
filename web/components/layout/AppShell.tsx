@@ -81,6 +81,7 @@ export const AppShell = ({
   useEffect(() => setIsNavigationOpen(false), [currentPath]);
   const activeHref = resolveActiveHref(currentPath, navigationForRole(user.role));
   const activeLabel = navigationForRole(user.role).find((item) => item.href === activeHref)?.label ?? "工作台";
+  const departmentName = user.storeName ?? "公司总部";
 
   return (
     <div className="sales-shell" data-role={user.role}>
@@ -106,11 +107,7 @@ export const AppShell = ({
         </Button>
         <div className="sales-shell__identity">
           <span className="sales-shell__avatar" aria-hidden="true">{user.displayName.slice(0, 1)}</span>
-          <span className="sales-shell__identity-copy"><strong>{user.displayName}</strong><small>{user.storeName ?? ROLE_LABELS[user.role]}</small></span>
-          {user.storeName ? (
-            <span className="sales-shell__store">{user.storeName}</span>
-          ) : null}
-          <span className="sales-shell__role">{ROLE_LABELS[user.role]}</span>
+          <span className="sales-shell__identity-copy"><strong>{user.displayName}</strong><small>{ROLE_LABELS[user.role]} · {departmentName}</small></span>
           {onLogout ? (
             <Button
               variant="outline"
@@ -144,22 +141,19 @@ export const AppShell = ({
           renderLink={renderLink}
           role={user.role}
         />
-        <div className="sales-shell__sidebar-user">
-          <span className="sales-shell__avatar" aria-hidden="true">{user.displayName.slice(0, 1)}</span>
-          <span><strong>{user.displayName}</strong><small>{ROLE_LABELS[user.role]}{user.storeName ? ` · ${user.storeName}` : ""}</small></span>
-          {onLogout ? (
+        {onLogout ? (
+          <div className="sales-shell__sidebar-user">
             <Button
               variant="ghost"
-              size="icon-sm"
               className="sales-shell__sidebar-logout"
               type="button"
-              aria-label="退出登录"
               onClick={onLogout}
             >
               <LogOut aria-hidden="true" />
+              <span>退出登录</span>
             </Button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </aside>
       {isNavigationOpen ? <button className="sales-shell__backdrop" type="button" aria-label="关闭主导航" onClick={() => setIsNavigationOpen(false)} /> : null}
       <main className="sales-shell__main" id="main-content" tabIndex={-1} inert={isNavigationOpen}>

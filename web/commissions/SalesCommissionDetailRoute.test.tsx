@@ -53,10 +53,12 @@ const makeClient = () =>
     getCommissionDashboard: vi.fn().mockResolvedValue(emptyDashboard),
   }) as unknown as ApiClient;
 
-const filterSelects = (): NodeListOf<HTMLSelectElement> => {
+const filterSelect = (index: number): HTMLSelectElement => {
   const form = document.querySelector(".sales-commission-filters");
   if (!form) throw new Error("未找到筛选表单");
-  return form.querySelectorAll("select");
+  const select = form.querySelectorAll("select")[index];
+  if (!select) throw new Error(`未找到第 ${index + 1} 个筛选下拉框`);
+  return select;
 };
 
 describe("销售提成详情筛选", () => {
@@ -92,9 +94,9 @@ describe("销售提成详情筛选", () => {
     );
 
     await screen.findByRole("option", { name: "验收营业员（SALE）" });
-    fireEvent.change(filterSelects()[1], { target: { value: CONFIG_SELLER_ID } });
+    fireEvent.change(filterSelect(1), { target: { value: CONFIG_SELLER_ID } });
 
-    await waitFor(() => expect(filterSelects()[1].value).toBe(CONFIG_SELLER_ID));
+    await waitFor(() => expect(filterSelect(1).value).toBe(CONFIG_SELLER_ID));
     await screen.findByText("销售提成明细");
     expect(screen.queryByText("当前页面暂时无法使用")).toBeNull();
   });
@@ -109,12 +111,12 @@ describe("销售提成详情筛选", () => {
     );
 
     await screen.findByRole("option", { name: "验收营业员（SALE）" });
-    fireEvent.change(filterSelects()[1], { target: { value: CONFIG_SELLER_ID } });
-    await waitFor(() => expect(filterSelects()[1].value).toBe(CONFIG_SELLER_ID));
+    fireEvent.change(filterSelect(1), { target: { value: CONFIG_SELLER_ID } });
+    await waitFor(() => expect(filterSelect(1).value).toBe(CONFIG_SELLER_ID));
 
-    fireEvent.change(filterSelects()[0], { target: { value: CONFIG_STORE_ID } });
-    await waitFor(() => expect(filterSelects()[0].value).toBe(CONFIG_STORE_ID));
-    expect(filterSelects()[1].value).toBe("");
+    fireEvent.change(filterSelect(0), { target: { value: CONFIG_STORE_ID } });
+    await waitFor(() => expect(filterSelect(0).value).toBe(CONFIG_STORE_ID));
+    expect(filterSelect(1).value).toBe("");
 
     await screen.findByText("销售提成明细");
     expect(screen.queryByText("当前页面暂时无法使用")).toBeNull();

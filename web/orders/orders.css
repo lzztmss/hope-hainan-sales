@@ -993,7 +993,15 @@
   position: sticky;
   bottom: 0;
   padding: var(--hfttr-space-3) 0 max(var(--hfttr-space-3), env(safe-area-inset-bottom));
-  background: linear-gradient(transparent, var(--app-color-surface) 30%);
+  background: transparent;
+}
+
+/* 操作栏不再有底色遮罩，按钮不能靠元素透明度表示禁用，否则滚动内容会从按钮里透出 */
+.order-detail-actions button:disabled {
+  border-color: var(--app-color-border);
+  background: var(--app-color-surface-subtle);
+  color: var(--app-color-text-muted);
+  opacity: 1;
 }
 
 .return-dialog {
