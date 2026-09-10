@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1.7
-
 ARG NODE_IMAGE=node:22.17.0-bookworm-slim
 ARG NGINX_IMAGE=nginx:1.28.0-alpine3.21
 
