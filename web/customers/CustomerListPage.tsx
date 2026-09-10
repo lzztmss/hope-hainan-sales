@@ -67,7 +67,6 @@ export const CustomerListPage = ({ client, viewer }: { client: ApiClient; viewer
     <PageLayout
       eyebrow="客户档案"
       title="客户管理"
-      description={globalDataRole(viewer.role) ? "查看全公司客户，可按营业厅和销售员筛选。" : viewer.role === "regional_manager" ? "只读查看所管营业厅客户，可按营业厅和销售员筛选。" : viewer.role === "store_manager" ? "仅展示本营业厅客户，可按本厅销售员筛选。" : "客户由正式报价自动建档，可查看归属、报价和订单情况。"}
     >
       <section className="ops-list" aria-label="客户档案">
       <header className="ops-list__heading"><h2>客户档案</h2><span>共 {total} 位客户</span></header>

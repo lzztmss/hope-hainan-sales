@@ -198,7 +198,6 @@ export const RegionalPersonalOrderPage = ({
 
   return <PageLayout
     actions={<Link className="regional-secondary-action" to="/commissions/regional">返回提成总览</Link>}
-    description={canEdit ? "一张业务订单可录入多个商品，系统保存逐件数量、单价和提成小计。" : "查看个人渠道订单、逐件提成和退货状态。"}
     eyebrow="大区经理提成"
     title={canEdit ? "个人渠道订单管理" : "我的个人渠道订单"}
   >

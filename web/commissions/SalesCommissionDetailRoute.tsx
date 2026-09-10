@@ -58,7 +58,6 @@ export const SalesCommissionDetailRoute = ({ client, actor }: { client: ApiClien
       {dashboard ? (
         <MyCommissionPage
           dashboard={dashboard}
-          description="逐商品展示原计提、部分退单扣回和当前净额"
           eyebrow="人力资源"
           onPageChange={(page) => void load(page)}
           onPayout={async (orderIds) => {

@@ -128,7 +128,6 @@ export const QuoteListPage = ({ client, viewer }: { client: ApiClient; viewer: A
     <PageLayout
       eyebrow="销售报价"
       title={globalDataRole(viewer.role) ? "全部报价" : viewer.role === "regional_manager" ? "大区报价" : viewer.role === "store_manager" ? "本厅报价" : "我的报价"}
-      description={globalDataRole(viewer.role) ? "查询全公司营业厅报价，可按营业厅和销售员筛选。" : viewer.role === "regional_manager" ? "只读查询所管营业厅报价，可按营业厅和销售员筛选。" : viewer.role === "store_manager" ? "仅展示本营业厅报价，可按本厅销售员筛选。" : "查询已保存报价，未转订单的报价可以继续修改、打印或转为订单。"}
       actions={viewer.role === "sales" ? <Link className="quote-management__primary-link" to="/quotes/new"><FilePlus2 aria-hidden="true" />新建报价</Link> : null}
     >
       <section className="ops-list" aria-label="报价管理">

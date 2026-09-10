@@ -56,7 +56,6 @@ export interface MyCommissionPageProps {
   onPayout?(orderIds: readonly string[]): Promise<void>;
   title?: string;
   eyebrow?: string;
-  description?: string;
 }
 
 const displayMoney = (value: number, reversal = false): string => {
@@ -116,7 +115,6 @@ const summaryDefinitions: ReadonlyArray<{
 
 export const MyCommissionPage = ({
   dashboard,
-  description = "数据按订单签收、公司收款和实际发放状态统计",
   eyebrow = "销售激励",
   onPageChange,
   onPayout,
@@ -144,7 +142,7 @@ export const MyCommissionPage = ({
       <div>
         <p>{eyebrow}</p>
         <h1 id="my-commission-title">{title}</h1>
-        <span>{dashboard.periodLabel} · {description}</span>
+        <span>{dashboard.periodLabel}</span>
       </div>
     </header>
 
