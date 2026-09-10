@@ -620,7 +620,6 @@ export const RegionalTemplateEditor = ({
                   <h2>{selected.name} · 第 {selected.versionNo} 版</h2>
                   <p>
                     版本最早可用日期 {selected.effectiveFrom}
-                    {selected.effectiveTo ? ` 至 ${selected.effectiveTo}` : ""}
                     {readOnly ? " · 当前版本只读" : " · 草稿可编辑"}
                     {selectedIsAssigned ? " · 当前统计月份使用中" : ""}
                     {hasUnsavedChanges ? " · 有未保存修改" : ""}
@@ -628,14 +627,14 @@ export const RegionalTemplateEditor = ({
                 </div>
                 <span className={`regional-template-status is-${selected.status}`}>
                   {selected.status === "published" && selectedCycleEndsOn && selectedCycleEndsOn < shanghaiToday()
-                    ? "目标周期已结束"
+                    ? "模板计算已结束"
                     : STATUS_LABELS[selected.status]}
                 </span>
               </header>
 
               <fieldset className="regional-rule-group" disabled={readOnly || busy}>
                 <legend>目标周期</legend>
-                <p>决定每个非自然月周期的订单目标。M1 开始日期可单独设置，不必等于模板适用日期或入职日期。</p>
+                <p>决定模板的完整计算范围和每个非自然月周期的订单目标。M1 可独立设置，模板计算结束日由周期类型自动生成。</p>
                 <div className="regional-rule-grid">
                   <label className="regional-field">
                     <span>计划类型</span>
@@ -660,7 +659,7 @@ export const RegionalTemplateEditor = ({
                       value={draftRules.targetCycle.startsOn ?? employmentStartDate ?? ""}
                       onChange={(event) => updateTargetCycle({ startsOn: event.currentTarget.value })}
                     />
-                    <small>首版可参考入职日期，但以这里填写的日期作为 M1 起点。{selectedCycleEndsOn ? ` 当前周期至 ${selectedCycleEndsOn}。` : ""}</small>
+                    <small>首版可参考入职日期，但以这里填写的日期作为 M1 起点。{selectedCycleEndsOn ? ` 模板计算至 ${selectedCycleEndsOn}，范围外订单不计提成。` : ""}</small>
                   </label>
                 </div>
                 <div className="regional-rule-grid">

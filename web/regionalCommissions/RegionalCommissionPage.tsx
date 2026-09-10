@@ -57,7 +57,7 @@ const settlementCategoryLabel: Record<string, string> = {
   tiered_order: "分段订单奖",
   milestone: "里程碑奖",
   top_up: "补足奖",
-  revenue_acceleration: "本月回款加速奖",
+  revenue_acceleration: "累计回款加速奖",
   personal_product: "个人商品提成",
   cooperation: "已确认合作奖",
   tiered_return: "有效退单扣回",
@@ -137,8 +137,12 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
     ? `${month} 已包含在 ${settlementCoveredBy.settlementMonth} ${settlementCoveredBy.status === "paid" ? "已发放" : "已确认"}的累计结算中，该月份不能再重复生成或确认结算单。`
     : null;
   const targetPlanEnded = Boolean(
-    summary?.targetPlanEndsOn && summary.targetPlanEndsOn < summary.statisticsEndsOn,
+    summary?.targetPlanEndsOn && summary.targetPlanEndsOn < `${month}-99`,
   );
+  const settledToDateFen = summary?.settlementEntries.reduce(
+    (sum, entry) => sum + entry.previouslySettledFen,
+    0,
+  ) ?? 0;
 
   const run = async (action: () => Promise<unknown>, success: string) => {
     try {
@@ -300,7 +304,7 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
           ["分段订单奖", yuan(summary.tieredOrderFen)],
           ["里程碑奖", yuan(summary.milestoneFen)],
           ["补足奖", yuan(summary.topUpFen)],
-          ["回款加速奖", yuan(summary.revenueAccelerationFen)],
+          ["累计回款加速奖", yuan(summary.revenueAccelerationFen)],
           ["个人商品提成", yuan(summary.personalProductFen)],
           ["合作奖", yuan(summary.cooperationFen)],
           ["累计金额", yuan(summary.totalFen)],
@@ -314,8 +318,8 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
         </div>
         {summary.targetPlanStartsOn && summary.targetPlanEndsOn ? <p className="regional-inline-help">
           累计查询范围：{summary.statisticsStartsOn ?? summary.targetPlanStartsOn} 至 {summary.statisticsEndsOn}；
-          目标计划范围：{summary.targetPlanStartsOn} 至 {summary.targetPlanEndsOn}{targetPlanEnded ? "（已结束）" : ""}。
-          {targetPlanEnded ? " 目标周期结束后不再产生新的周期目标奖；历史订单和已产生奖项仍保留。" : ""}
+          模板计算范围：{summary.targetPlanStartsOn} 至 {summary.targetPlanEndsOn}{targetPlanEnded ? "（已结束）" : ""}。
+          {targetPlanEnded ? " 范围外订单不再产生新提成；原始订单、历史奖项和退单调整仍保留。" : ""}
         </p> : null}
         <div className="regional-table-wrap"><table><thead><tr><th>周期</th><th>起止日期</th><th>本期目标</th><th>本期有效订单</th><th>周期内累计有效订单</th><th>目标奖</th></tr></thead><tbody>
           {summary.periods.map((period) => <tr key={period.sequence}><td>M{period.sequence}</td><td>{period.startsOn} 至 {period.endsOn}</td><td>{period.targetOrderCount}</td><td>{period.orderCount}</td><td>{period.cumulativeOrderCount}</td><td>{yuan(period.rewardFen)}</td></tr>)}
@@ -345,7 +349,7 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
           <strong>{summary.revenueAcceleration.unlocked ? "回款加速奖已解锁" : "回款加速奖尚未解锁"}</strong>
           <span>有效订单 {summary.revenueAcceleration.currentOrderCount.toLocaleString()} / {summary.revenueAcceleration.unlockOrderCount.toLocaleString()}</span>
           <span>比例 {(summary.revenueAcceleration.ratePartsPerMillion / 10_000).toFixed(4).replace(/0+$/, "").replace(/\.$/, "")}% · 月度封顶 {yuan(summary.revenueAcceleration.monthlyCapFen)}</span>
-          <small>{summary.revenueAcceleration.unlocked ? `本月按已核验净回款计算：${yuan(summary.revenueAccelerationFen)}` : "未达到累计订单门槛，因此本月奖励为 ¥0.00。"}</small>
+          <small>{summary.revenueAcceleration.unlocked ? `本月按已核验净回款计算：${yuan(summary.currentMonthRevenueAccelerationFen)}；模板范围内累计 ${yuan(summary.revenueAccelerationFen)}。` : "未达到累计订单门槛，因此本月奖励为 ¥0.00。"}</small>
         </div>
         {summary.receipt && canReview && summary.receipt.verificationStatus !== "rejected" ? <div className="regional-review-panel">
           <label><span>{summary.receipt.verificationStatus === "verified" ? "退回更正原因" : "驳回原因（核验通过时可不填）"}</span><input value={receiptReviewReason} onChange={(event) => setReceiptReviewReason(event.currentTarget.value)} /></label>
@@ -403,15 +407,22 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
               : "尚未分配已发布模板"}</span>
             {summary.templateEffectiveFrom ? <small>规则适用期：{summary.templateEffectiveFrom}{summary.templateEffectiveTo ? ` 至 ${summary.templateEffectiveTo}` : " 起"}。切换统计月份时会按历史适用日期匹配对应版本。</small> : null}
           </div>
+          <div className="regional-settlement-preview__source">
+            <strong>累计结算进度</strong>
+            <span>已确认/已发放 {yuan(settledToDateFen)}</span>
+            <small>{currentStatement && currentStatement.status !== "draft"
+              ? `锁定后新增差额 ${yuan(summary.settlementPreviewFen)}，自动结转到下个未结算月。`
+              : `当前尚待结算 ${yuan(summary.settlementPreviewFen)}。`}</small>
+          </div>
           <ul className="regional-settlement-rules">
-            <li>营业厅订单在签收满 7 天后计为有效订单；从入职日起累计 {summary.managedOrderCount} 笔。</li>
-            <li>个人渠道订单按其生效日和商品快照计入；目标计划内共 {summary.personalOrderCount} 笔。</li>
-            <li>回款奖只使用本月已核验净回款，合作奖只使用已确认记录，退单按规则扣回。</li>
-            <li>“本月应结算”是截止本月累计结果减去以前月份已结算金额；生成草稿时会保存这份计算快照。</li>
+            <li>营业厅订单在签收满 7 天后计为有效订单；模板计算范围内累计 {summary.managedOrderCount} 笔。</li>
+            <li>个人渠道订单按其生效日和匹配模板计入；模板计算范围内共 {summary.personalOrderCount} 笔。</li>
+            <li>回款奖累计纳入模板范围内各月已核验净回款；合作奖只使用已确认记录，退单按规则扣回。</li>
+            <li>“待结算”是累计已产生减去累计已确认/已发放；锁定后补录的历史业务差额自动结转到下个未结算月。</li>
           </ul>
         </div>
         {settlementCoveredReason ? <div className="system-notice">{settlementCoveredReason}</div> : null}
-        <div className="regional-table-wrap regional-settlement-breakdown"><table><thead><tr><th>提成组成</th><th>当前统计结果</th><th>{settlementCoveredBy ? "已结算/已覆盖" : "以前月份已结算"}</th><th>{settlementCoveredBy ? "本月可结算" : "本月应结算"}</th></tr></thead><tbody>
+        <div className="regional-table-wrap regional-settlement-breakdown"><table><thead><tr><th>提成组成</th><th>累计已产生</th><th>累计已确认/发放</th><th>{currentStatement && currentStatement.status !== "draft" ? "结转待结算" : "本期待结算"}</th></tr></thead><tbody>
           {summary.settlementEntries.map((entry) => <tr key={entry.category}>
             <td>{settlementCategoryLabel[entry.category] ?? entry.category}</td>
             <td>{yuan(entry.accruedFen)}</td>

@@ -112,7 +112,7 @@ describe("大区经理个人渠道提成", () => {
     await client.close();
   });
 
-  it("目标周期结束后停止周期目标奖，但不误伤仍在适用期的其他规则", async () => {
+  it("模板计算周期结束后不再纳入新订单或新奖励", async () => {
     const directory = await mkdtemp(join(tmpdir(), "hope-regional-ended-plan-"));
     directories.push(directory);
     const path = join(directory, "app.sqlite");
@@ -157,14 +157,13 @@ describe("大区经理个人渠道提成", () => {
       evidenceNo: "AFTER-PLAN-EVIDENCE",
       lines: [{ sku: "GATEWAY", label: "迷你网关", quantity: 1 }],
     });
-    const cooperation = await service.submitCooperation(hr, {
+    await expect(service.submitCooperation(hr, {
       managerId: "regional",
       stageCode: "PROJECT",
       achievedOn: "2026-09-10",
       evidenceNo: "PROJECT-SEP",
       note: "9 月立项",
-    });
-    expect(cooperation).toMatchObject({ stageCode: "PROJECT", achievedOn: "2026-09-10" });
+    })).rejects.toThrow("达成日期不在已分配模板的计算范围内");
 
     const september = await service.summary(hr, "regional", "2026-09");
     expect(september).toMatchObject({
@@ -172,27 +171,86 @@ describe("大区经理个人渠道提成", () => {
       targetPlanStartsOn: "2026-01-15",
       targetPlanEndsOn: "2026-07-14",
       statisticsStartsOn: "2026-01-15",
-      statisticsEndsOn: "2026-09-30",
-      orderCount: 1,
+      statisticsEndsOn: "2026-07-14",
+      orderCount: 0,
       managedOrderCount: 0,
-      personalOrderCount: 1,
+      personalOrderCount: 0,
       completionFen: 0,
-      tieredOrderFen: 100,
+      tieredOrderFen: 0,
       milestoneFen: 0,
       topUpFen: 0,
-      personalProductFen: 600,
+      personalProductFen: 0,
       cooperationFen: 0,
-      totalFen: 700,
+      totalFen: 0,
     });
     await expect(service.summary(hr, "regional", "2025-12")).rejects.toThrow("不能早于大区经理入职月份");
     await expect(service.summary(hr, "regional", "2026-10")).rejects.toThrow("不能晚于当前月份");
 
     const firstDraft = await service.calculateStatement(hr, "regional", "2026-09");
-    expect(firstDraft).toMatchObject({ targetPlanId: targetPlan.id, totalFen: 700 });
+    expect(firstDraft).toMatchObject({ targetPlanId: targetPlan.id, totalFen: 0 });
     const secondDraft = await service.calculateStatement(hr, "regional", "2026-09");
-    expect(secondDraft).toMatchObject({ targetPlanId: targetPlan.id, totalFen: 700 });
+    expect(secondDraft).toMatchObject({ targetPlanId: targetPlan.id, totalFen: 0 });
     const ledger = await client.db.select().from(regionalCommissionLedger);
-    expect(ledger).toHaveLength(2);
+    expect(ledger).toHaveLength(0);
+    await client.close();
+  });
+
+  it("后创建的模板会自动纳入计算范围内尚未结算的原始订单", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "hope-regional-template-after-order-"));
+    directories.push(directory);
+    const path = join(directory, "app.sqlite");
+    await migrateDatabase(path);
+    const client = createDatabaseClient(path);
+    await client.db.insert(users).values([
+      { id: "admin", workNo: "ADMIN", displayName: "管理员", passwordHash: "x", role: "admin", personnelType: "admin", mustChangePassword: false },
+      { id: "hr", workNo: "HR", displayName: "人力", passwordHash: "x", role: "hr", personnelType: "admin", mustChangePassword: false },
+      { id: "regional", workNo: "REGIONAL", displayName: "大区经理", passwordHash: "x", role: "regional_manager", personnelType: "admin", employmentStartDate: "2026-01-15", mustChangePassword: false },
+    ]);
+    const service = new RegionalCommissionService(client);
+    const hr: AuthenticatedUser = { id: "hr", displayName: "人力", role: "hr", storeId: null, mustChangePassword: false };
+    const admin: AuthenticatedUser = { id: "admin", displayName: "管理员", role: "admin", storeId: null, mustChangePassword: false };
+
+    await service.createPersonalOrder(hr, {
+      managerId: "regional",
+      orderNo: "BEFORE-TEMPLATE",
+      channel: "电信",
+      orderCount: 1,
+      businessDate: "2026-01-15",
+      signedOn: "2026-01-15",
+      evidenceNo: "BEFORE-TEMPLATE",
+      lines: [{ sku: "GATEWAY", label: "迷你网关", quantity: 1 }],
+    });
+    const draft = await service.createTemplate(admin, {
+      name: "后创建模板",
+      effectiveFrom: "2026-01-15",
+      reason: "订单成立后补建规则",
+      rules: {
+        ...DEFAULT_REGIONAL_COMMISSION_RULES,
+        targetCycle: {
+          startsOn: "2026-01-15",
+          planType: "half_year",
+          periodTargets: [1_000, 4_000, 8_000, 10_000, 13_000, 14_000],
+        },
+      },
+    });
+    const published = await service.publishTemplate(admin, draft.id, "确认发布");
+    expect(published.effectiveTo).toBe("2026-07-14");
+    await service.assignTemplate(admin, {
+      managerId: "regional",
+      templateVersionId: published.id,
+      effectiveFrom: "2026-01-15",
+      reason: "补入尚未结算的周期订单",
+    });
+
+    const january = await service.summary(hr, "regional", "2026-01");
+    expect(january).toMatchObject({
+      statisticsStartsOn: "2026-01-15",
+      statisticsEndsOn: "2026-01-31",
+      templateEffectiveTo: "2026-07-14",
+      orderCount: 1,
+      personalOrderCount: 1,
+      personalProductFen: 600,
+    });
     await client.close();
   });
 
@@ -305,6 +363,10 @@ describe("大区经理个人渠道提成", () => {
     const rules = {
       ...DEFAULT_REGIONAL_COMMISSION_RULES,
       targetCycle: { startsOn: "2026-01-15", planType: "half_year" as const, periodTargets: [1_000, 4_000, 8_000, 10_000, 13_000, 14_000] },
+      revenueAcceleration: {
+        ...DEFAULT_REGIONAL_COMMISSION_RULES.revenueAcceleration,
+        unlockOrderCount: 1,
+      },
     };
     const [template] = await client.db.insert(regionalCommissionTemplateVersions).values({
       templateCode: "BACKDATED",
@@ -342,6 +404,27 @@ describe("大区经理个人渠道提成", () => {
     const augustStatement = await service.calculateStatement(hr, "regional", "2026-08");
     await service.transitionStatement(admin, augustStatement.id, "confirm");
     await service.transitionStatement(admin, augustStatement.id, "pay");
+
+    const septemberStatement = await service.calculateStatement(hr, "regional", "2026-09");
+    await service.transitionStatement(admin, septemberStatement.id, "confirm");
+    await service.transitionStatement(admin, septemberStatement.id, "pay");
+
+    const lateJulyReceiptId = await service.upsertReceipt(hr, {
+      managerId: "regional",
+      month: "2026-07",
+      netReceiptFen: 30_000_000,
+      evidenceNo: "LATE-JULY-RECEIPT",
+      note: "8、9 月发放后补录",
+    });
+    await service.verifyReceipt(admin, lateJulyReceiptId, true);
+    const septemberAfterLateReceipt = await service.summary(hr, "regional", "2026-09");
+    expect(septemberAfterLateReceipt).toMatchObject({
+      currentMonthRevenueAccelerationFen: 0,
+      revenueAccelerationFen: 15_000,
+      settlementPreviewFen: 15_000,
+    });
+    expect(septemberAfterLateReceipt.settlementEntries.find((entry) => entry.category === "revenue_acceleration"))
+      .toMatchObject({ accruedFen: 15_000, previouslySettledFen: 0, payableFen: 15_000 });
 
     const june = await service.summary(hr, "regional", "2026-06");
     expect(june.settlementCoveredBy).toMatchObject({

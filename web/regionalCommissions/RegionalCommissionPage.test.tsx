@@ -32,6 +32,7 @@ const summary: RegionalCommissionSummary = {
   milestoneFen: 0,
   topUpFen: 0,
   revenueAccelerationFen: 0,
+  currentMonthRevenueAccelerationFen: 0,
   personalProductFen: 0,
   cooperationFen: 0,
   directReturnFen: 0,
@@ -111,8 +112,8 @@ describe("大区经理目标周期", () => {
     expect(await screen.findByRole("heading", { name: "目标计划周期" })).toBeVisible();
     expect(screen.getByText("2026-01-15 至 2026-02-14")).toBeVisible();
     expect(screen.getByText(/累计查询范围：2026-01-15 至 2026-09-30/)).toBeVisible();
-    expect(screen.getByText(/目标计划范围：2026-01-15 至 2026-07-14（已结束）/)).toBeVisible();
-    expect(screen.getByText(/历史订单和已产生奖项仍保留/)).toBeVisible();
+    expect(screen.getByText(/模板计算范围：2026-01-15 至 2026-07-14（已结束）/)).toBeVisible();
+    expect(screen.getByText(/范围外订单不再产生新提成/)).toBeVisible();
     expect(screen.getByRole("columnheader", { name: "本期目标" })).toBeVisible();
     expect(screen.getByRole("columnheader", { name: "周期内累计有效订单" })).toBeVisible();
     expect(screen.queryByRole("button", { name: "保存目标草稿" })).not.toBeInTheDocument();
@@ -134,7 +135,7 @@ describe("大区经理目标周期", () => {
     expect(screen.getByText(/它不是员工工资明细/)).toBeVisible();
     expect(screen.getByText("海南大区经理默认提成 · 第 1 版")).toBeVisible();
     expect(screen.getByText(/签收满 7 天后计为有效订单/)).toBeVisible();
-    expect(screen.getByRole("columnheader", { name: "本月应结算" })).toBeVisible();
+    expect(screen.getByRole("columnheader", { name: "本期待结算" })).toBeVisible();
     expect(screen.getByRole("button", { name: "生成08月结算单" })).toBeVisible();
     expect(screen.queryByText("2026-09")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "目标周期" }));

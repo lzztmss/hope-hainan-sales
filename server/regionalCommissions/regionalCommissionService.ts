@@ -95,12 +95,24 @@ const assignmentTargetCycle = (assignment: RuleAssignment, fallbackStartsOn: str
     : null;
 };
 
-const rulesOn = (assignments: readonly RuleAssignment[], onDate: string, _fallbackStartsOn: string | null = null) =>
-  assignments.find((assignment) =>
-    assignment.assignmentEffectiveFrom <= onDate
-    && (!assignment.assignmentEffectiveTo || assignment.assignmentEffectiveTo >= onDate)
-    && (!assignment.templateEffectiveTo || assignment.templateEffectiveTo >= onDate),
-  ) ?? fallbackRules();
+const earliestDate = (...values: Array<string | null | undefined>): string | null => {
+  const dates = values.filter((value): value is string => Boolean(value));
+  return dates.length ? dates.sort()[0]! : null;
+};
+
+const assignmentCalculationEndsOn = (assignment: RuleAssignment, fallbackStartsOn: string | null = null) =>
+  earliestDate(
+    assignment.assignmentEffectiveTo,
+    assignment.templateEffectiveTo,
+    assignmentTargetCycle(assignment, fallbackStartsOn)?.endsOn,
+  );
+
+const rulesOn = (assignments: readonly RuleAssignment[], onDate: string, fallbackStartsOn: string | null = null) =>
+  assignments.find((assignment) => {
+    const calculationEndsOn = assignmentCalculationEndsOn(assignment, fallbackStartsOn);
+    return assignment.assignmentEffectiveFrom <= onDate
+      && (!calculationEndsOn || calculationEndsOn >= onDate);
+  }) ?? fallbackRules();
 
 const receiptAuditSnapshot = (value: unknown) => {
   const row = (value ?? {}) as Record<string, unknown>;
@@ -299,10 +311,19 @@ export class RegionalCommissionService {
     requireRole(actor, "admin");
     const rows = await this.client.db.select().from(regionalCommissionTemplateVersions)
       .orderBy(asc(regionalCommissionTemplateVersions.templateCode), asc(regionalCommissionTemplateVersions.versionNo));
-    return rows.map((row) => ({
-      ...row,
-      rulesSnapshot: normalizeRegionalCommissionRules(row.rulesSnapshot),
-    }));
+    return rows.map((row) => {
+      const rulesSnapshot = normalizeRegionalCommissionRules(row.rulesSnapshot);
+      const cycle = buildTargetPlan(
+        rulesSnapshot.targetCycle.startsOn ?? row.effectiveFrom,
+        rulesSnapshot.targetCycle.planType,
+        rulesSnapshot.targetCycle.periodTargets,
+      );
+      return {
+        ...row,
+        effectiveTo: earliestDate(row.effectiveTo, cycle.endsOn),
+        rulesSnapshot,
+      };
+    });
   }
 
   async createTemplate(actor: AuthenticatedUser, input: { name: string; effectiveFrom: string; reason: string; rules?: RegionalCommissionRules }) {
@@ -352,8 +373,24 @@ export class RegionalCommissionService {
     return this.client.withTransaction(async (tx) => {
       const draft = (await tx.select().from(regionalCommissionTemplateVersions).where(and(eq(regionalCommissionTemplateVersions.id, id), eq(regionalCommissionTemplateVersions.status, "draft"))))[0];
       if (!draft) throw new Error("仅草稿模板可以发布");
+      const normalizedRules = rulesForTemplate(draft.rulesSnapshot);
+      const publishedRules = {
+        ...normalizedRules,
+        targetCycle: {
+          ...normalizedRules.targetCycle,
+          startsOn: normalizedRules.targetCycle.startsOn ?? draft.effectiveFrom,
+        },
+      };
+      const targetCycle = buildTargetPlan(
+        publishedRules.targetCycle.startsOn,
+        publishedRules.targetCycle.planType,
+        publishedRules.targetCycle.periodTargets,
+      );
+      if (draft.effectiveFrom > targetCycle.endsOn) {
+        throw new Error("版本最早可用日期不能晚于模板计算结束日期");
+      }
       await tx.update(regionalCommissionTemplateVersions).set({ effectiveTo: addDays(draft.effectiveFrom, -1), updatedAt: new Date() }).where(and(eq(regionalCommissionTemplateVersions.templateCode, draft.templateCode), eq(regionalCommissionTemplateVersions.status, "published"), isNull(regionalCommissionTemplateVersions.effectiveTo)));
-      const [row] = await tx.update(regionalCommissionTemplateVersions).set({ status: "published", rulesSnapshot: rulesForTemplate(draft.rulesSnapshot) as unknown as Record<string, unknown>, publishedBy: actor.id, publishedAt: new Date(), changeReason: reason, version: draft.version + 1, updatedAt: new Date() }).where(eq(regionalCommissionTemplateVersions.id, id)).returning();
+      const [row] = await tx.update(regionalCommissionTemplateVersions).set({ status: "published", effectiveTo: targetCycle.endsOn, rulesSnapshot: publishedRules as unknown as Record<string, unknown>, publishedBy: actor.id, publishedAt: new Date(), changeReason: reason, version: draft.version + 1, updatedAt: new Date() }).where(eq(regionalCommissionTemplateVersions.id, id)).returning();
       return row!;
     });
   }
@@ -380,6 +417,16 @@ export class RegionalCommissionService {
     if (!template || template.status !== "published") throw new Error("只能分配已发布模板");
     if (input.effectiveFrom < template.effectiveFrom) {
       throw new Error(`分配生效日期不能早于模板生效日期 ${template.effectiveFrom}`);
+    }
+    const templateRules = rulesForTemplate(template.rulesSnapshot);
+    const templateCycle = buildTargetPlan(
+      templateRules.targetCycle.startsOn ?? template.effectiveFrom,
+      templateRules.targetCycle.planType,
+      templateRules.targetCycle.periodTargets,
+    );
+    const templateEndsOn = earliestDate(template.effectiveTo, templateCycle.endsOn);
+    if (templateEndsOn && input.effectiveFrom > templateEndsOn) {
+      throw new Error(`分配生效日期不能晚于模板计算结束日期 ${templateEndsOn}`);
     }
     await this.client.withTransaction(async (tx) => {
       const [activeAssignment] = await tx.select().from(regionalCommissionTemplateAssignments)
@@ -490,6 +537,13 @@ export class RegionalCommissionService {
       ?? summaryRules.rules.targetCycle.startsOn
       ?? summaryRules.assignmentEffectiveFrom
       ?? formalStartsOn;
+    const calculationEndsOn = earliestDate(
+      targetPlan?.endsOn,
+      summaryRules.templateVersionId
+        ? assignmentCalculationEndsOn(summaryRules, cycleFallbackStartsOn)
+        : null,
+    );
+    const statisticsEndsOn = earliestDate(asOfDate, calculationEndsOn) ?? asOfDate;
     const history = await this.client.db.select().from(regionalManagerStoreHistory)
       .where(eq(regionalManagerStoreHistory.regionalManagerId, managerId));
     const storeIds = [...new Set(history.map((row) => row.storeId))];
@@ -501,6 +555,7 @@ export class RegionalCommissionService {
       const effectiveAt = new Date(order.signedAt.getTime() + 7 * DAY_MS);
       if ((order.cancelledAt && order.cancelledAt < effectiveAt) || (order.deletedAt && order.deletedAt < effectiveAt)) return [];
       if (!calculationStartsOn || dateOnly(effectiveAt) < calculationStartsOn) return [];
+      if (calculationEndsOn && dateOnly(effectiveAt) > calculationEndsOn) return [];
       if (manager.employmentEndDate && dateOnly(effectiveAt) > manager.employmentEndDate) return [];
       const assigned = history.some((row) => row.storeId === order.storeId && row.effectiveFrom <= effectiveAt && (!row.effectiveTo || row.effectiveTo > effectiveAt));
       return assigned ? [{ ...order, effectiveOn: dateOnly(effectiveAt) }] : [];
@@ -517,6 +572,7 @@ export class RegionalCommissionService {
     const personal = calculationStartsOn
       ? personalRows.filter((row) =>
         row.effectiveOn >= calculationStartsOn
+        && (!calculationEndsOn || row.effectiveOn <= calculationEndsOn)
         && (!manager.employmentEndDate || row.effectiveOn <= manager.employmentEndDate)
         && !(row.status === "voided" && row.voidedAt && dateOnly(row.voidedAt) <= asOfDate))
       : [];
@@ -554,10 +610,15 @@ export class RegionalCommissionService {
     const personalById = new Map(personal.map((row) => [row.id, row]));
     const productFen = productLines.reduce((sum, row) => {
       const order = personalById.get(row.orderId);
+      if (!order) return sum;
+      const eventRules = rulesOn(ruleAssignments, order.effectiveOn, cycleFallbackStartsOn);
+      const unitCommissionFen = eventRules.templateVersionId
+        ? eventRules.rules.productCommissionFen[row.sku as RegionalProductSku]
+        : 0;
       const returnedQuantity = order?.returnedOn && order.returnedOn <= asOfDate
         ? row.returnedQuantity
         : 0;
-      return sum + (row.quantity - returnedQuantity) * row.unitCommissionFen;
+      return sum + (row.quantity - returnedQuantity) * unitCommissionFen;
     }, 0);
     const legacyCumulativePlanRows = await this.client.db.select({
       sequence: regionalCommissionTargetPeriods.sequence,
@@ -656,9 +717,34 @@ export class RegionalCommissionService {
           orderCount: topUpThreshold,
         }]
       : [];
-    const revenueAccelerationFen = receipt?.verificationStatus === "verified" && resolved.templateVersionId
-      ? revenueAccelerationReward(receipt.netReceiptFen, orderCount >= resolved.rules.revenueAcceleration.unlockOrderCount, resolved.rules)
-      : 0;
+    const receiptRows = await this.client.db.select().from(regionalNetReceipts)
+      .where(and(
+        eq(regionalNetReceipts.regionalManagerId, managerId),
+        lte(regionalNetReceipts.month, month),
+      ));
+    const revenueAccelerationByMonth = receiptRows
+      .filter((row) => row.verificationStatus === "verified")
+      .flatMap((row) => {
+        const receiptMonthStartsOn = `${row.month}-01`;
+        const receiptMonthEndsOn = dateOnly(monthEnd(row.month));
+        if (calculationStartsOn && receiptMonthEndsOn < calculationStartsOn) return [];
+        if (calculationEndsOn && receiptMonthStartsOn > calculationEndsOn) return [];
+        const ruleDate = earliestDate(receiptMonthEndsOn, calculationEndsOn) ?? receiptMonthEndsOn;
+        const eventRules = rulesOn(ruleAssignments, ruleDate, cycleFallbackStartsOn);
+        if (!eventRules.templateVersionId) return [];
+        const effectiveOrderCount = units.filter((unit) => unit.effectiveOn <= ruleDate).length;
+        return [{
+          month: row.month,
+          amountFen: revenueAccelerationReward(
+            row.netReceiptFen,
+            effectiveOrderCount >= eventRules.rules.revenueAcceleration.unlockOrderCount,
+            eventRules.rules,
+          ),
+        }];
+      });
+    const revenueAccelerationFen = revenueAccelerationByMonth.reduce((sum, row) => sum + row.amountFen, 0);
+    const currentMonthRevenueAccelerationFen = revenueAccelerationByMonth
+      .find((row) => row.month === month)?.amountFen ?? 0;
     const cooperation = await this.client.db.select().from(regionalCooperationStages)
       .where(eq(regionalCooperationStages.regionalManagerId, managerId))
       .orderBy(desc(regionalCooperationStages.achievedOn), desc(regionalCooperationStages.createdAt));
@@ -692,18 +778,20 @@ export class RegionalCommissionService {
             : formalStartsOn;
       return priorStartsOn === calculationStartsOn;
     });
-    const priorStatementIds = new Set(finalizedStatementsInCycle
-      .filter((row) => row.settlementMonth < month)
+    const settledStatementIds = new Set(finalizedStatementsInCycle
+      .filter((row) => row.settlementMonth <= month)
       .map((row) => row.id));
     const settlementCoveredBy = currentStatement && currentStatement.status !== "draft"
       ? null
       : finalizedStatementsInCycle
           .filter((row) => row.settlementMonth > month)
           .sort((left, right) => left.settlementMonth.localeCompare(right.settlementMonth))[0] ?? null;
+    // 新版合作奖直接使用业务账本；旧数据曾把合作奖生成为 statement 账本，
+    // 两者都必须纳入累计，以便历史已发金额和后续撤销能完整对上。
     const cooperationLedger = allLedger.filter((row) =>
-      row.sourceType === "cooperation" && row.occurredOn <= asOfDate);
+      row.category === "cooperation" && row.occurredOn <= asOfDate);
     const cooperationFen = cooperationLedger.reduce((sum, row) => sum + row.amountFen, 0);
-    const priorLedger = allLedger.filter((row) => row.statementId !== null && priorStatementIds.has(row.statementId));
+    const settledLedger = allLedger.filter((row) => row.statementId !== null && settledStatementIds.has(row.statementId));
     const cumulativeCategories = [
       ["completion", completionFen],
       ["tiered_order", tieredOrderFen],
@@ -718,7 +806,7 @@ export class RegionalCommissionService {
       previouslySettledFen: number;
       payableFen: number;
     }> = cumulativeCategories.map(([category, accruedFen]) => {
-      const previouslySettledFen = priorLedger
+      const previouslySettledFen = settledLedger
         .filter((row) => row.category === category)
         .reduce((sum, row) => sum + row.amountFen, 0);
       return {
@@ -729,22 +817,23 @@ export class RegionalCommissionService {
       };
     });
     const previouslySettledCooperationFen = cooperationLedger
-      .filter((row) => row.paidAt !== null || (row.statementId !== null && row.statementId !== currentStatement?.id))
+      .filter((row) => row.statementId !== null && settledStatementIds.has(row.statementId))
       .reduce((sum, row) => sum + row.amountFen, 0);
-    const payableCooperationFen = cooperationLedger
-      .filter((row) => row.paidAt === null && (row.statementId === null || row.statementId === currentStatement?.id))
-      .reduce((sum, row) => sum + row.amountFen, 0);
+    const payableCooperationFen = cooperationFen - previouslySettledCooperationFen;
     settlementEntries.push({
       category: "cooperation",
       accruedFen: cooperationFen,
       previouslySettledFen: previouslySettledCooperationFen,
       payableFen: payableCooperationFen,
     });
+    const settledRevenueAccelerationFen = settledLedger
+      .filter((row) => row.category === "revenue_acceleration")
+      .reduce((sum, row) => sum + row.amountFen, 0);
     settlementEntries.push({
       category: "revenue_acceleration",
       accruedFen: revenueAccelerationFen,
-      previouslySettledFen: 0,
-      payableFen: revenueAccelerationFen,
+      previouslySettledFen: settledRevenueAccelerationFen,
+      payableFen: revenueAccelerationFen - settledRevenueAccelerationFen,
     });
     const rawSettlementPreviewFen = settlementEntries.reduce(
       (sum, entry) => sum + entry.payableFen,
@@ -766,18 +855,20 @@ export class RegionalCommissionService {
       templateName: summaryRules.templateName,
       templateVersionNo: summaryRules.templateVersionNo,
       templateEffectiveFrom: summaryRules.assignmentEffectiveFrom,
-      templateEffectiveTo: summaryRules.assignmentEffectiveTo,
+      templateEffectiveTo: summaryRules.templateVersionId
+        ? assignmentCalculationEndsOn(summaryRules, cycleFallbackStartsOn)
+        : null,
       targetPlanId: configuredTargetCycle ? null : legacyTargetPlan?.id ?? null,
       targetPlanType: targetPlan?.planType ?? null,
       targetPlanStartsOn: targetPlan?.startsOn ?? null,
       targetPlanEndsOn: targetPlan?.endsOn ?? null,
       targetPlanStatus: configuredTargetCycle ? "active" as const : legacyTargetPlan?.status ?? null,
       statisticsStartsOn: calculationStartsOn,
-      statisticsEndsOn: asOfDate,
+      statisticsEndsOn,
       employmentStartDate: manager.employmentStartDate,
       employmentEndDate: manager.employmentEndDate,
       orderCount, managedOrderCount: managedOrdersAsOf.length, personalOrderCount: personal.reduce((sum, row) => sum + row.orderCount, 0),
-      completionFen, tieredOrderFen, milestoneFen, topUpFen, revenueAccelerationFen, personalProductFen: productFen,
+      completionFen, tieredOrderFen, milestoneFen, topUpFen, revenueAccelerationFen, currentMonthRevenueAccelerationFen, personalProductFen: productFen,
       cooperationFen, directReturnFen,
       totalFen: completionFen + tieredOrderFen + milestoneFen + topUpFen + revenueAccelerationFen + productFen + cooperationFen - directReturnFen,
       settlementPreviewFen,
@@ -803,7 +894,20 @@ export class RegionalCommissionService {
     assertManagerAccess(actor, managerId);
     const rows = await this.client.db.select().from(regionalPersonalChannelOrders)
       .where(eq(regionalPersonalChannelOrders.regionalManagerId, managerId)).orderBy(asc(regionalPersonalChannelOrders.businessDate));
-    return Promise.all(rows.map(async (order) => ({ ...order, lines: await this.client.db.select().from(regionalPersonalChannelOrderLines).where(eq(regionalPersonalChannelOrderLines.orderId, order.id)) })));
+    return Promise.all(rows.map(async (order) => {
+      const resolved = await this.resolveRules(managerId, order.effectiveOn);
+      const lines = await this.client.db.select().from(regionalPersonalChannelOrderLines)
+        .where(eq(regionalPersonalChannelOrderLines.orderId, order.id));
+      return {
+        ...order,
+        lines: lines.map((line) => {
+          const unitCommissionFen = resolved.templateVersionId
+            ? resolved.rules.productCommissionFen[line.sku as RegionalProductSku]
+            : 0;
+          return { ...line, unitCommissionFen, subtotalFen: unitCommissionFen * line.quantity };
+        }),
+      };
+    }));
   }
 
   async createPersonalOrder(actor: AuthenticatedUser, input: PersonalOrderInput) {
@@ -978,7 +1082,7 @@ export class RegionalCommissionService {
   async submitCooperation(actor: AuthenticatedUser, input: { managerId: string; stageCode: string; achievedOn: string; evidenceNo: string; note?: string }) {
     requireRole(actor, "hr", "admin");
     const resolved = await this.resolveRules(input.managerId, input.achievedOn);
-    if (!resolved.templateVersionId) throw new Error("请先为大区经理分配已发布的提成模板");
+    if (!resolved.templateVersionId) throw new Error("达成日期不在已分配模板的计算范围内");
     const rule = resolved.rules.cooperationStages.find((stage) => stage.code === input.stageCode);
     if (!rule) throw new Error("合作奖阶段不存在");
     const [row] = await this.client.db.insert(regionalCooperationStages).values({ regionalManagerId: input.managerId, stageCode: input.stageCode, stageLabel: rule.label, amountFen: rule.amountFen, achievedOn: input.achievedOn, evidenceNo: input.evidenceNo, note: input.note, submittedBy: actor.id }).returning();
@@ -997,6 +1101,8 @@ export class RegionalCommissionService {
       if (!stage) throw new Error("合作奖阶段不存在");
       const needsFinance = stage.stageCode === "PILOT" || stage.stageCode === "SCALE";
       if ((needsFinance && stage.status !== "finance_verified") || (!needsFinance && stage.status !== "submitted" && stage.status !== "finance_verified")) throw new Error("合作奖尚未完成所需核验");
+      const resolved = await this.resolveRules(stage.regionalManagerId, stage.achievedOn);
+      if (!resolved.templateVersionId) throw new Error("达成日期不在已分配模板的计算范围内，不能确认奖励");
       const prerequisites = await this.cooperationPrerequisites(stage.regionalManagerId, stage.stageCode, stage.achievedOn);
       if (!prerequisites.satisfied) throw new Error(`合作阶段条件尚未满足：${prerequisites.label}`);
       await this.client.withTransaction(async (tx) => {
@@ -1095,7 +1201,7 @@ export class RegionalCommissionService {
         eq(regionalCommissionLedger.sourceType, "cooperation"),
         isNull(regionalCommissionLedger.statementId),
         isNull(regionalCommissionLedger.paidAt),
-        lte(regionalCommissionLedger.occurredOn, summary.statisticsEndsOn),
+        lte(regionalCommissionLedger.occurredOn, dateOnly(monthEnd(month))),
       ));
       return statement!;
     });
