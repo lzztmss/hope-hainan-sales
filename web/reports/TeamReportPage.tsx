@@ -106,7 +106,7 @@ export const TeamReportPage = ({
           <section className="ops-list" aria-label="团队明细">
             <header className="ops-list__heading"><h2>团队明细</h2><span>{report.total ?? report.rows.length} 项</span></header>
             <Table aria-label="团队销售明细">
-            <TableHeader><TableRow><TableHead>归属</TableHead><TableHead>报价 / 订单</TableHead><TableHead>成交率</TableHead><TableHead>一次性原额</TableHead><TableHead>退单额</TableHead><TableHead>设备净额</TableHead><TableHead>FTTR / 心连心月费</TableHead><TableHead>36 个月合约月费</TableHead><TableHead>期间提成净额</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>归属</TableHead><TableHead>报价 / 订单</TableHead><TableHead>成交率</TableHead><TableHead>一次性原额</TableHead><TableHead>退单额</TableHead><TableHead>设备净额</TableHead><TableHead>月付套餐月费</TableHead><TableHead>36 个月合计</TableHead><TableHead>期间提成净额</TableHead></TableRow></TableHeader>
             <TableBody>
             {report.rows.map((row) => (
               <TableRow aria-label={`${row.label}销售数据`} key={row.key}>
@@ -116,7 +116,7 @@ export const TeamReportPage = ({
                 <TableCell>{formatReportFen(row.oneTimeOriginalFen)}</TableCell>
                 <TableCell>{formatReportFen(row.returnedFen)}</TableCell>
                 <TableCell>{formatReportFen(row.oneTimeNetFen)}</TableCell>
-                <TableCell>{formatReportFen(row.fttrMonthlyFen)} / {formatReportFen(row.heartMonthlyFen)}</TableCell>
+                <TableCell>{formatReportFen(row.monthlyFen)}</TableCell>
                 <TableCell>{formatReportFen(row.contract36Fen)}</TableCell>
                 <TableCell>{formatReportFen(row.commissionNetFen)}</TableCell>
               </TableRow>

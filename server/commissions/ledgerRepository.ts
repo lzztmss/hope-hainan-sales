@@ -29,6 +29,7 @@ import type {
 
 type QueryExecutor = AppDatabase | DbTransaction;
 type RuleRow = typeof commissionRules.$inferSelect;
+const POLICY_CODE = "HAINAN_DEVICE_COMMISSION";
 
 const mapScope = (row: RuleRow): CommissionScope => {
   if (row.salespersonId) return { kind: "salesperson", value: row.salespersonId };
@@ -40,8 +41,8 @@ const mapScope = (row: RuleRow): CommissionScope => {
 };
 
 const mapSku = (row: RuleRow): string => {
-  if (row.targetType !== "fttr_plan") return row.targetSku!;
-  return row.targetSku === "CUSTOM" ? "FTTR_CUSTOM" : `FTTR_${row.fttrPlan}`;
+  if (!row.targetSku) throw new Error("设备提成规则缺少 SKU");
+  return row.targetSku;
 };
 
 const mapRule = (row: RuleRow): CommissionRule => ({
@@ -60,30 +61,6 @@ const calculationSnapshot = (
   calculation: input.calculation,
   attributionSnapshot: input.attributionSnapshot,
 });
-
-export const buildFttrCommissionLine = (source: {
-  fttrKind: "none" | "standard" | "custom";
-  fttrPlan: number | null;
-}): CommissionOrderLine | null => {
-  if (source.fttrKind === "none") return null;
-  if (!Number.isInteger(source.fttrPlan) || source.fttrPlan === null) {
-    throw new Error("订单 FTTR 档位快照不完整");
-  }
-  if (source.fttrKind === "custom") {
-    return {
-      sku: "FTTR_CUSTOM",
-      label: `FTTR 自定义档位（${source.fttrPlan} 元/月）`,
-      quantity: 1,
-      lineType: "charge",
-    };
-  }
-  return {
-    sku: `FTTR_${source.fttrPlan}`,
-    label: `FTTR ${source.fttrPlan} 元套餐`,
-    quantity: 1,
-    lineType: "charge",
-  };
-};
 
 export class DrizzleCommissionLedgerRepository
   implements CommissionLedgerRepository
@@ -114,8 +91,6 @@ export class DrizzleCommissionLedgerRepository
         storeId: orders.storeId,
         sellerId: orders.sellerId,
         paymentMode: orders.paymentMode,
-        fttrKind: orders.fttrKind,
-        fttrPlan: orders.fttrPlan,
         personnelType: users.personnelType,
       })
       .from(orders)
@@ -144,7 +119,6 @@ export class DrizzleCommissionLedgerRepository
         .where(eq(orderAttributions.orderId, orderId)),
     ]);
 
-    const fttrLine = buildFttrCommissionLine(order);
     return {
       id: order.id,
       status: order.status,
@@ -156,7 +130,7 @@ export class DrizzleCommissionLedgerRepository
         personnelType: order.personnelType,
         paymentMode: order.paymentMode,
       },
-      lines: fttrLine ? [fttrLine, ...lines] : lines,
+      lines,
       attributions: attributionRows,
     };
   }
@@ -226,6 +200,7 @@ export class DrizzleCommissionLedgerRepository
       .from(commissionPolicyVersions)
       .where(
         and(
+          eq(commissionPolicyVersions.policyCode, POLICY_CODE),
           inArray(commissionPolicyVersions.status, ["published", "stopped"]),
           lte(commissionPolicyVersions.effectiveFrom, at),
           or(
@@ -240,7 +215,10 @@ export class DrizzleCommissionLedgerRepository
     const rules = await this.executor
       .select()
       .from(commissionRules)
-      .where(eq(commissionRules.policyVersionId, version.id));
+      .where(and(
+        eq(commissionRules.policyVersionId, version.id),
+        eq(commissionRules.targetType, "product"),
+      ));
     return {
       id: version.id,
       version: version.versionNo,

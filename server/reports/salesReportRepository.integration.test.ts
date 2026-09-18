@@ -181,8 +181,7 @@ describe("销售报表退货后的月费口径", () => {
     );
     expect(facts).toHaveLength(1);
     expect(facts[0]).toMatchObject({
-      fttrMonthlyFen: 15_900,
-      heartMonthlyFen: 2_000,
+      monthlyFen: 17_900,
       contract36Fen: 644_400,
     });
     await client.close();

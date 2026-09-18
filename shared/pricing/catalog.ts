@@ -48,8 +48,7 @@ const component = (
 });
 
 export const ACTIVE_CATALOG: PricingCatalog = deepFreeze({
-  version: "2026-08-02",
-  fttrPlans: [129, 159, 199, 239, 299, 399],
+  version: "2026-09-11",
   charges: {
     WATCH: charge("WATCH", "AI 健康智能手表", "块", 59_900, 2_000, {
       watch: 1,

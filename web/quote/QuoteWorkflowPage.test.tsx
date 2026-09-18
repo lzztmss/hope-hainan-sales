@@ -11,6 +11,7 @@ import {
 const client: QuoteWorkflowClient = {
   confirmQuote: vi.fn(),
   createOrderFromQuote: vi.fn(),
+  listSubscriptionPlans: vi.fn().mockResolvedValue([]),
   recordQuotePrint: vi.fn(),
   updateQuote: vi.fn(),
 };

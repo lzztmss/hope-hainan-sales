@@ -1,3 +1,4 @@
+import { isTrustedOrigin } from "../security/origin.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import type { AuthService } from "../auth/authService.js";
@@ -9,7 +10,7 @@ const user = async (request: FastifyRequest, reply: FastifyReply, auth: AuthServ
 export const registerRegionalCommissionRoutes = async (app: FastifyInstance, options: { authService: AuthService; service: RegionalCommissionService; appOrigin: string }): Promise<void> => {
   app.addHook("preHandler", async (request, reply) => {
     if (request.url.startsWith("/api/regional-commissions") || request.url.startsWith("/api/admin/regional-commission")) {
-      if (request.method !== "GET" && request.headers.origin && request.headers.origin !== options.appOrigin) {
+      if (request.method !== "GET" && request.headers.origin && !isTrustedOrigin(request.headers.origin, options.appOrigin)) {
         return reply.status(403).send({ error: "请求来源不可信" });
       }
     }

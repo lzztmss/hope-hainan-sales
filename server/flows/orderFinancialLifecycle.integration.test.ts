@@ -103,7 +103,7 @@ describe("订单、售后、收款与提成全流程", () => {
     const policyStart = new Date("2026-07-01T00:00:00.000Z");
     await client.db.insert(commissionPolicyVersions).values({
       id: ids.policy,
-      policyCode: "HAINAN_FTTR_HEARTLINK",
+      policyCode: "HAINAN_DEVICE_COMMISSION",
       versionNo: 1,
       name: "全流程测试规则",
       status: "published",
@@ -121,7 +121,7 @@ describe("订单、售后、收款与提成全流程", () => {
         ruleName: "设备A提成",
         businessDomain: "heartlink",
         targetType: "product",
-        targetSku: "DEVICE_A",
+        targetSku: "WATCH",
         paymentModeScope: "all",
         calculationBasis: "per_unit",
         packageMode: "additive",
@@ -136,7 +136,7 @@ describe("订单、售后、收款与提成全流程", () => {
         ruleName: "设备B提成",
         businessDomain: "heartlink",
         targetType: "product",
-        targetSku: "DEVICE_B",
+        targetSku: "MATTRESS",
         paymentModeScope: "all",
         calculationBasis: "per_unit",
         packageMode: "additive",
@@ -206,10 +206,10 @@ describe("订单、售后、收款与提成全流程", () => {
         beneficiarySnapshot: { displayName: seller.displayName },
       });
       const lineRows = await client.db.insert(orderLines).values([
-        { orderId, lineType: "charge", sku: "DEVICE_A", label: "自选设备A", unit: "个", quantity: 1, oneTimeUnitFen: 10_000, oneTimeSubtotalFen: 10_000, monthlyUnitFen: 0, monthlySubtotalFen: 0, locations: [] },
-        { orderId, lineType: "charge", sku: "DEVICE_B", label: "自选设备B", unit: "个", quantity: 1, oneTimeUnitFen: 20_000, oneTimeSubtotalFen: 20_000, monthlyUnitFen: 0, monthlySubtotalFen: 0, locations: [] },
+        { orderId, lineType: "charge", sku: "WATCH", label: "AI 健康智能手表", unit: "块", quantity: 1, oneTimeUnitFen: 10_000, oneTimeSubtotalFen: 10_000, monthlyUnitFen: 0, monthlySubtotalFen: 0, locations: [] },
+        { orderId, lineType: "charge", sku: "MATTRESS", label: "睡眠监测床垫", unit: "张", quantity: 1, oneTimeUnitFen: 20_000, oneTimeSubtotalFen: 20_000, monthlyUnitFen: 0, monthlySubtotalFen: 0, locations: [] },
       ]).returning();
-      return { orderId, lineAId: lineRows.find((line) => line.sku === "DEVICE_A")!.id };
+      return { orderId, lineAId: lineRows.find((line) => line.sku === "WATCH")!.id };
     };
     const normal = await createOrder("01");
     const special = await createOrder("02");

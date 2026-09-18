@@ -7,8 +7,8 @@ import { OrderCompositionDialog } from "./OrderCompositionDialog";
 describe("生成订单前销售构成确认", () => {
   it("区分套餐和独立单品并二次确认", () => {
     const calculation = calculateQuote({
-      mode: "contract_36",
-      fttrPlan: 159,
+      mode: "one_time",
+      subscriptionPlanId: null,
       selection: { homeDual: 1, mattress: 1 },
     });
     const onConfirm = vi.fn();

@@ -61,7 +61,6 @@ export const QuoteDetailPage = ({ client, quoteId, viewer }: { client: ApiClient
           <QuotePrintDocument
             calculation={quote.calculation}
             confirmedAt={quote.confirmedAt}
-            customFttrNote={quote.pricing.customFttrNote}
             customerName={quote.customer.name}
             elderCount={quote.customer.elderCount}
             phoneMasked={quote.customer.phoneMasked}
@@ -87,7 +86,7 @@ export const QuoteDetailPage = ({ client, quoteId, viewer }: { client: ApiClient
           <section aria-label="报价单预览" aria-modal="true" className="quote-preview-dialog" role="dialog">
             <QuotePrintDocument {...{
               calculation: quote.calculation, confirmedAt: quote.confirmedAt,
-              customFttrNote: quote.pricing.customFttrNote, customerName: quote.customer.name,
+              customerName: quote.customer.name,
               elderCount: quote.customer.elderCount, phoneMasked: quote.customer.phoneMasked,
               quoteNo: quote.quoteNo, roomType: quote.customer.roomType, version: quote.version,
             }} preview actions={<><button type="button" onClick={() => setPreviewOpen(false)}>关闭预览</button><button className="is-primary" type="button" onClick={() => void print()}>打印报价</button></>} />

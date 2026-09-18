@@ -9,7 +9,6 @@ export interface QuotePrintDocumentProps {
   phoneMasked: string;
   roomType?: RoomType;
   elderCount: number;
-  customFttrNote?: string;
   version: number;
   calculation: QuoteCalculation;
   actions?: ReactNode;
@@ -29,7 +28,6 @@ export const QuotePrintDocument = ({
   actions,
   calculation,
   confirmedAt,
-  customFttrNote,
   customerName,
   elderCount,
   phoneMasked,
@@ -41,7 +39,7 @@ export const QuotePrintDocument = ({
   <article className={`quote-management__detail quote-management__print-document${preview ? " quote-management__print-document--preview" : ""}`}>
     <header className="quote-management__print-header">
       <img src="/haipo-logo.jpg" alt="海魄科技标识" />
-      <div><strong>海南联通 FTTR 心连心融合套餐</strong><h2>客户报价单</h2></div>
+      <div><strong>海南联通心连心养老套餐</strong><h2>客户报价单</h2></div>
     </header>
     <section>
       <h2>客户与报价</h2>
@@ -53,13 +51,13 @@ export const QuotePrintDocument = ({
         <div><dt>客户户型</dt><dd>{roomType ? roomLabel[roomType] : "未填写"}</dd></div>
         <div><dt>长者人数</dt><dd>{elderCount} 位</dd></div>
         <div><dt>支付方式</dt><dd>{calculation.mode === "contract_36" ? "36 个月合约月付" : "设备一次性购买"}</dd></div>
-        <div><dt>FTTR 方案</dt><dd>{calculation.fttrKind === "none" ? "不新增 FTTR" : calculation.fttrKind === "custom" ? `自定义：${customFttrNote ?? "以业务受理为准"}` : `${calculation.fttrPlan} 元/月`}</dd></div>
+        <div><dt>月付套餐</dt><dd>{calculation.subscriptionPlan?.name ?? "不适用"}</dd></div>
         <div><dt>报价版本</dt><dd>第 {version} 版</dd></div>
         <div><dt>价格版本</dt><dd>{calculation.catalogVersion}</dd></div>
         <div><dt>每月合计</dt><dd>{money(calculation.monthlyTotalFen)}</dd></div>
         <div><dt>36个月月费</dt><dd>{money(calculation.contract36Fen)}</dd></div>
         <div><dt>一次性费用</dt><dd>{money(calculation.oneTimeFen)}</dd></div>
-        <div><dt>预计总支出</dt><dd>{money(calculation.contract36Fen + calculation.oneTimeFen)}</dd></div>
+        <div><dt>预计总支出</dt><dd>{money(calculation.mode === "contract_36" ? calculation.contract36Fen : calculation.oneTimeFen)}</dd></div>
       </dl>
     </section>
     <section>

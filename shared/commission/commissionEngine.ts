@@ -15,36 +15,37 @@ const defaultRule = (sku: string, amountFen: number): CommissionRule => ({
   enabled: true,
 });
 
-const configurableRule = (sku: string): CommissionRule => ({
-  id: `default-v1-${sku.toLowerCase()}`,
-  sku,
-  amountFen: 0,
-  paymentMode: "all",
-  scope: { kind: "global" },
-  enabled: false,
-});
-
 export const DEFAULT_COMMISSION_RULES: readonly CommissionRule[] = Object.freeze(
   [
     defaultRule("WATCH", 2_000),
     defaultRule("MATTRESS", 4_000),
-    defaultRule("ONE_KEY", 2_000),
-    defaultRule("HOME_DUAL", 3_000),
-    defaultRule("STANDARD_BUNDLE", 6_000),
     defaultRule("GATEWAY", 600),
     defaultRule("MOTION", 900),
     defaultRule("DOOR", 900),
     defaultRule("PORTABLE_BUTTON", 900),
     defaultRule("WALL_BUTTON", 900),
-    configurableRule("FTTR_129"),
-    configurableRule("FTTR_159"),
-    configurableRule("FTTR_199"),
-    configurableRule("FTTR_239"),
-    configurableRule("FTTR_299"),
-    configurableRule("FTTR_399"),
-    configurableRule("FTTR_CUSTOM"),
   ].map((rule) => Object.freeze({ ...rule, scope: Object.freeze(rule.scope) })),
 );
+
+export const COMMISSION_DEVICE_SKUS = [
+  "WATCH",
+  "MATTRESS",
+  "GATEWAY",
+  "MOTION",
+  "DOOR",
+  "PORTABLE_BUTTON",
+  "WALL_BUTTON",
+] as const;
+
+const COMPONENT_DEVICE_SKU: Readonly<Record<string, string>> = {
+  watch: "WATCH",
+  mattress: "MATTRESS",
+  gateway: "GATEWAY",
+  motion: "MOTION",
+  door: "DOOR",
+  portableButton: "PORTABLE_BUTTON",
+  wallButton: "WALL_BUTTON",
+};
 
 const scopeMatches = (
   scope: CommissionScope,
@@ -139,13 +140,18 @@ export const calculateCommission = (
     ignoredComponentCount: 0,
   };
 
-  for (const line of orderLines) {
-    validateLine(line);
-    if (line.lineType === "component") {
-      calculation.ignoredComponentCount += line.quantity;
-      continue;
-    }
+  const hasComponentSnapshot = orderLines.some((line) => line.lineType === "component");
+  const commissionableLines = hasComponentSnapshot
+    ? orderLines.flatMap((line): CommissionOrderLine[] => {
+        if (line.lineType !== "component") return [];
+        const sku = COMPONENT_DEVICE_SKU[line.sku];
+        if (!sku) throw new Error(`未知的套餐设备：${line.sku}`);
+        return [{ ...line, sku, lineType: "charge" }];
+      })
+    : orderLines;
 
+  for (const line of commissionableLines) {
+    validateLine(line);
     const rule = selectRule(line.sku, rules, sellerContext);
     if (!rule) {
       calculation.unconfigured.push({

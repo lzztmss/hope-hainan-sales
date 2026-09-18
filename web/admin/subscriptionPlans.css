@@ -1,0 +1,17 @@
+.subscription-plans { display: grid; gap: var(--hfttr-space-5); }
+.subscription-plans__list { display: grid; gap: var(--hfttr-space-3); align-content: start; }
+.subscription-plans__list button { display: grid; gap: var(--hfttr-space-1); padding: var(--hfttr-space-4); border: 1px solid var(--app-color-border); border-radius: var(--app-radius-control); background: white; color: inherit; text-align: left; }
+.subscription-plans__list button.is-selected { border-color: var(--app-color-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--app-color-primary) 18%, transparent); }
+.subscription-plans__list span, .subscription-plans__list small { color: var(--app-color-text-muted); }
+.subscription-plans__editor { display: grid; gap: var(--hfttr-space-4); padding: var(--hfttr-space-5); border: 1px solid var(--app-color-border); border-radius: var(--app-radius-surface); background: white; }
+.subscription-plans__editor > label { display: grid; gap: var(--hfttr-space-2); font-weight: 700; }
+.subscription-plans__editor input, .subscription-plans__editor textarea, .subscription-plans__editor button { min-height: var(--app-control-min-size); padding: var(--hfttr-space-2) var(--hfttr-space-3); border: 1px solid var(--app-color-border); border-radius: var(--app-radius-control); font: inherit; }
+.subscription-plans__editor fieldset { display: grid; gap: var(--hfttr-space-2); padding: var(--hfttr-space-4); border: 1px solid var(--app-color-border); border-radius: var(--app-radius-control); }
+.subscription-plans__editor fieldset label { display: grid; grid-template-columns: minmax(0, 1fr) 6rem; gap: var(--hfttr-space-3); align-items: center; }
+.subscription-plans__editor .subscription-plans__active { display: flex; align-items: center; }
+.subscription-plans__active input { min-height: auto; }
+.subscription-plans__error { color: var(--app-color-danger); }
+.subscription-plans__actions { display: flex; flex-wrap: wrap; gap: var(--hfttr-space-3); }
+.subscription-plans__actions button { flex: 1 1 10rem; }
+.subscription-plans__actions .is-danger { border-color: var(--app-color-danger); color: var(--app-color-danger); background: white; }
+@media (min-width: 900px) { .subscription-plans { grid-template-columns: minmax(15rem, .7fr) minmax(28rem, 1.3fr); } }

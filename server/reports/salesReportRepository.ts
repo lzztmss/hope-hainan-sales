@@ -26,8 +26,7 @@ interface CountRow extends DimensionRow {
 
 interface OrderAmountRow extends DimensionRow {
   one_time_fen: number;
-  fttr_monthly_fen: number;
-  heart_monthly_fen: number;
+  monthly_fen: number;
   contract_36_fen: number;
 }
 
@@ -50,8 +49,7 @@ const emptyFact = (dimension: DimensionRow): SalesReportFact => ({
   orderCount: 0,
   oneTimeOriginalFen: 0,
   returnedFen: 0,
-  fttrMonthlyFen: 0,
-  heartMonthlyFen: 0,
+  monthlyFen: 0,
   contract36Fen: 0,
   commissionEstimatedFen: 0,
   commissionPendingSettlementFen: 0,
@@ -194,8 +192,7 @@ export class DrizzleSalesReportRepository implements SalesReportRepository {
           SELECT o.store_id, s.name AS store_name, o.seller_id,
                  u.display_name AS seller_name,
                  COALESCE(SUM(o.one_time_fen), 0) AS one_time_fen,
-                 COALESCE(SUM(CASE WHEN o.status = 'returned' THEN 0 ELSE o.fttr_monthly_fen END), 0) AS fttr_monthly_fen,
-                 COALESCE(SUM(CASE WHEN o.status = 'returned' THEN 0 ELSE MAX(o.heart_monthly_fen - COALESCE(rr.returned_monthly_fen, 0), 0) END), 0) AS heart_monthly_fen,
+                 COALESCE(SUM(CASE WHEN o.status = 'returned' THEN 0 ELSE MAX(o.monthly_total_fen - COALESCE(rr.returned_monthly_fen, 0), 0) END), 0) AS monthly_fen,
                  COALESCE(SUM(CASE WHEN o.status = 'returned' THEN 0 ELSE MAX(o.contract_36_fen - COALESCE(rr.returned_monthly_fen, 0) * 36, 0) END), 0) AS contract_36_fen
           FROM orders o
           JOIN stores s ON s.id = o.store_id
@@ -276,8 +273,7 @@ export class DrizzleSalesReportRepository implements SalesReportRepository {
     for (const row of orderAmountRows) {
       const fact = ensure(row);
       fact.oneTimeOriginalFen += Number(row.one_time_fen);
-      fact.fttrMonthlyFen += Number(row.fttr_monthly_fen);
-      fact.heartMonthlyFen += Number(row.heart_monthly_fen);
+      fact.monthlyFen += Number(row.monthly_fen);
       fact.contract36Fen += Number(row.contract_36_fen);
     }
     for (const row of returnRows) ensure(row).returnedFen += Number(row.amount_fen);

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, exists, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 
 import {
   completionReward,
@@ -547,19 +547,91 @@ export class RegionalCommissionService {
     const history = await this.client.db.select().from(regionalManagerStoreHistory)
       .where(eq(regionalManagerStoreHistory.regionalManagerId, managerId));
     const storeIds = [...new Set(history.map((row) => row.storeId))];
-    const candidateOrders = storeIds.length === 0 ? [] : await this.client.db.select({
-      id: orders.id, orderNo: orders.orderNo, storeId: orders.storeId, signedAt: orders.signedAt, status: orders.status, reconciledAt: orders.reconciledAt, cancelledAt: orders.cancelledAt, deletedAt: orders.deletedAt,
-    }).from(orders).where(and(inArray(orders.storeId, storeIds), lte(orders.signedAt, new Date(asOf.getTime() - 7 * DAY_MS))));
-    const managedOrdersAsOf = candidateOrders.flatMap((order) => {
-      if (!order.signedAt) return [];
-      const effectiveAt = new Date(order.signedAt.getTime() + 7 * DAY_MS);
-      if ((order.cancelledAt && order.cancelledAt < effectiveAt) || (order.deletedAt && order.deletedAt < effectiveAt)) return [];
-      if (!calculationStartsOn || dateOnly(effectiveAt) < calculationStartsOn) return [];
-      if (calculationEndsOn && dateOnly(effectiveAt) > calculationEndsOn) return [];
-      if (manager.employmentEndDate && dateOnly(effectiveAt) > manager.employmentEndDate) return [];
-      const assigned = history.some((row) => row.storeId === order.storeId && row.effectiveFrom <= effectiveAt && (!row.effectiveTo || row.effectiveTo > effectiveAt));
-      return assigned ? [{ ...order, effectiveOn: dateOnly(effectiveAt) }] : [];
-    });
+    type ManagedOrder = { id: string; effectiveOn: string; reconciledAt: Date | null };
+    const [completedFullReturn] = await this.client.db.select({ id: orderReturns.id })
+      .from(orderReturns)
+      .where(and(
+        eq(orderReturns.returnType, "full"),
+        eq(orderReturns.status, "completed"),
+        lte(orderReturns.completedAt, asOf),
+      ))
+      .limit(1);
+    let managedOrdersAsOf: ManagedOrder[];
+    if (storeIds.length === 0) {
+      managedOrdersAsOf = [];
+    } else if (!completedFullReturn && calculationStartsOn) {
+      // Most summaries have no completed full returns. Aggregate the large
+      // managed-order set by effective day in SQLite, then expand only the
+      // tiny shape used by the reward calculator. This avoids transferring
+      // tens of thousands of order rows and repeatedly checking assignments
+      // in JavaScript while preserving the existing calculation semantics.
+      const effectiveAt = sql<number>`${orders.signedAt} + ${7 * DAY_MS}`;
+      const effectiveOn = sql<string>`date((${effectiveAt}) / 1000, 'unixepoch')`;
+      const conditions = [
+        isNotNull(orders.signedAt),
+        lte(orders.signedAt, new Date(asOf.getTime() - 7 * DAY_MS)),
+        gte(effectiveAt, Date.parse(`${calculationStartsOn}T00:00:00.000Z`)),
+        or(isNull(orders.cancelledAt), gte(orders.cancelledAt, effectiveAt)),
+        or(isNull(orders.deletedAt), gte(orders.deletedAt, effectiveAt)),
+        exists(
+          this.client.db.select({ id: regionalManagerStoreHistory.id })
+            .from(regionalManagerStoreHistory)
+            .where(and(
+              eq(regionalManagerStoreHistory.regionalManagerId, managerId),
+              eq(regionalManagerStoreHistory.storeId, orders.storeId),
+              lte(regionalManagerStoreHistory.effectiveFrom, effectiveAt),
+              or(
+                isNull(regionalManagerStoreHistory.effectiveTo),
+                gt(regionalManagerStoreHistory.effectiveTo, effectiveAt),
+              ),
+            )),
+        ),
+      ];
+      if (calculationEndsOn) {
+        conditions.push(lt(effectiveAt, Date.parse(`${addDays(calculationEndsOn, 1)}T00:00:00.000Z`)));
+      }
+      if (manager.employmentEndDate) {
+        conditions.push(lt(effectiveAt, Date.parse(`${addDays(manager.employmentEndDate, 1)}T00:00:00.000Z`)));
+      }
+      const dailyRows = await this.client.db.select({
+        effectiveOn,
+        orderCount: sql<number>`count(*)`,
+        verifiedCount: sql<number>`sum(case when ${orders.reconciledAt} is not null and ${orders.reconciledAt} <= ${asOf.getTime()} then 1 else 0 end)`,
+      }).from(orders)
+        .where(and(...conditions))
+        .groupBy(effectiveOn)
+        .orderBy(effectiveOn);
+      managedOrdersAsOf = dailyRows.flatMap((row) => Array.from(
+        { length: Number(row.orderCount) },
+        (_, index): ManagedOrder => ({
+          id: `${row.effectiveOn}:${String(index).padStart(8, "0")}`,
+          effectiveOn: row.effectiveOn,
+          reconciledAt: index < Number(row.verifiedCount) ? asOf : null,
+        }),
+      ));
+    } else {
+      const candidateOrders = await this.client.db.select({
+        id: orders.id,
+        storeId: orders.storeId,
+        signedAt: orders.signedAt,
+        reconciledAt: orders.reconciledAt,
+        cancelledAt: orders.cancelledAt,
+        deletedAt: orders.deletedAt,
+      }).from(orders).where(and(
+        inArray(orders.storeId, storeIds),
+        lte(orders.signedAt, new Date(asOf.getTime() - 7 * DAY_MS)),
+      ));
+      managedOrdersAsOf = candidateOrders.flatMap((order) => {
+        if (!order.signedAt) return [];
+        const effectiveAt = new Date(order.signedAt.getTime() + 7 * DAY_MS);
+        if ((order.cancelledAt && order.cancelledAt < effectiveAt) || (order.deletedAt && order.deletedAt < effectiveAt)) return [];
+        if (!calculationStartsOn || dateOnly(effectiveAt) < calculationStartsOn) return [];
+        if (calculationEndsOn && dateOnly(effectiveAt) > calculationEndsOn) return [];
+        if (manager.employmentEndDate && dateOnly(effectiveAt) > manager.employmentEndDate) return [];
+        const assigned = history.some((row) => row.storeId === order.storeId && row.effectiveFrom <= effectiveAt && (!row.effectiveTo || row.effectiveTo > effectiveAt));
+        return assigned ? [{ id: order.id, effectiveOn: dateOnly(effectiveAt), reconciledAt: order.reconciledAt }] : [];
+      });
+    }
     const planManagedOrders = targetPlan
       ? managedOrdersAsOf.filter((order) =>
         order.effectiveOn >= targetPlan.startsOn && order.effectiveOn <= targetPlan.endsOn)
@@ -645,7 +717,7 @@ export class RegionalCommissionService {
     }, 0);
     const cumulativeManagedIds = new Set(managedOrdersAsOf.map((order) => order.id));
     // 不构造 50,000 个 SQL 占位符；先按退单状态读取，再以内存集合限定经理订单。
-    const fullReturns = managedOrdersAsOf.length ? (await this.client.db.select({ orderId: orderReturns.orderId, completedAt: orderReturns.completedAt })
+    const fullReturns = completedFullReturn && managedOrdersAsOf.length ? (await this.client.db.select({ orderId: orderReturns.orderId, completedAt: orderReturns.completedAt })
       .from(orderReturns).where(and(eq(orderReturns.returnType, "full"), eq(orderReturns.status, "completed"), lte(orderReturns.completedAt, asOf))))
       .filter((row) => cumulativeManagedIds.has(row.orderId)) : [];
     const systemReturnIds = new Set(fullReturns.map((row) => row.orderId));
@@ -653,20 +725,28 @@ export class RegionalCommissionService {
       ...managedOrdersAsOf.map((order) => ({ effectiveOn: order.effectiveOn, key: order.id, returned: systemReturnIds.has(order.id) })),
       ...personal.flatMap((order) => Array.from({ length: order.orderCount }, (_, index) => ({ effectiveOn: order.effectiveOn, key: `${order.id}:${index}`, returned: order.status === "returned" && Boolean(order.returnedOn && order.returnedOn <= asOfDate) }))),
     ].sort((left, right) => left.effectiveOn.localeCompare(right.effectiveOn) || left.key.localeCompare(right.key));
-    const tieredOrderFen = units.reduce((sum, unit, index) => {
-      const eventRules = rulesOn(ruleAssignments, unit.effectiveOn, cycleFallbackStartsOn);
-      if (!eventRules.templateVersionId) return sum;
-      return sum
-        + tieredOrderReward(index + 1, eventRules.rules)
-        - tieredOrderReward(index, eventRules.rules);
-    }, 0);
-    const directReturnFen = units.reduce((sum, unit, index) => {
-      if (!unit.returned) return sum;
-      const eventRules = rulesOn(ruleAssignments, unit.effectiveOn, cycleFallbackStartsOn);
-      return eventRules.templateVersionId
-        ? sum + tieredOrderReward(index + 1, eventRules.rules) - tieredOrderReward(index, eventRules.rules)
-        : sum;
-    }, 0);
+    const unitGroups: Array<{
+      effectiveOn: string;
+      startIndex: number;
+      units: typeof units;
+    }> = [];
+    for (const unit of units) {
+      const current = unitGroups[unitGroups.length - 1];
+      if (current?.effectiveOn === unit.effectiveOn) {
+        current.units.push(unit);
+      } else {
+        unitGroups.push({
+          effectiveOn: unit.effectiveOn,
+          startIndex: unitGroups.length === 0
+            ? 0
+            : unitGroups[unitGroups.length - 1]!.startIndex
+              + unitGroups[unitGroups.length - 1]!.units.length,
+          units: [unit],
+        });
+      }
+    }
+    let tieredOrderFen = 0;
+    let directReturnFen = 0;
     let milestoneFen = 0;
     const milestoneEvents: Array<{
       category: "milestone";
@@ -678,23 +758,41 @@ export class RegionalCommissionService {
       templateVersionNo: number;
       orderCount: number;
     }> = [];
-    units.forEach((unit, index) => {
-      const eventRules = rulesOn(ruleAssignments, unit.effectiveOn, cycleFallbackStartsOn);
-      if (!eventRules.templateVersionId) return;
-      const nextCumulativeFen = milestoneReward(index + 1, eventRules.rules);
-      if (nextCumulativeFen <= milestoneFen) return;
-      milestoneEvents.push({
-        category: "milestone",
-        eventKey: `milestone:${managerId}:${eventRules.templateVersionId}:${index + 1}:${eventRules.templateVersionId}`,
-        amountFen: nextCumulativeFen - milestoneFen,
-        occurredOn: unit.effectiveOn,
-        templateVersionId: eventRules.templateVersionId,
-        templateName: eventRules.templateName,
-        templateVersionNo: eventRules.templateVersionNo,
-        orderCount: index + 1,
+    for (const group of unitGroups) {
+      const eventRules = rulesOn(ruleAssignments, group.effectiveOn, cycleFallbackStartsOn);
+      if (!eventRules.templateVersionId) continue;
+      const endIndex = group.startIndex + group.units.length;
+      tieredOrderFen += tieredOrderReward(endIndex, eventRules.rules)
+        - tieredOrderReward(group.startIndex, eventRules.rules);
+      group.units.forEach((unit, offset) => {
+        if (!unit.returned) return;
+        const index = group.startIndex + offset;
+        directReturnFen += tieredOrderReward(index + 1, eventRules.rules)
+          - tieredOrderReward(index, eventRules.rules);
       });
-      milestoneFen = nextCumulativeFen;
-    });
+
+      const milestoneBoundaries = new Set<number>([group.startIndex + 1]);
+      for (const milestone of eventRules.rules.milestones) {
+        if (milestone.orderCount > group.startIndex && milestone.orderCount <= endIndex) {
+          milestoneBoundaries.add(milestone.orderCount);
+        }
+      }
+      for (const orderPosition of [...milestoneBoundaries].sort((left, right) => left - right)) {
+        const nextCumulativeFen = milestoneReward(orderPosition, eventRules.rules);
+        if (nextCumulativeFen <= milestoneFen) continue;
+        milestoneEvents.push({
+          category: "milestone",
+          eventKey: `milestone:${managerId}:${eventRules.templateVersionId}:${orderPosition}:${eventRules.templateVersionId}`,
+          amountFen: nextCumulativeFen - milestoneFen,
+          occurredOn: group.effectiveOn,
+          templateVersionId: eventRules.templateVersionId,
+          templateName: eventRules.templateName!,
+          templateVersionNo: eventRules.templateVersionNo!,
+          orderCount: orderPosition,
+        });
+        milestoneFen = nextCumulativeFen;
+      }
+    }
     const verifiedOrderCount = managedOrdersAsOf.filter((order) => Boolean(order.reconciledAt && order.reconciledAt <= asOf)).length
       + personal.reduce((sum, row) => sum + row.orderCount, 0);
     const topUpThreshold = summaryRules.rules.topUp.orderCount;

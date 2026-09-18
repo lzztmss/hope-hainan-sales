@@ -61,7 +61,7 @@ export const LoginPage = () => {
           <div>
             <p>海南联通 · 海魄科技</p>
             <h1 id="login-title">
-              海南联通 FTTR 心连心融合套餐销售报价系统
+              海南联通心连心养老套餐销售报价系统
             </h1>
           </div>
         </div>

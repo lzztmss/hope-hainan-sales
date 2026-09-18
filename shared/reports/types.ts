@@ -17,8 +17,7 @@ export interface SalesReportMetrics {
   oneTimeOriginalFen: number;
   returnedFen: number;
   oneTimeNetFen: number;
-  fttrMonthlyFen: number;
-  heartMonthlyFen: number;
+  monthlyFen: number;
   contract36Fen: number;
   commissionEstimatedFen: number;
   commissionPendingSettlementFen: number;

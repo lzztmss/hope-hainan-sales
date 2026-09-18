@@ -14,6 +14,7 @@ import type { ReturnService } from "./returns/returnService.js";
 import type { SalesReportService } from "./reports/salesReportService.js";
 import type { CustomerService } from "./customers/customerService.js";
 import type { RegionalCommissionService } from "./regionalCommissions/regionalCommissionService.js";
+import type { SubscriptionPlanService } from "./plans/planService.js";
 import { registerAdminRoutes } from "./routes/admin.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerCommissionRuleRoutes } from "./routes/commissionRules.js";
@@ -24,6 +25,7 @@ import { registerReturnRoutes } from "./routes/returns.js";
 import { registerReportRoutes } from "./routes/reports.js";
 import { registerCustomerRoutes } from "./routes/customers.js";
 import { registerRegionalCommissionRoutes } from "./routes/regionalCommissions.js";
+import { registerSubscriptionPlanRoutes } from "./routes/plans.js";
 
 export interface AppDependencies {
   authService?: AuthService;
@@ -37,6 +39,7 @@ export interface AppDependencies {
   salesReportService?: SalesReportService;
   customerService?: CustomerService;
   regionalCommissionService?: RegionalCommissionService;
+  planService?: SubscriptionPlanService;
   appOrigin?: string;
   secureCookies?: boolean;
   onClose?: () => Promise<void>;
@@ -134,6 +137,13 @@ export const buildApp = (
         await registerRegionalCommissionRoutes(securedApp, {
           authService: _dependencies.authService!,
           service: _dependencies.regionalCommissionService,
+          appOrigin: _dependencies.appOrigin ?? "http://127.0.0.1:5173",
+        });
+      }
+      if (_dependencies.planService) {
+        await registerSubscriptionPlanRoutes(securedApp, {
+          authService: _dependencies.authService!,
+          planService: _dependencies.planService,
           appOrigin: _dependencies.appOrigin ?? "http://127.0.0.1:5173",
         });
       }

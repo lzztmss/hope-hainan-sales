@@ -12,8 +12,7 @@ export interface SalesReportFact {
   orderCount: number;
   oneTimeOriginalFen: number;
   returnedFen: number;
-  fttrMonthlyFen: number;
-  heartMonthlyFen: number;
+  monthlyFen: number;
   contract36Fen: number;
   commissionEstimatedFen: number;
   commissionPendingSettlementFen: number;
@@ -64,8 +63,7 @@ const emptyMetrics = (): SalesReportMetrics => ({
   oneTimeOriginalFen: 0,
   returnedFen: 0,
   oneTimeNetFen: 0,
-  fttrMonthlyFen: 0,
-  heartMonthlyFen: 0,
+  monthlyFen: 0,
   contract36Fen: 0,
   commissionEstimatedFen: 0,
   commissionPendingSettlementFen: 0,
@@ -88,8 +86,7 @@ const metricsForFacts = (facts: readonly SalesReportFact[]): SalesReportMetrics 
       "orderCount",
       "oneTimeOriginalFen",
       "returnedFen",
-      "fttrMonthlyFen",
-      "heartMonthlyFen",
+      "monthlyFen",
       "contract36Fen",
       "commissionEstimatedFen",
       "commissionPendingSettlementFen",
@@ -212,8 +209,7 @@ export const createSalesReportService = (options: {
               orderCount: 0,
               oneTimeOriginalFen: 0,
               returnedFen: 0,
-              fttrMonthlyFen: 0,
-              heartMonthlyFen: 0,
+              monthlyFen: 0,
               contract36Fen: 0,
               commissionEstimatedFen: 0,
               commissionPendingSettlementFen: 0,
@@ -279,7 +275,7 @@ export const createSalesReportService = (options: {
       });
       return {
         csv: buildSalesReportCsv(report),
-        fileName: `FTTR心连心销售报表_${report.period.from}_${report.period.to}.csv`,
+        fileName: `心连心养老套餐销售报表_${report.period.from}_${report.period.to}.csv`,
       };
     },
   };

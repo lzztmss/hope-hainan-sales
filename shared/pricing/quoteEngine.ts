@@ -2,13 +2,14 @@ import { ACTIVE_CATALOG } from "./catalog.js";
 import type {
   ChargeSku,
   ComponentId,
-  FttrKind,
   PricingCatalog,
   QuoteCalculation,
   QuoteChargeLine,
   QuoteComponentLine,
   QuoteInput,
   QuoteSelection,
+  SubscriptionPlanDefinition,
+  SubscriptionPlanSnapshot,
 } from "./types.js";
 
 const COMPONENT_ORDER: readonly ComponentId[] = [
@@ -64,60 +65,34 @@ const normalizeSelection = (selection: QuoteSelection): NormalizedSelection => (
   locations: selection.locations,
 });
 
-interface ResolvedFttr {
-  kind: FttrKind;
-  plan: number | null;
-  monthlyFen: number;
-  customNote: string | null;
-}
-
-const resolveFttr = (
+const resolveSubscriptionPlan = (
   input: QuoteInput,
-  catalog: PricingCatalog,
-): ResolvedFttr => {
-  if (input.fttrPlan === null) {
-    if (input.mode === "contract_36") {
-      throw new Error("36 个月月付必须选择 FTTR 档位");
+  plan: SubscriptionPlanDefinition | null | undefined,
+): SubscriptionPlanSnapshot | null => {
+  if (input.mode === "one_time") {
+    if (input.subscriptionPlanId !== null) {
+      throw new Error("一次性购买不能选择月付套餐");
     }
-
-    return {
-      kind: "none",
-      plan: null,
-      monthlyFen: 0,
-      customNote: null,
-    };
+    return null;
   }
-
-  if (
-    !Number.isInteger(input.fttrPlan) ||
-    input.fttrPlan < 1 ||
-    input.fttrPlan > 9_999
-  ) {
-    throw new Error("FTTR 月费必须是 1 至 9999 元的整数");
+  if (!input.subscriptionPlanId || !plan || plan.id !== input.subscriptionPlanId) {
+    throw new Error("36 个月月付必须选择有效套餐");
   }
-
-  const isStandard = catalog.fttrPlans.some(
-    (plan) => plan === input.fttrPlan,
-  );
-  if (isStandard) {
-    return {
-      kind: "standard",
-      plan: input.fttrPlan,
-      monthlyFen: input.fttrPlan * 100,
-      customNote: null,
-    };
+  if (!plan.active) throw new Error("所选月付套餐已停用");
+  if (plan.contractMonths !== 36) throw new Error("月付套餐必须为36个月");
+  if (!Number.isSafeInteger(plan.monthlyFen) || plan.monthlyFen <= 0) {
+    throw new Error("月付套餐价格不正确");
   }
-
-  const customNote = input.customFttrNote?.trim();
-  if (!customNote) {
-    throw new Error("自定义 FTTR 月费必须填写说明");
-  }
-
+  if (plan.items.length === 0) throw new Error("月付套餐必须包含设备");
   return {
-    kind: "custom",
-    plan: input.fttrPlan,
-    monthlyFen: input.fttrPlan * 100,
-    customNote,
+    id: plan.id,
+    code: plan.code,
+    name: plan.name,
+    description: plan.description,
+    monthlyFen: plan.monthlyFen,
+    contractMonths: 36,
+    version: plan.version,
+    items: plan.items.map((item) => ({ ...item })),
   };
 };
 
@@ -169,15 +144,26 @@ const canonicalCharges = (
 };
 
 const buildChargeLines = (
-  input: QuoteInput,
   catalog: PricingCatalog,
   charges: readonly { sku: ChargeSku; quantity: number }[],
+  plan: SubscriptionPlanSnapshot | null,
 ): QuoteChargeLine[] =>
+  plan
+    ? [{
+        sku: `PLAN:${plan.id}`,
+        label: plan.name,
+        unit: "套",
+        quantity: 1,
+        oneTimeUnitFen: 0,
+        monthlyUnitFen: plan.monthlyFen,
+        oneTimeSubtotalFen: 0,
+        monthlySubtotalFen: plan.monthlyFen,
+      }]
+    :
   charges.map(({ sku, quantity }) => {
     const definition = catalog.charges[sku];
-    const useMonthly = input.mode === "contract_36" && definition.monthlyFen > 0;
-    const oneTimeUnitFen = useMonthly ? 0 : definition.oneTimeFen;
-    const monthlyUnitFen = useMonthly ? definition.monthlyFen : 0;
+    const oneTimeUnitFen = definition.oneTimeFen;
+    const monthlyUnitFen = 0;
 
     return {
       sku,
@@ -271,33 +257,34 @@ const buildComponentLines = (
 export const calculateQuote = (
   input: QuoteInput,
   catalog: PricingCatalog = ACTIVE_CATALOG,
+  plan?: SubscriptionPlanDefinition | null,
 ): QuoteCalculation => {
-  const fttr = resolveFttr(input, catalog);
+  const subscriptionPlan = resolveSubscriptionPlan(input, plan);
   const selection = normalizeSelection(input.selection);
-  const charges = canonicalCharges(selection, catalog);
-  const chargeLines = buildChargeLines(input, catalog, charges);
+  const selectedOneTimeCharges = canonicalCharges(selection, catalog);
+  if (
+    subscriptionPlan &&
+    selectedOneTimeCharges.some((entry) => entry.quantity > 0)
+  ) {
+    throw new Error("月付订单只能选择一个套餐，不能混入一次性设备");
+  }
+  const charges = subscriptionPlan
+    ? subscriptionPlan.items.map((item) => ({ ...item }))
+    : selectedOneTimeCharges;
+  const chargeLines = buildChargeLines(catalog, charges, subscriptionPlan);
   const componentLines = buildComponentLines(charges, selection, catalog);
-  const fttrMonthlyFen = fttr.monthlyFen;
-  const heartMonthlyFen = chargeLines.reduce(
-    (total, line) => total + line.monthlySubtotalFen,
-    0,
-  );
   const oneTimeFen = chargeLines.reduce(
     (total, line) => total + line.oneTimeSubtotalFen,
     0,
   );
-  const monthlyTotalFen = fttrMonthlyFen + heartMonthlyFen;
+  const monthlyTotalFen = subscriptionPlan?.monthlyFen ?? 0;
 
   return {
     catalogVersion: catalog.version,
     mode: input.mode,
-    fttrKind: fttr.kind,
-    fttrPlan: fttr.plan,
-    customFttrNote: fttr.customNote,
+    subscriptionPlan,
     chargeLines,
     componentLines,
-    fttrMonthlyFen,
-    heartMonthlyFen,
     oneTimeFen,
     monthlyTotalFen,
     contract36Fen:

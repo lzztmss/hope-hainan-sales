@@ -1,9 +1,5 @@
 export type PaymentMode = "one_time" | "contract_36";
 
-export type FttrPlan = 129 | 159 | 199 | 239 | 299 | 399;
-
-export type FttrKind = "none" | "standard" | "custom";
-
 export type RoomType = "one_bedroom" | "two_bedroom" | "three_bedroom";
 
 export type ChargeSku =
@@ -43,9 +39,45 @@ export interface QuoteSelection {
 
 export interface QuoteInput {
   mode: PaymentMode;
-  fttrPlan: number | null;
-  customFttrNote?: string;
+  subscriptionPlanId: string | null;
   selection: QuoteSelection;
+}
+
+export interface SubscriptionPlanItem {
+  sku: Extract<
+    ChargeSku,
+    | "WATCH"
+    | "MATTRESS"
+    | "GATEWAY"
+    | "MOTION"
+    | "DOOR"
+    | "PORTABLE_BUTTON"
+    | "WALL_BUTTON"
+  >;
+  quantity: number;
+}
+
+export interface SubscriptionPlanDefinition {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  monthlyFen: number;
+  contractMonths: 36;
+  active: boolean;
+  version: number;
+  items: readonly SubscriptionPlanItem[];
+}
+
+export interface SubscriptionPlanSnapshot {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  monthlyFen: number;
+  contractMonths: 36;
+  version: number;
+  items: SubscriptionPlanItem[];
 }
 
 export interface CatalogCharge {
@@ -67,7 +99,6 @@ export interface ComponentDefinition {
 
 export interface PricingCatalog {
   readonly version: string;
-  readonly fttrPlans: readonly FttrPlan[];
   readonly charges: Readonly<Record<ChargeSku, CatalogCharge>>;
   readonly components: Readonly<Record<ComponentId, ComponentDefinition>>;
   readonly entitlements: readonly {
@@ -77,7 +108,7 @@ export interface PricingCatalog {
 }
 
 export interface QuoteChargeLine {
-  sku: ChargeSku;
+  sku: string;
   label: string;
   unit: string;
   quantity: number;
@@ -99,13 +130,9 @@ export interface QuoteComponentLine {
 export interface QuoteCalculation {
   catalogVersion: string;
   mode: PaymentMode;
-  fttrKind: FttrKind;
-  fttrPlan: number | null;
-  customFttrNote: string | null;
+  subscriptionPlan: SubscriptionPlanSnapshot | null;
   chargeLines: QuoteChargeLine[];
   componentLines: QuoteComponentLine[];
-  fttrMonthlyFen: number;
-  heartMonthlyFen: number;
   oneTimeFen: number;
   monthlyTotalFen: number;
   contract36Fen: number;

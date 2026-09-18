@@ -9,6 +9,8 @@ import type {
   QuoteCalculation,
   QuoteInput,
   RoomType,
+  SubscriptionPlanDefinition,
+  SubscriptionPlanItem,
 } from "../../shared/pricing/types";
 import type { RegionalCommissionRules } from "../../shared/regionalCommission/types";
 import type { MyCommissionDashboard } from "../commissions/MyCommissionPage";
@@ -168,6 +170,24 @@ export interface QuoteCustomerInput {
 export interface ConfirmQuoteInput {
   customer: QuoteCustomerInput;
   pricing: QuoteInput;
+}
+
+export type SubscriptionPlanDto = SubscriptionPlanDefinition;
+
+export interface SaveSubscriptionPlanInput {
+  code: string;
+  name: string;
+  description?: string | null;
+  monthlyFen: number;
+  active: boolean;
+  items: readonly SubscriptionPlanItem[];
+  reason: string;
+  expectedVersion?: number;
+}
+
+export interface DeleteSubscriptionPlanInput {
+  expectedVersion: number;
+  reason: string;
 }
 
 export interface ConfirmedQuoteSummary {
@@ -339,6 +359,7 @@ export interface OrderLineDto {
   oneTimeSubtotalFen: number;
   monthlySubtotalFen: number;
   locations: readonly string[];
+  hardwareNumbers: readonly string[];
   reason?: string | null;
 }
 
@@ -351,11 +372,7 @@ export interface OrderDto {
   status: OrderStatus;
   salesChannel: "online" | "offline";
   paymentMode: OrderPaymentMode;
-  fttrKind: "none" | "standard" | "custom";
-  fttrPlan: number | null;
-  customFttrNote?: string | null;
-  fttrMonthlyFen: number;
-  heartMonthlyFen: number;
+  subscriptionPlanId: string | null;
   oneTimeFen: number;
   monthlyTotalFen: number;
   contract36Fen: number;
@@ -518,6 +535,10 @@ export interface ApiClient {
   createCommissionPolicyDraft(
     input: CreateCommissionPolicyDraftInput,
   ): Promise<CommissionPolicyVersionDto>;
+  listSubscriptionPlans(includeInactive?: boolean): Promise<readonly SubscriptionPlanDto[]>;
+  createSubscriptionPlan(input: SaveSubscriptionPlanInput): Promise<SubscriptionPlanDto>;
+  updateSubscriptionPlan(id: string, input: SaveSubscriptionPlanInput): Promise<SubscriptionPlanDto>;
+  deleteSubscriptionPlan(id: string, input: DeleteSubscriptionPlanInput): Promise<void>;
   createOrderFromQuote(
     quoteId: string,
     idempotencyKey: string,
@@ -909,6 +930,37 @@ export const createApiClient = ({
           headers: { "Idempotency-Key": idempotencyKey },
         }),
       );
+    },
+    async listSubscriptionPlans(includeInactive = false) {
+      const suffix = includeInactive ? "?includeInactive=true" : "";
+      return readProperty<readonly SubscriptionPlanDto[]>(
+        await request(`/api/subscription-plans${suffix}`),
+        "plans",
+      );
+    },
+    async createSubscriptionPlan(input) {
+      return readProperty<SubscriptionPlanDto>(
+        await request("/api/subscription-plans", {
+          method: "POST",
+          body: JSON.stringify(input),
+        }),
+        "plan",
+      );
+    },
+    async updateSubscriptionPlan(id, input) {
+      return readProperty<SubscriptionPlanDto>(
+        await request(`/api/subscription-plans/${encodeURIComponent(id)}`, {
+          method: "PUT",
+          body: JSON.stringify(input),
+        }),
+        "plan",
+      );
+    },
+    async deleteSubscriptionPlan(id, input) {
+      await request(`/api/subscription-plans/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        body: JSON.stringify(input),
+      });
     },
     async getQuote(quoteId) {
       return readQuoteDetail(

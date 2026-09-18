@@ -129,10 +129,10 @@ describe("订单Excel导出", () => {
     ]);
     const orderSheet = workbook.getWorksheet("订单对账明细")!;
     expect(orderSheet.getCell("A6").value).toBe(order.orderNo);
-    expect(orderSheet.getCell("J6").value).toBe(159);
-    expect(orderSheet.getCell("L6").value).toBe(20);
-    expect(orderSheet.getCell("M6").value).toBe(179);
-    expect(orderSheet.getCell("N5").value).toBe("36个月合约月费合计");
+    expect(orderSheet.getCell("J6").value).toBe(189);
+    expect(orderSheet.getCell("K6").value).toBe(179);
+    expect(orderSheet.getCell("L6").value).toBe(6804);
+    expect(orderSheet.getCell("L5").value).toBe("36个月合计");
     expect(orderSheet.getCell("Q6").value).toBeInstanceOf(Date);
     expect(orderSheet.autoFilter).toBeTruthy();
 
@@ -143,7 +143,7 @@ describe("订单Excel导出", () => {
     const returnSheet = workbook.getWorksheet("售后退款明细")!;
     expect(returnSheet.getCell("C6").value).toBe("特殊处理");
     expect(returnSheet.getCell("N6").value).toBe(50);
-    expect(returnSheet.getCell("P6").value).toBe("部分退货，不影响FTTR");
+    expect(returnSheet.getCell("P6").value).toBe("部分退货，按当前规则处理");
   });
 
   it("拒绝销售员导出", async () => {

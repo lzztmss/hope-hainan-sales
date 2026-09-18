@@ -25,8 +25,8 @@ afterEach(async () => {
 });
 
 const pricing = (watch: number): QuoteInput => ({
-  mode: "contract_36",
-  fttrPlan: 159,
+  mode: "one_time",
+  subscriptionPlanId: null,
   selection: { watch },
 });
 
@@ -92,8 +92,8 @@ describe("SQLite 报价持久化主链路", () => {
     const updated = await service.updateQuote(seller, created.id, draft(2), 1);
     expect(updated.quoteNo).toBe(created.quoteNo);
     expect(updated.version).toBe(2);
-    expect(updated.calculation.heartMonthlyFen).toBeGreaterThan(
-      loaded.calculation.heartMonthlyFen,
+    expect(updated.calculation.oneTimeFen).toBeGreaterThan(
+      loaded.calculation.oneTimeFen,
     );
     const list = await service.listQuotes(seller, { query: "王女士", page: 1, pageSize: 20 });
     expect(list.items.map((quote) => quote.id)).toContain(created.id);

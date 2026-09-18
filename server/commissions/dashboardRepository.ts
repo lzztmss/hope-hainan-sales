@@ -3,12 +3,15 @@ import {
   desc,
   eq,
   exists,
+  gte,
   gt,
   inArray,
   isNull,
+  lt,
   lte,
   notExists,
   or,
+  sql,
   type SQL,
 } from "drizzle-orm";
 
@@ -30,7 +33,6 @@ import {
   users,
 } from "../db/schema.js";
 import type { CommissionPolicyForAccrual } from "./ledgerService.js";
-import { buildFttrCommissionLine } from "./ledgerRepository.js";
 import type {
   CommissionDashboardRepository,
   CommissionDashboardRepositoryFilters,
@@ -43,7 +45,7 @@ import type {
 
 type QueryExecutor = AppDatabase;
 type RuleRow = typeof commissionRules.$inferSelect;
-const POLICY_CODE = "HAINAN_FTTR_HEARTLINK";
+const POLICY_CODE = "HAINAN_DEVICE_COMMISSION";
 
 const mapScope = (row: RuleRow): CommissionScope => {
   if (row.salespersonId) return { kind: "salesperson", value: row.salespersonId };
@@ -55,8 +57,8 @@ const mapScope = (row: RuleRow): CommissionScope => {
 };
 
 const mapSku = (row: RuleRow): string => {
-  if (row.targetType !== "fttr_plan") return row.targetSku!;
-  return row.targetSku === "CUSTOM" ? "FTTR_CUSTOM" : `FTTR_${row.fttrPlan}`;
+  if (!row.targetSku) throw new Error("设备提成规则缺少 SKU");
+  return row.targetSku;
 };
 
 const mapRule = (row: RuleRow): CommissionRule => ({
@@ -71,11 +73,9 @@ const mapRule = (row: RuleRow): CommissionRule => ({
 const ruleSkuExpression = (row: {
   targetType: RuleRow["targetType"] | null;
   targetSku: string | null;
-  fttrPlan: number | null;
 }): string | null => {
   if (!row.targetType) return null;
-  if (row.targetType !== "fttr_plan") return row.targetSku;
-  return row.targetSku === "CUSTOM" ? "FTTR_CUSTOM" : `FTTR_${row.fttrPlan}`;
+  return row.targetSku;
 };
 
 const isDashboardLedgerEntryType = (
@@ -173,7 +173,6 @@ export class DrizzleCommissionDashboardRepository
         ruleId: commissionLedger.ruleId,
         ruleTargetType: commissionRules.targetType,
         ruleTargetSku: commissionRules.targetSku,
-        ruleFttrPlan: commissionRules.fttrPlan,
         ruleName: commissionRules.ruleName,
         activatedAt: orders.activatedAt,
         signedAt: orders.signedAt,
@@ -243,7 +242,6 @@ export class DrizzleCommissionDashboardRepository
         ruleSku: ruleSkuExpression({
           targetType: row.ruleTargetType,
           targetSku: row.ruleTargetSku,
-          fttrPlan: row.ruleFttrPlan,
         }),
         ruleName: row.ruleName,
         activatedAt: row.activatedAt,
@@ -274,6 +272,12 @@ export class DrizzleCommissionDashboardRepository
       conditions.push(orderHasBeneficiary(this.executor, filters.beneficiaryId));
     }
     if (filters.orderId) conditions.push(eq(orders.id, filters.orderId));
+    if (filters.orderReferenceFrom) {
+      conditions.push(gte(orders.createdAt, filters.orderReferenceFrom));
+    }
+    if (filters.orderReferenceTo) {
+      conditions.push(lt(orders.createdAt, filters.orderReferenceTo));
+    }
 
     const orderRows = await this.executor
       .select({
@@ -283,8 +287,6 @@ export class DrizzleCommissionDashboardRepository
         storeId: orders.storeId,
         sellerId: orders.sellerId,
         paymentMode: orders.paymentMode,
-        fttrKind: orders.fttrKind,
-        fttrPlan: orders.fttrPlan,
         personnelType: users.personnelType,
         customerNameEncrypted: customers.nameEncrypted,
         customerPhoneTail: customers.phoneTail,
@@ -342,7 +344,6 @@ export class DrizzleCommissionDashboardRepository
       if (row.status !== "pending" && row.status !== "accepted") {
         throw new Error("预计提成订单状态不正确");
       }
-      const fttrLine = buildFttrCommissionLine(row);
       return {
         id: row.id,
         orderNo: row.orderNo,
@@ -355,15 +356,12 @@ export class DrizzleCommissionDashboardRepository
         customerPhoneTail: row.customerPhoneTail,
         customerSnapshot: row.customerSnapshot,
         createdAt: row.createdAt,
-        lines: [
-          ...(fttrLine ? [fttrLine] : []),
-          ...(linesByOrder.get(row.id) ?? []).map((line) => ({
+        lines: (linesByOrder.get(row.id) ?? []).map((line) => ({
             sku: line.sku,
             label: line.label,
             quantity: line.quantity,
             lineType: line.lineType,
           })),
-        ],
         attributions: attributionsByOrder.get(row.id) ?? [],
       };
     });
@@ -389,6 +387,13 @@ export class DrizzleCommissionDashboardRepository
       conditions.push(orderHasBeneficiary(this.executor, filters.beneficiaryId));
     }
     if (filters.orderId) conditions.push(eq(orders.id, filters.orderId));
+    const referenceAt = sql<number>`coalesce(${orders.activatedAt}, ${orders.signedAt}, ${orders.createdAt})`;
+    if (filters.orderReferenceFrom) {
+      conditions.push(gte(referenceAt, filters.orderReferenceFrom.getTime()));
+    }
+    if (filters.orderReferenceTo) {
+      conditions.push(lt(referenceAt, filters.orderReferenceTo.getTime()));
+    }
 
     const rows = await this.executor
       .select({
@@ -441,7 +446,10 @@ export class DrizzleCommissionDashboardRepository
     const rows = await this.executor
       .select()
       .from(commissionRules)
-      .where(eq(commissionRules.policyVersionId, version.id));
+      .where(and(
+        eq(commissionRules.policyVersionId, version.id),
+        eq(commissionRules.targetType, "product"),
+      ));
     return {
       id: version.id,
       version: version.versionNo,

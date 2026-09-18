@@ -1,3 +1,4 @@
+import { isTrustedOrigin } from "../security/origin.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
@@ -98,7 +99,7 @@ const ensureTrustedOrigin = (
   appOrigin: string,
 ): boolean => {
   const origin = request.headers.origin;
-  if (origin && origin !== appOrigin) {
+  if (origin && !isTrustedOrigin(origin, appOrigin)) {
     void reply.status(403).send({ error: "请求来源不可信" });
     return false;
   }

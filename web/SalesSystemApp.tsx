@@ -5,6 +5,7 @@ import { type ApiClient, type ApiUserRole, apiClient } from "./api/client";
 import { APP_BASE_PATH } from "./appBasePath";
 import { CommissionRulesRoute } from "./admin/CommissionRulesRoute";
 import { UserStoreManagementRoute } from "./admin/UserStoreManagementRoute";
+import { SubscriptionPlansPage } from "./admin/SubscriptionPlansPage";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { ChangePasswordPage } from "./auth/ChangePasswordPage";
 import { LoginPage } from "./auth/LoginPage";
@@ -338,7 +339,7 @@ export const SalesSystemRoutes = ({ client }: SalesSystemRoutesProps) => (
 
           <Route element={<RequireRole allowed={["admin"]} />}>
             <Route path="/admin/users" element={<AdminUsersRoute />} />
-            <Route path="/admin/pricing" element={<PlaceholderPage title="价格版本" />} />
+            <Route path="/admin/pricing" element={<SubscriptionPlansPage client={client} />} />
             <Route path="/admin/commissions" element={<AdminCommissionRoute client={client} />} />
             <Route path="/admin/settlements" element={<PlaceholderPage title="结算批次" />} />
             <Route path="/admin/audit" element={<PlaceholderPage title="审计与回收站" />} />

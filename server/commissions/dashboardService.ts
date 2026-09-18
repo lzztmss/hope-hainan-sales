@@ -95,6 +95,8 @@ export interface CommissionDashboardRepositoryFilters {
   storeId?: string;
   beneficiaryId?: string;
   orderId?: string;
+  orderReferenceFrom?: Date;
+  orderReferenceTo?: Date;
 }
 
 export interface CommissionDashboardRepository {
@@ -867,9 +869,15 @@ export const createCommissionDashboardService = (
     user: AuthenticatedUser,
     filters: CommissionDashboardFilters,
     orderId?: string,
+    period?: Period,
   ) => {
     const normalized = normalizeFilters(user, filters);
-    const repositoryFilters = { ...normalized.repository, orderId };
+    const repositoryFilters = {
+      ...normalized.repository,
+      orderId,
+      orderReferenceFrom: period?.start,
+      orderReferenceTo: period?.end,
+    };
     const at = now();
     const [ledgerRows, estimatedOrders, missingAccrualOrders, policy] = await Promise.all([
       options.repository.listLedger(normalized.scope, repositoryFilters),
@@ -922,7 +930,7 @@ export const createCommissionDashboardService = (
       if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
         throw new CommissionDashboardError("每页数量必须为1至100", 400);
       }
-      const loaded = await loadPresented(user, filters);
+      const loaded = await loadPresented(user, filters, undefined, period);
       const periodOrders = loaded.orders.filter(
         (order) => order.sortAt >= period.start && order.sortAt < period.end,
       );

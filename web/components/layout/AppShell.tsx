@@ -89,7 +89,7 @@ export const AppShell = ({
       </a>
       <header className="sales-shell__header">
         <div className="sales-shell__mobile-brand"><span>联</span><strong>销售运营中台</strong></div>
-        <div className="sales-shell__breadcrumb"><span>海南联通 FTTR</span><strong>{activeLabel}</strong></div>
+        <div className="sales-shell__breadcrumb"><span>海南联通心连心</span><strong>{activeLabel}</strong></div>
         <Button
           variant="outline"
           size="sm"
@@ -136,7 +136,7 @@ export const AppShell = ({
       >
         <div className="sales-shell__sidebar-brand">
           <span className="sales-shell__brand-mark">联</span>
-          <span><strong>销售运营中台</strong><small>海南联通 · FTTR 心连心</small></span>
+          <span><strong>销售运营中台</strong><small>海南联通 · 心连心养老套餐</small></span>
           <Button className="sales-shell__drawer-close" variant="ghost" size="icon" aria-label="关闭主导航" onClick={() => setIsNavigationOpen(false)}><X aria-hidden="true" /></Button>
         </div>
         <RoleNavigation

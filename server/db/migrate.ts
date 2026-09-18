@@ -13,8 +13,26 @@ export const migrateDatabase = async (
 ): Promise<void> => {
   const client = createDatabaseClient(sqlitePath);
   try {
+    // SQLite ignores changes to foreign_keys while a transaction is active.
+    // Drizzle wraps migrations in a transaction, so table-rebuild migrations
+    // must disable enforcement before the migrator starts and validate the
+    // resulting graph explicitly afterwards.
+    client.raw.pragma("foreign_keys = OFF");
     migrate(client.db, { migrationsFolder });
+    const violations = client.raw.pragma("foreign_key_check") as Array<{
+      table: string;
+      rowid: number | null;
+      parent: string;
+      fkid: number;
+    }>;
+    if (violations.length > 0) {
+      const first = violations[0]!;
+      throw new Error(
+        `数据库迁移后外键校验失败：${first.table}[${first.rowid ?? "?"}] -> ${first.parent}`,
+      );
+    }
   } finally {
+    client.raw.pragma("foreign_keys = ON");
     await client.close();
   }
 };

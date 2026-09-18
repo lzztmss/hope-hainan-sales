@@ -21,8 +21,7 @@ const salesMetrics: ReadonlyArray<{
   { key: "oneTimeOriginalFen", label: "一次性设备原额", kind: "money" },
   { key: "returnedFen", label: "退单额", kind: "money", tone: "danger" },
   { key: "oneTimeNetFen", label: "一次性设备净额", kind: "money", tone: "primary" },
-  { key: "fttrMonthlyFen", label: "FTTR 月费", kind: "money" },
-  { key: "heartMonthlyFen", label: "心连心月增费", kind: "money" },
+  { key: "monthlyFen", label: "月付套餐月费", kind: "money" },
   { key: "contract36Fen", label: "36个月合约月费合计", kind: "money" },
 ];
 

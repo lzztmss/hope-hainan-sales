@@ -33,11 +33,10 @@ export interface CommissionRulesRouteProps {
 }
 
 const PREFERRED_SIMULATION_SKUS = [
-  "STANDARD_BUNDLE",
-  "HOME_DUAL",
-  "ONE_KEY",
   "MATTRESS",
   "WATCH",
+  "GATEWAY",
+  "MOTION",
 ] as const;
 
 const partsForShanghai = (value: Date) => {
@@ -82,9 +81,7 @@ const labelForSku = (sku: string): string => {
   ];
   if (charge) return charge.label;
 
-  if (sku === "FTTR_CUSTOM") return "FTTR 自定义档位";
-  const fttrMatch = /^FTTR_(\d+)$/.exec(sku);
-  return fttrMatch ? `FTTR ${fttrMatch[1]} 元套餐` : sku;
+  return sku;
 };
 
 const mapHistory = (

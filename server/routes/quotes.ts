@@ -1,3 +1,4 @@
+import { isTrustedOrigin } from "../security/origin.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
@@ -17,7 +18,7 @@ const quoteFieldLabels = {
   phone: "客户手机号",
   elderCount: "长者人数",
   mode: "支付方式",
-  fttrPlan: "FTTR 档位",
+  subscriptionPlanId: "月付套餐",
   selection: "商品数量",
   expectedVersion: "报价版本",
 } as const;
@@ -49,8 +50,7 @@ const locationsSchema = z
 
 const pricingSchema = z.object({
   mode: z.enum(["one_time", "contract_36"]),
-  fttrPlan: z.number().int().min(1).max(9_999).nullable(),
-  customFttrNote: z.string().trim().max(500).optional(),
+  subscriptionPlanId: z.string().uuid().nullable(),
   selection: z.object({
     watch: quantity,
     mattress: quantity,
@@ -103,7 +103,7 @@ const ensureTrustedOrigin = (
   appOrigin: string,
 ): boolean => {
   const origin = request.headers.origin;
-  if (origin && origin !== appOrigin) {
+  if (origin && !isTrustedOrigin(origin, appOrigin)) {
     void reply.status(403).send({ error: "请求来源不可信" });
     return false;
   }
@@ -171,7 +171,7 @@ export const registerQuoteRoutes = async (
       return sendValidationError(reply, parsed.error, quoteFieldLabels, "请检查报价配置");
     }
     try {
-      return options.quoteService.previewQuote(parsed.data);
+      return await options.quoteService.previewQuote(parsed.data);
     } catch (error) {
       return sendServiceError(reply, error);
     }

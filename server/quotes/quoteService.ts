@@ -14,6 +14,7 @@ import {
   type UserScope,
 } from "../auth/authorization.js";
 import { maskPhone, normalizeMainlandPhone } from "../security/pii.js";
+import type { SubscriptionPlanService } from "../plans/planService.js";
 
 export interface QuoteCustomerDraft {
   name: string;
@@ -61,11 +62,7 @@ export interface QuoteWriteRecord {
   sellerId: string;
   status: "confirmed" | "converted" | "expired" | "lost" | "voided";
   paymentMode: QuoteCalculation["mode"];
-  fttrKind: QuoteCalculation["fttrKind"];
-  fttrPlan: number | null;
-  customFttrNote: string | null;
-  fttrMonthlyFen: number;
-  heartMonthlyFen: number;
+  subscriptionPlanId: string | null;
   oneTimeFen: number;
   monthlyTotalFen: number;
   contract36Fen: number;
@@ -162,6 +159,7 @@ export interface QuotePiiPort {
 export interface QuoteServiceOptions {
   repository: QuoteRepository;
   pii: QuotePiiPort;
+  plans?: Pick<SubscriptionPlanService, "requireActive">;
   now?: () => Date;
   randomSuffix?: () => string;
 }
@@ -349,24 +347,23 @@ export const createQuoteService = (options: QuoteServiceOptions) => {
     notesEncrypted: record.notesEncrypted,
   });
 
-  const quoteValues = (
+  const quoteValues = async (
     base: Pick<QuoteWriteRecord, "quoteNo" | "idempotencyKey" | "storeId" | "sellerId" | "confirmedAt">,
     customerId: string,
     draft: QuoteDraft,
     customerRecord: CustomerWriteRecord,
     phone: string,
-  ): QuoteWriteRecord => {
-    const calculated = calculateQuote(draft.pricing);
+  ): Promise<QuoteWriteRecord> => {
+    const plan = draft.pricing.mode === "contract_36"
+      ? await options.plans?.requireActive(draft.pricing.subscriptionPlanId ?? "")
+      : null;
+    const calculated = calculateQuote(draft.pricing, undefined, plan);
     return {
       ...base,
       customerId,
       status: "confirmed",
       paymentMode: calculated.mode,
-      fttrKind: calculated.fttrKind,
-      fttrPlan: calculated.fttrPlan,
-      customFttrNote: calculated.customFttrNote,
-      fttrMonthlyFen: calculated.fttrMonthlyFen,
-      heartMonthlyFen: calculated.heartMonthlyFen,
+      subscriptionPlanId: calculated.subscriptionPlan?.id ?? null,
       oneTimeFen: calculated.oneTimeFen,
       monthlyTotalFen: calculated.monthlyTotalFen,
       contract36Fen: calculated.contract36Fen,
@@ -381,8 +378,11 @@ export const createQuoteService = (options: QuoteServiceOptions) => {
   };
 
   return {
-    previewQuote(draft: Pick<QuoteDraft, "pricing">): QuoteCalculation {
-      return calculateQuote(draft.pricing);
+    async previewQuote(draft: Pick<QuoteDraft, "pricing">): Promise<QuoteCalculation> {
+      const plan = draft.pricing.mode === "contract_36"
+        ? await options.plans?.requireActive(draft.pricing.subscriptionPlanId ?? "")
+        : null;
+      return calculateQuote(draft.pricing, undefined, plan);
     },
 
     async confirmQuote(
@@ -429,7 +429,7 @@ export const createQuoteService = (options: QuoteServiceOptions) => {
         const confirmedAt = now();
 
         return repository.createQuote(
-          quoteValues(
+          await quoteValues(
             {
               quoteNo: `XLX-${formatShanghaiDate(confirmedAt)}-${randomSuffix()}`,
               idempotencyKey,
@@ -498,7 +498,7 @@ export const createQuoteService = (options: QuoteServiceOptions) => {
         }
         const { record, phone } = buildCustomerRecord(user, draft.customer);
         const customer = await repository.upsertCustomer(record);
-        const next = quoteValues(
+        const next = await quoteValues(
           {
             quoteNo: current.quoteNo,
             idempotencyKey: current.idempotencyKey,

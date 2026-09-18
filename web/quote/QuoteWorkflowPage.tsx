@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { flushSync } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -13,6 +13,7 @@ import type {
   QuoteInput,
   QuoteSelection,
   RoomType,
+  SubscriptionPlanDefinition,
 } from "../../shared/pricing/types";
 import type {
   ApiClient,
@@ -29,7 +30,7 @@ import "./quoteWorkflow.css";
 
 export type QuoteWorkflowClient = Pick<
   ApiClient,
-  "confirmQuote" | "createOrderFromQuote" | "recordQuotePrint" | "updateQuote"
+  "confirmQuote" | "createOrderFromQuote" | "listSubscriptionPlans" | "recordQuotePrint" | "updateQuote"
 >;
 
 export interface QuoteWorkflowPageProps {
@@ -41,7 +42,6 @@ export interface QuoteWorkflowPageProps {
 
 type QuantityKey = Exclude<keyof QuoteSelection, "locations">;
 type Scenario = "custom" | "one_key" | "home_dual" | "room";
-type FttrChoice = "none" | "custom" | `${number}`;
 
 const ROOM_LABELS: Record<RoomType, string> = {
   one_bedroom: "一室一厅",
@@ -160,18 +160,10 @@ const QuoteTotalsBreakdown = ({
 
   return (
     <div className="quote-workflow__totals">
-      <div>
-        <span>FTTR 月费底座{suffix}</span>
-        <strong>
-          {calculation.fttrKind === "none"
-            ? "未选择"
-            : `¥${formatMoney(calculation.fttrMonthlyFen)}`}
-        </strong>
-      </div>
-      <div>
-        <span>心连心月增费{suffix}</span>
-        <strong>¥{formatMoney(calculation.heartMonthlyFen)}</strong>
-      </div>
+      {isContract ? <div>
+        <span>{calculation.subscriptionPlan?.name ?? "月付套餐"}月费{suffix}</span>
+        <strong>¥{formatMoney(calculation.monthlyTotalFen)}</strong>
+      </div> : null}
       <div>
         <span>{isContract ? "一次性增配费" : "一次性设备费"}{suffix}</span>
         <strong>¥{formatMoney(calculation.oneTimeFen)}</strong>
@@ -273,25 +265,13 @@ const scenarioSelection = (
 
 const buildPricing = (
   mode: PaymentMode,
-  fttrChoice: FttrChoice,
-  customFttr: string,
-  customFttrNote: string,
+  subscriptionPlanId: string,
   selection: QuoteSelection,
 ): QuoteInput => {
-  const fttrPlan =
-    fttrChoice === "none"
-      ? null
-      : fttrChoice === "custom"
-        ? Number(customFttr)
-        : Number(fttrChoice);
-
   return {
     mode,
-    fttrPlan,
-    ...(fttrChoice === "custom"
-      ? { customFttrNote: customFttrNote.trim() }
-      : {}),
-    selection,
+    subscriptionPlanId: mode === "contract_36" ? subscriptionPlanId || null : null,
+    selection: mode === "contract_36" ? {} : selection,
   };
 };
 
@@ -303,18 +283,14 @@ export const QuoteWorkflowPage = ({
 }: QuoteWorkflowPageProps) => {
   const navigate = useNavigate();
   const originalPricing = initialQuote?.pricing;
-  const originalFttrPlan = originalPricing?.fttrPlan;
-  const originalFttrIsStandard = originalFttrPlan != null && ACTIVE_CATALOG.fttrPlans.some((plan) => plan === originalFttrPlan);
   const [name, setName] = useState(initialQuote?.customer.name ?? "");
   const [phone, setPhone] = useState(initialQuote?.customer.phone ?? "");
   const [roomType, setRoomType] = useState<RoomType>(initialQuote?.customer.roomType ?? "one_bedroom");
   const [elderCount, setElderCount] = useState<1 | 2 | 3 | 4>((initialQuote?.customer.elderCount ?? 1) as 1 | 2 | 3 | 4);
-  const [mode, setMode] = useState<PaymentMode>(originalPricing?.mode ?? "contract_36");
-  const [fttrChoice, setFttrChoice] = useState<FttrChoice>(
-    originalFttrPlan === null ? "none" : originalFttrIsStandard ? String(originalFttrPlan) as FttrChoice : originalFttrPlan !== undefined ? "custom" : "159",
-  );
-  const [customFttr, setCustomFttr] = useState(originalFttrPlan != null && !originalFttrIsStandard ? String(originalFttrPlan) : "");
-  const [customFttrNote, setCustomFttrNote] = useState(originalPricing?.customFttrNote ?? "");
+  const [mode, setMode] = useState<PaymentMode>(originalPricing?.mode ?? "one_time");
+  const [plans, setPlans] = useState<readonly SubscriptionPlanDefinition[]>([]);
+  const [plansLoading, setPlansLoading] = useState(true);
+  const [subscriptionPlanId, setSubscriptionPlanId] = useState(originalPricing?.subscriptionPlanId ?? "");
   const [scenario, setScenario] = useState<Scenario>("custom");
   const [selectionNotice, setSelectionNotice] = useState<string | null>(null);
   const [selection, setSelection] = useState<QuoteSelection>(originalPricing?.selection ?? initialSelection());
@@ -331,32 +307,44 @@ export const QuoteWorkflowPage = ({
   const orderIdempotencyKey = useRef<string | null>(null);
   const locked = busy || Boolean(savedQuote);
 
+  useEffect(() => {
+    let cancelled = false;
+    void client.listSubscriptionPlans().then((loaded) => {
+      if (cancelled) return;
+      setPlans(loaded);
+      setSubscriptionPlanId((current) => current || loaded[0]?.id || "");
+    }).catch((reason) => {
+      if (!cancelled) setError(messageFor(reason));
+    }).finally(() => {
+      if (!cancelled) setPlansLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [client]);
+
+  const selectedPlan = plans.find((plan) => plan.id === subscriptionPlanId) ?? null;
+
   const pricing = useMemo(
     () =>
       buildPricing(
         mode,
-        fttrChoice,
-        customFttr,
-        customFttrNote,
+        subscriptionPlanId,
         selection,
       ),
-    [customFttr, customFttrNote, fttrChoice, mode, selection],
+    [mode, selection, subscriptionPlanId],
   );
 
   const preview = useMemo(() => {
     try {
-      return { calculation: calculateQuote(pricing), error: null };
+      return { calculation: calculateQuote(pricing, ACTIVE_CATALOG, selectedPlan), error: null };
     } catch (calculationError) {
       return { calculation: null, error: messageFor(calculationError) };
     }
-  }, [pricing]);
+  }, [pricing, selectedPlan]);
 
   const chooseMode = (nextMode: PaymentMode) => {
     setMode(nextMode);
-    if (nextMode === "one_time") {
-      setFttrChoice("none");
-    } else if (fttrChoice === "none") {
-      setFttrChoice("159");
+    if (nextMode === "contract_36") {
+      setSubscriptionPlanId((current) => current || plans[0]?.id || "");
     }
   };
 
@@ -586,47 +574,27 @@ export const QuoteWorkflowPage = ({
           </label>
         </fieldset>
 
-        <div className="quote-workflow__fttr">
-          <label htmlFor="quote-fttr-plan">FTTR 月费档位</label>
+        {mode === "contract_36" ? <div className="quote-workflow__fttr">
+          <label htmlFor="quote-subscription-plan">36个月月付套餐</label>
           <select
-            id="quote-fttr-plan"
-            value={fttrChoice}
-            disabled={locked}
-            onChange={(event) => setFttrChoice(event.currentTarget.value as FttrChoice)}
+            id="quote-subscription-plan"
+            value={subscriptionPlanId}
+            disabled={locked || plansLoading}
+            onChange={(event) => setSubscriptionPlanId(event.currentTarget.value)}
           >
-            {mode === "one_time" ? <option value="none">不新增 FTTR</option> : null}
-            {ACTIVE_CATALOG.fttrPlans.map((plan) => (
-              <option key={plan} value={plan}>
-                {plan} 元/月
+            {plans.length === 0 ? <option value="">暂无可售月付套餐</option> : null}
+            {plans.map((plan) => (
+              <option key={plan.id} value={plan.id}>
+                {plan.name}（¥{formatMoney(plan.monthlyFen)}/月）
               </option>
             ))}
-            <option value="custom">自定义月费</option>
           </select>
-          {fttrChoice === "custom" ? (
-            <>
-              <label htmlFor="quote-custom-fttr">自定义 FTTR 月费（元）</label>
-              <input
-                id="quote-custom-fttr"
-                type="number"
-                min="1"
-                max="9999"
-                step="1"
-                value={customFttr}
-                disabled={locked}
-                onChange={(event) => setCustomFttr(event.currentTarget.value)}
-              />
-              <label htmlFor="quote-custom-fttr-note">自定义 FTTR 说明</label>
-              <input
-                id="quote-custom-fttr-note"
-                value={customFttrNote}
-                disabled={locked}
-                onChange={(event) => setCustomFttrNote(event.currentTarget.value)}
-              />
-            </>
-          ) : null}
-        </div>
+          {selectedPlan ? <p>
+            {selectedPlan.items.map((item) => `${ACTIVE_CATALOG.charges[item.sku].label} × ${item.quantity}`).join("、")}
+          </p> : null}
+        </div> : null}
 
-        <fieldset className="quote-workflow__choice-group">
+        {mode === "one_time" ? <fieldset className="quote-workflow__choice-group">
           <legend>报价场景</legend>
           {(
             [
@@ -653,9 +621,9 @@ export const QuoteWorkflowPage = ({
               {label}
             </label>
           ))}
-        </fieldset>
+        </fieldset> : null}
 
-        <aside
+        {mode === "one_time" ? <aside
           aria-label="核算规则"
           className="quote-workflow__pricing-rule"
           role="note"
@@ -663,12 +631,12 @@ export const QuoteWorkflowPage = ({
           <strong>核算规则</strong>
           <p>按当前所选计价商品的生效单价与数量逐项相加，不自动改为其他优惠组合。</p>
           <p>人体传感器、门磁或报警按钮必须连接网关；未选网关时，系统会自动补充 1 个并在预览明细中标出。</p>
-        </aside>
+        </aside> : null}
         {selectionNotice ? (
           <p className="quote-workflow__selection-notice" role="status">{selectionNotice}</p>
         ) : null}
 
-        <section className="quote-workflow__catalog" aria-labelledby="catalog-title">
+        {mode === "one_time" ? <section className="quote-workflow__catalog" aria-labelledby="catalog-title">
           <h3 id="catalog-title">大客户特优价与数量</h3>
           <div className="quote-workflow__catalog-grid">
             {PRODUCT_CONTROLS.map(({ key, sku }) => {
@@ -703,7 +671,7 @@ export const QuoteWorkflowPage = ({
               );
             })}
           </div>
-        </section>
+        </section> : null}
       </section>
 
       {savedQuote ? (
@@ -711,7 +679,6 @@ export const QuoteWorkflowPage = ({
           <QuotePrintDocument
             calculation={savedQuote.calculation}
             confirmedAt={savedQuote.confirmedAt}
-            customFttrNote={customFttrNote.trim() || undefined}
             customerName={name.trim()}
             elderCount={elderCount}
             phoneMasked={maskPhone(phone)}
@@ -755,7 +722,6 @@ export const QuoteWorkflowPage = ({
             <QuotePrintDocument
               calculation={savedQuote.calculation}
               confirmedAt={savedQuote.confirmedAt}
-              customFttrNote={customFttrNote.trim() || undefined}
               customerName={name.trim()}
               elderCount={elderCount}
               phoneMasked={maskPhone(phone)}

@@ -72,35 +72,11 @@ const statusLabel: Record<CommissionPolicyStatus, string> = {
   stopped: "已停用",
 };
 
-const ACCESSORY_SKUS = new Set([
-  "GATEWAY",
-  "MOTION",
-  "DOOR",
-  "PORTABLE_BUTTON",
-  "WALL_BUTTON",
-]);
-
-const ruleGroupFor = (sku: string): "heartlink" | "accessory" | "fttr" => {
-  if (sku.startsWith("FTTR_")) return "fttr";
-  if (ACCESSORY_SKUS.has(sku)) return "accessory";
-  return "heartlink";
-};
-
 const RULE_GROUPS = [
   {
-    id: "heartlink" as const,
-    title: "心连心产品与组合",
-    description: "套装内部物理设备不会重复计提；组合按这里配置的固定金额计提。",
-  },
-  {
-    id: "accessory" as const,
-    title: "单独销售配件",
-    description: "仅作为独立计价商品销售时按件计提；套装内部配件不重复计提。",
-  },
-  {
-    id: "fttr" as const,
-    title: "FTTR 套餐",
-    description: "默认未启用；管理员可分别设置标准档和自定义档的一次性提成。",
+    id: "devices" as const,
+    title: "单独销售设备",
+    description: "手表、床垫和所有配件都按物理设备计提；月付套餐和一次性套装均按其内含设备数量汇总。",
   },
 ];
 
@@ -150,7 +126,7 @@ export const CommissionRulesPage = ({
     () =>
       RULE_GROUPS.map((group) => ({
         ...group,
-        rules: policy.rules.filter((rule) => ruleGroupFor(rule.sku) === group.id),
+        rules: policy.rules,
       })).filter((group) => group.rules.length > 0),
     [policy.rules],
   );
@@ -244,8 +220,8 @@ export const CommissionRulesPage = ({
           <p className="commission-admin-page__eyebrow">管理员专区</p>
           <h1 id="commission-title">提成规则管理</h1>
           <p>
-            设置每个计价产品的固定提成金额。套装内部设备不重复计提，
-            36 个月合约只计提一次。
+            设置每件物理设备的固定提成。无论单卖设备还是放入套装，
+            都按实际包含的设备数量汇总，36 个月月付套餐只计提一次。
           </p>
         </div>
         <span className={`commission-policy-status is-${policy.status}`}>
@@ -347,7 +323,7 @@ export const CommissionRulesPage = ({
         <div className="commission-section-heading">
           <div>
             <h2 id="fixed-rules-title">固定提成金额</h2>
-            <p>单位：人民币元／件（或套）</p>
+            <p>单位：人民币元／件</p>
           </div>
         </div>
         {groupedRules.map((group) => (

@@ -21,8 +21,7 @@ const headers = [
   "一次性设备原额(元)",
   "退单额(元)",
   "一次性设备净额(元)",
-  "FTTR月费(元)",
-  "心连心月增费(元)",
+  "月付套餐月费(元)",
   "36个月合约月费合计(元)",
   "提成预计(元)",
   "提成待结算(元)",
@@ -43,8 +42,7 @@ const rowCells = (
     | "oneTimeOriginalFen"
     | "returnedFen"
     | "oneTimeNetFen"
-    | "fttrMonthlyFen"
-    | "heartMonthlyFen"
+    | "monthlyFen"
     | "contract36Fen"
     | "commissionEstimatedFen"
     | "commissionPendingSettlementFen"
@@ -62,8 +60,7 @@ const rowCells = (
   fen(row.oneTimeOriginalFen),
   fen(row.returnedFen),
   fen(row.oneTimeNetFen),
-  fen(row.fttrMonthlyFen),
-  fen(row.heartMonthlyFen),
+  fen(row.monthlyFen),
   fen(row.contract36Fen),
   fen(row.commissionEstimatedFen),
   fen(row.commissionPendingSettlementFen),

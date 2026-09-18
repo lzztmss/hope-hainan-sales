@@ -57,7 +57,7 @@ const ADMIN_NAVIGATION: readonly NavigationItem[] = [
   { group: "insights", href: "/commissions/regional", icon: WalletCards, label: "大区经理提成" },
   { group: "insights", href: "/commissions/regional/personal-orders", icon: FilePlus2, label: "个人渠道订单" },
   { group: "system", href: "/admin/users", icon: Users, label: "营业厅与账号" },
-  { group: "system", href: "/admin/pricing", icon: Tags, label: "价格版本" },
+  { group: "system", href: "/admin/pricing", icon: Tags, label: "月付套餐" },
   { group: "system", href: "/admin/commissions", icon: Settings2, label: "提成规则" },
   { group: "system", href: "/admin/settlements", icon: ShieldCheck, label: "结算批次" },
   { group: "system", href: "/admin/audit", icon: ArchiveRestore, label: "审计与回收站" },

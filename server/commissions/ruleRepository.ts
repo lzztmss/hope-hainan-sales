@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, max } from "drizzle-orm";
 
+import { COMMISSION_DEVICE_SKUS } from "../../shared/commission/commissionEngine.js";
 import type { CommissionRule, CommissionScope } from "../../shared/commission/types.js";
 import type { AppDatabase, DbClient, DbTransaction } from "../db/client.js";
 import {
@@ -19,13 +20,7 @@ type QueryExecutor = AppDatabase | DbTransaction;
 type PolicyRow = typeof commissionPolicyVersions.$inferSelect;
 type RuleRow = typeof commissionRules.$inferSelect;
 
-const POLICY_CODE = "HAINAN_FTTR_HEARTLINK";
-const PACKAGE_SKUS = new Set([
-  "STANDARD_BUNDLE",
-  "ONE_KEY",
-  "HOME_DUAL",
-]);
-
+const POLICY_CODE = "HAINAN_DEVICE_COMMISSION";
 const toIso = (value: Date | null): string | null =>
   value ? value.toISOString() : null;
 
@@ -39,8 +34,8 @@ const mapScope = (row: RuleRow): CommissionScope => {
 };
 
 const mapSku = (row: RuleRow): string => {
-  if (row.targetType !== "fttr_plan") return row.targetSku!;
-  return row.targetSku === "CUSTOM" ? "FTTR_CUSTOM" : `FTTR_${row.fttrPlan}`;
+  if (!row.targetSku) throw new Error("设备提成规则缺少 SKU");
+  return row.targetSku;
 };
 
 const mapRule = (row: RuleRow): CommissionRule => ({
@@ -75,28 +70,13 @@ const mapVersion = (
 });
 
 const targetFields = (sku: string) => {
-  if (sku === "FTTR_CUSTOM") {
-    return {
-      businessDomain: "fttr" as const,
-      targetType: "fttr_plan" as const,
-      targetSku: "CUSTOM",
-      fttrPlan: null,
-    };
-  }
-  const fttrMatch = /^FTTR_(\d{1,4})$/.exec(sku);
-  if (fttrMatch) {
-    return {
-      businessDomain: "fttr" as const,
-      targetType: "fttr_plan" as const,
-      targetSku: null,
-      fttrPlan: Number(fttrMatch[1]),
-    };
+  if (!(COMMISSION_DEVICE_SKUS as readonly string[]).includes(sku)) {
+    throw new Error(`不支持的设备提成 SKU：${sku}`);
   }
   return {
     businessDomain: "heartlink" as const,
-    targetType: PACKAGE_SKUS.has(sku) ? ("package" as const) : ("product" as const),
+    targetType: "product" as const,
     targetSku: sku,
-    fttrPlan: null,
   };
 };
 
@@ -120,7 +100,7 @@ const ruleInsertValues = (
     ...target,
     paymentModeScope: rule.paymentMode,
     calculationBasis: "per_unit",
-    packageMode: target.targetType === "package" ? "fixed_override" : "additive",
+    packageMode: "additive",
     amountFen: rule.amountFen,
     ...scopeFields(rule.scope),
     attributionScope: "all",
@@ -184,7 +164,10 @@ const loadRules = async (
   return executor
     .select()
     .from(commissionRules)
-    .where(inArray(commissionRules.policyVersionId, [...policyIds]));
+    .where(and(
+      inArray(commissionRules.policyVersionId, [...policyIds]),
+      eq(commissionRules.targetType, "product"),
+    ));
 };
 
 const replaceStoredVersion = async (

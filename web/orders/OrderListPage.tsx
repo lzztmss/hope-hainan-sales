@@ -377,7 +377,7 @@ export const OrderListPage = ({
     <div className="order-page">
       <header className="order-page__header">
         <div>
-          <p>海南联通 FTTR 心连心</p>
+          <p>海南联通心连心养老套餐</p>
           <h1>{ROLE_TITLES[viewer.role]}</h1>
           <span>{pageDescription}</span>
         </div>

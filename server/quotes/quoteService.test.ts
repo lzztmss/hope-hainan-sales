@@ -37,8 +37,8 @@ const nonSalesUsers: AuthenticatedUser[] = [
 ];
 
 const pricing = (watch: number): QuoteInput => ({
-  mode: "contract_36",
-  fttrPlan: 159,
+  mode: "one_time",
+  subscriptionPlanId: null,
   selection: { watch },
 });
 
@@ -166,8 +166,8 @@ describe("报价保存后编辑主链路", () => {
 
     expect(updated.quoteNo).toBe(created.quoteNo);
     expect(updated.version).toBe(2);
-    expect(updated.calculation.heartMonthlyFen).toBe(4_000);
-    expect(updated.calculation.monthlyTotalFen).toBe(19_900);
+    expect(updated.calculation.oneTimeFen).toBe(119_800);
+    expect(updated.calculation.monthlyTotalFen).toBe(0);
     expect(repository.audits).toHaveLength(1);
   });
 

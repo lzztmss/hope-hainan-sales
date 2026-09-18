@@ -75,7 +75,6 @@ export const QuoteStandalonePrintPage = ({
           <QuotePrintDocument
             calculation={quote.calculation}
             confirmedAt={quote.confirmedAt}
-            customFttrNote={quote.pricing.customFttrNote}
             customerName={quote.customer.name}
             elderCount={quote.customer.elderCount}
             phoneMasked={quote.customer.phoneMasked}

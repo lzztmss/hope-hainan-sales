@@ -8,8 +8,12 @@ describe("统一报价单", () => {
   it("同时展示客户、金额、计价商品和最终设备", () => {
     const calculation = calculateQuote({
       mode: "contract_36",
-      fttrPlan: 159,
-      selection: { homeDual: 1 },
+      subscriptionPlanId: "plan-a",
+      selection: {},
+    }, undefined, {
+      id: "plan-a", code: "A", name: "月付套餐A", description: null,
+      monthlyFen: 15_900, contractMonths: 36, active: true, version: 1,
+      items: [{ sku: "GATEWAY", quantity: 1 }, { sku: "MOTION", quantity: 1 }],
     });
 
     render(
@@ -29,6 +33,6 @@ describe("统一报价单", () => {
     expect(screen.getByText("报价客户")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "计价商品" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "最终实际设备" })).toBeInTheDocument();
-    expect(screen.getByText(/心连心·居家双护/)).toBeInTheDocument();
+    expect(screen.getAllByText(/月付套餐A/).length).toBeGreaterThan(0);
   });
 });

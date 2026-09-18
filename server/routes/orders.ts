@@ -1,3 +1,4 @@
+import { isTrustedOrigin } from "../security/origin.js";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
@@ -106,8 +107,6 @@ const listQuerySchema = z.object({
     ])
     .optional(),
   paymentMode: z.enum(["one_time", "contract_36"]).optional(),
-  fttrKind: z.enum(["none", "standard", "custom"]).optional(),
-  fttrPlan: z.coerce.number().int().min(1).max(9_999).optional(),
   roomType: z
     .enum(["one_bedroom", "two_bedroom", "three_bedroom"])
     .optional(),
@@ -132,7 +131,7 @@ const ensureTrustedOrigin = (
   appOrigin: string,
 ): boolean => {
   const origin = request.headers.origin;
-  if (origin && origin !== appOrigin) {
+  if (origin && !isTrustedOrigin(origin, appOrigin)) {
     void reply.status(403).send({ error: "请求来源不可信" });
     return false;
   }
@@ -216,8 +215,6 @@ const parseListFilters = (
       sellerQuery: parsed.data.sellerQuery,
       status: parsed.data.status,
       paymentMode: parsed.data.paymentMode,
-      fttrKind: parsed.data.fttrKind,
-      fttrPlan: parsed.data.fttrPlan,
       roomType: parsed.data.roomType,
       productSku: parsed.data.productSku,
       dateFrom,

@@ -11,6 +11,7 @@ import { createCommissionLedgerService } from "./commissions/ledgerService.js";
 import { DrizzleCommissionDashboardRepository } from "./commissions/dashboardRepository.js";
 import { createCommissionDashboardService } from "./commissions/dashboardService.js";
 import { createDatabaseClient } from "./db/client.js";
+import { migrateDatabase } from "./db/migrate.js";
 import { DrizzleOrderRepository } from "./orders/orderRepository.js";
 import { createOrderService } from "./orders/orderService.js";
 import { createOrderExportService } from "./orders/orderExportService.js";
@@ -25,6 +26,8 @@ import { DrizzleCustomerRepository } from "./customers/customerRepository.js";
 import { createCustomerService } from "./customers/customerService.js";
 import { ACTIVE_CATALOG } from "../shared/pricing/catalog.js";
 import { RegionalCommissionService } from "./regionalCommissions/regionalCommissionService.js";
+import { DrizzleSubscriptionPlanRepository } from "./plans/planRepository.js";
+import { createSubscriptionPlanService } from "./plans/planService.js";
 
 const requiredEnvironment = (name: string): string => {
   const value = process.env[name]?.trim();
@@ -40,7 +43,11 @@ const decodeKey = (name: string): Buffer => {
 
 const port = Number(process.env.PORT ?? 3001);
 const host = process.env.HOST ?? "127.0.0.1";
-const databaseClient = createDatabaseClient(requiredEnvironment("SQLITE_PATH"));
+const sqlitePath = requiredEnvironment("SQLITE_PATH");
+if (process.env.NODE_ENV !== "production") {
+  await migrateDatabase(sqlitePath);
+}
+const databaseClient = createDatabaseClient(sqlitePath);
 const pii = createPiiProtector({
   encryptionKey: decodeKey("PII_ENCRYPTION_KEY_BASE64"),
   lookupKey: decodeKey("PII_LOOKUP_HMAC_KEY_BASE64"),
@@ -49,9 +56,13 @@ const authService = createAuthService({
   repository: new DrizzleAuthRepository(databaseClient.db),
   phoneLookupHash: pii.phoneLookupHash,
 });
+const planService = createSubscriptionPlanService({
+  repository: new DrizzleSubscriptionPlanRepository(databaseClient),
+});
 const quoteService = createQuoteService({
   repository: new DrizzleQuoteRepository(databaseClient),
   pii,
+  plans: planService,
 });
 const commissionRuleService = createCommissionRuleService({
   repository: new DrizzleCommissionRuleRepository(databaseClient),
@@ -102,6 +113,7 @@ const app = buildApp({
   salesReportService,
   customerService,
   regionalCommissionService: new RegionalCommissionService(databaseClient),
+  planService,
   appOrigin: requiredEnvironment("APP_ORIGIN"),
   secureCookies: process.env.NODE_ENV === "production",
   onClose: () => databaseClient.close(),

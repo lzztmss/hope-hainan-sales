@@ -122,15 +122,11 @@ const mapSummary = (order: OrderDto, viewer: OrderViewer): OrderSummary => ({
   permissions: permissionsFor(order, viewer),
 });
 
-const fttrLabel = (order: OrderDto): string => {
-  if (order.fttrKind === "none" || order.fttrPlan === null) {
-    return "未新增 FTTR";
-  }
-  if (order.fttrKind === "custom") {
-    const note = order.customFttrNote?.trim();
-    return `FTTR ${order.fttrPlan} 元/月（自定义${note ? `：${note}` : ""}）`;
-  }
-  return `FTTR ${order.fttrPlan} 元/月`;
+const subscriptionPlanLabel = (order: OrderDto): string => {
+  if (order.paymentMode !== "contract_36") return "一次性购买";
+  return order.lines.find(
+    (line) => line.lineType === "charge" && line.sku.startsWith("PLAN:"),
+  )?.label ?? "36个月月付套餐";
 };
 
 const timelineFor = (order: OrderDto): OrderTimelineEvent[] => {
@@ -260,6 +256,7 @@ const mapLine = (
     oneTimeSubtotalFen: line.oneTimeSubtotalFen,
     monthlySubtotalFen: line.monthlySubtotalFen,
     locations: [...line.locations],
+    hardwareNumbers: [...line.hardwareNumbers],
   };
 };
 
@@ -274,8 +271,7 @@ const mapDetail = (
     activatedAt: order.activatedAt,
     signedAt: order.signedAt,
     customerAddress: order.customer.address?.trim() || "客户地址未提供",
-    fttrLabel: fttrLabel(order),
-    heartMonthlyFen: order.heartMonthlyFen,
+    subscriptionPlanLabel: subscriptionPlanLabel(order),
     contract36Fen: order.contract36Fen,
     lines: order.lines.map((line, index) =>
       mapLine(

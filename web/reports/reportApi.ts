@@ -43,7 +43,7 @@ export const createReportsApi = (
     const blob = await response.blob();
     const disposition = response.headers.get("content-disposition") ?? "";
     const encodedName = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
-    const fileName = encodedName ? decodeURIComponent(encodedName) : "FTTR心连心销售报表.csv";
+    const fileName = encodedName ? decodeURIComponent(encodedName) : "心连心养老套餐销售报表.csv";
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;

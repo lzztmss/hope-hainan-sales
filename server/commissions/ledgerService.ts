@@ -245,10 +245,12 @@ const reversalsForReturn = (
   completedReturn: ReturnRequestRecord,
   eventKey: string,
 ): CommissionLedgerReversal[] => {
-  const amountsByRule = reversalAmountsByRule(
-    accrual.calculation,
-    completedReturn.items,
-  );
+  const amountsByRule = completedReturn.returnType === "full"
+    ? accrual.calculation.items.reduce((result, item) => {
+        result.set(item.ruleId, (result.get(item.ruleId) ?? 0) + item.subtotalFen);
+        return result;
+      }, new Map<string, number>())
+    : reversalAmountsByRule(accrual.calculation, completedReturn.items);
   return Array.from(amountsByRule.entries()).flatMap(([ruleId, amountFen]) =>
     splitAmount(amountFen, validateAttributions(accrual.attributionSnapshot))
       .filter((allocation) => allocation.amountFen > 0)

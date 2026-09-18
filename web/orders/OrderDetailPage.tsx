@@ -370,6 +370,7 @@ export const OrderDetailPage = ({
     }, {} as Partial<Record<ComponentId, number>>);
   const visibleLines = order.lines.flatMap((line) => {
     if (line.lineType === "charge") return [line];
+    if (order.paymentMode === "contract_36") return [line];
     const packageQuantity = packageComponentQuantities[line.sku as ComponentId] ?? 0;
     if (packageQuantity <= 0) return [];
     return [{ ...line, quantity: Math.min(line.quantity, packageQuantity) }];
@@ -377,17 +378,6 @@ export const OrderDetailPage = ({
   const nextMonthlyFen = monthlyAmountAfterCompletedReturns(order);
   const hasMonthlyAdjustment =
     order.paymentMode === "contract_36" && nextMonthlyFen < order.monthlyTotalFen;
-  const stoppedHeartMonthlyFen = order.lines
-    .filter((line) => line.lineType === "charge")
-    .reduce(
-      (sum, line) => sum + line.monthlyUnitFen * line.returnedQuantity,
-      0,
-    );
-  const nextHeartMonthlyFen =
-    order.status === "returned"
-      ? 0
-      : Math.max(0, order.heartMonthlyFen - stoppedHeartMonthlyFen);
-
   const runAuditedAction = async (): Promise<void> => {
     if (!action) return;
     setBusy(true);
@@ -481,10 +471,8 @@ export const OrderDetailPage = ({
         <div><dt>销售员</dt><dd>{order.sellerName}</dd></div>
         <div><dt>订单渠道</dt><dd>{order.salesChannel === "online" ? "线上订单" : "线下订单"}</dd></div>
         <div><dt>服务地址</dt><dd>{order.customerAddress}</dd></div>
-        <div><dt>FTTR 档位</dt><dd>{order.fttrLabel}</dd></div>
-        <div><dt>{hasMonthlyAdjustment ? "原心连心月增费" : "心连心月增费"}</dt><dd>{formatOrderMoney(order.heartMonthlyFen)}/月</dd></div>
-        {hasMonthlyAdjustment ? <div><dt>扣除已退商品后心连心月增费</dt><dd>{formatOrderMoney(nextHeartMonthlyFen)}/月</dd></div> : null}
-        <div><dt>原合同 36 个月名义合计</dt><dd>{formatOrderMoney(order.contract36Fen)}</dd></div>
+        <div><dt>售卖方式</dt><dd>{order.subscriptionPlanLabel}</dd></div>
+        {order.paymentMode === "contract_36" ? <div><dt>36 个月合计</dt><dd>{formatOrderMoney(order.contract36Fen)}</dd></div> : null}
       </dl>
 
       <section className="order-detail-section" aria-labelledby="order-lines-title">

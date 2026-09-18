@@ -108,11 +108,7 @@ const baseOrder = (row: OrderRow): Omit<OrderRecord, "lines" | "attributions"> =
   status: row.status,
   salesChannel: row.salesChannel,
   paymentMode: row.paymentMode,
-  fttrKind: row.fttrKind,
-  fttrPlan: row.fttrPlan,
-  customFttrNote: row.customFttrNote,
-  fttrMonthlyFen: row.fttrMonthlyFen,
-  heartMonthlyFen: row.heartMonthlyFen,
+  subscriptionPlanId: row.subscriptionPlanId,
   oneTimeFen: row.oneTimeFen,
   monthlyTotalFen: row.monthlyTotalFen,
   contract36Fen: row.contract36Fen,
@@ -219,6 +215,7 @@ export class DrizzleOrderRepository implements OrderRepository {
         oneTimeSubtotalFen: line.oneTimeSubtotalFen,
         monthlySubtotalFen: line.monthlySubtotalFen,
         locations: line.locations,
+        hardwareNumbers: line.hardwareNumbers,
         reason: line.reason,
         lineSnapshot: line.lineSnapshot,
       })),
@@ -324,11 +321,7 @@ export class DrizzleOrderRepository implements OrderRepository {
       status: quote.status,
       deletedAt: quote.deletedAt,
       paymentMode: quote.paymentMode,
-      fttrKind: quote.fttrKind,
-      fttrPlan: quote.fttrPlan,
-      customFttrNote: quote.customFttrNote,
-      fttrMonthlyFen: quote.fttrMonthlyFen,
-      heartMonthlyFen: quote.heartMonthlyFen,
+      subscriptionPlanId: quote.subscriptionPlanId,
       oneTimeFen: quote.oneTimeFen,
       monthlyTotalFen: quote.monthlyTotalFen,
       contract36Fen: quote.contract36Fen,
@@ -349,6 +342,7 @@ export class DrizzleOrderRepository implements OrderRepository {
         oneTimeSubtotalFen: line.oneTimeSubtotalFen,
         monthlySubtotalFen: line.monthlySubtotalFen,
         locations: line.locations,
+        hardwareNumbers: [],
         reason: line.reason,
       })),
     };
@@ -398,6 +392,7 @@ export class DrizzleOrderRepository implements OrderRepository {
           oneTimeSubtotalFen: line.oneTimeSubtotalFen,
           monthlySubtotalFen: line.monthlySubtotalFen,
           locations: line.locations,
+          hardwareNumbers: line.hardwareNumbers,
           reason: line.reason,
           lineSnapshot: line.lineSnapshot,
         })),
@@ -557,12 +552,6 @@ export class DrizzleOrderRepository implements OrderRepository {
     if (filters.status) conditions.push(eq(orders.status, filters.status));
     if (filters.paymentMode) {
       conditions.push(eq(orders.paymentMode, filters.paymentMode));
-    }
-    if (filters.fttrKind) {
-      conditions.push(eq(orders.fttrKind, filters.fttrKind));
-    }
-    if (filters.fttrPlan !== undefined) {
-      conditions.push(eq(orders.fttrPlan, filters.fttrPlan));
     }
     if (filters.roomType) {
       conditions.push(

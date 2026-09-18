@@ -11,7 +11,7 @@ export const NON_RETURNABLE_PACKAGE_SKUS: ReadonlySet<ChargeSku> = new Set([
 ]);
 
 export const isNonReturnablePackageSku = (sku: string): boolean =>
-  NON_RETURNABLE_PACKAGE_SKUS.has(sku as ChargeSku);
+  sku.startsWith("PLAN:") || NON_RETURNABLE_PACKAGE_SKUS.has(sku as ChargeSku);
 
 /**
  * 客户现金退款上限的单件口径：

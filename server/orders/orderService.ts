@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-import type { PaymentMode, FttrKind } from "../../shared/pricing/types.js";
+import type { PaymentMode } from "../../shared/pricing/types.js";
 import {
   canAccessOwnedRecord,
   scopeForUser,
@@ -26,6 +26,7 @@ export interface SourceOrderLine {
   oneTimeSubtotalFen: number;
   monthlySubtotalFen: number;
   locations: string[];
+  hardwareNumbers: string[];
   reason: string | null;
 }
 
@@ -38,11 +39,7 @@ export interface SourceQuoteForOrder {
   status: "confirmed" | "converted" | "expired" | "lost" | "voided";
   deletedAt: Date | null;
   paymentMode: PaymentMode;
-  fttrKind: FttrKind;
-  fttrPlan: number | null;
-  customFttrNote: string | null;
-  fttrMonthlyFen: number;
-  heartMonthlyFen: number;
+  subscriptionPlanId: string | null;
   oneTimeFen: number;
   monthlyTotalFen: number;
   contract36Fen: number;
@@ -95,11 +92,7 @@ export interface OrderWriteRecord {
   status: OrderStatus;
   salesChannel: "online" | "offline";
   paymentMode: PaymentMode;
-  fttrKind: FttrKind;
-  fttrPlan: number | null;
-  customFttrNote: string | null;
-  fttrMonthlyFen: number;
-  heartMonthlyFen: number;
+  subscriptionPlanId: string | null;
   oneTimeFen: number;
   monthlyTotalFen: number;
   contract36Fen: number;
@@ -146,8 +139,6 @@ export interface OrderListFilters {
   sellerQuery?: string;
   status?: OrderStatus;
   paymentMode?: PaymentMode;
-  fttrKind?: FttrKind;
-  fttrPlan?: number;
   roomType?: string;
   productSku?: string;
   dateFrom?: Date;
@@ -334,11 +325,7 @@ const presentOrder = (
     status: order.status,
     salesChannel: order.salesChannel,
     paymentMode: order.paymentMode,
-    fttrKind: order.fttrKind,
-    fttrPlan: order.fttrPlan,
-    customFttrNote: order.customFttrNote,
-    fttrMonthlyFen: order.fttrMonthlyFen,
-    heartMonthlyFen: order.heartMonthlyFen,
+    subscriptionPlanId: order.subscriptionPlanId,
     oneTimeFen: order.oneTimeFen,
     monthlyTotalFen: order.monthlyTotalFen,
     contract36Fen: order.contract36Fen,
@@ -556,11 +543,7 @@ export const createOrderService = (options: OrderServiceOptions) => {
             status: "pending",
             salesChannel,
             paymentMode: quote.paymentMode,
-            fttrKind: quote.fttrKind,
-            fttrPlan: quote.fttrPlan,
-            customFttrNote: quote.customFttrNote,
-            fttrMonthlyFen: quote.fttrMonthlyFen,
-            heartMonthlyFen: quote.heartMonthlyFen,
+            subscriptionPlanId: quote.subscriptionPlanId,
             oneTimeFen: quote.oneTimeFen,
             monthlyTotalFen: quote.monthlyTotalFen,
             contract36Fen: quote.contract36Fen,

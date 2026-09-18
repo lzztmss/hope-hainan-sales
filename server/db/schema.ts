@@ -41,11 +41,6 @@ export const paymentModeEnum = sqliteEnum("payment_mode", [
   "contract_36",
 ]);
 export const salesChannelEnum = sqliteEnum("sales_channel", ["online", "offline"]);
-export const fttrKindEnum = sqliteEnum("fttr_kind", [
-  "none",
-  "standard",
-  "custom",
-]);
 export const quoteLineTypeEnum = sqliteEnum("quote_line_type", [
   "charge",
   "component",
@@ -100,12 +95,10 @@ export const commissionRuleStatusEnum = sqliteEnum("commission_rule_status", [
 ]);
 export const commissionBusinessDomainEnum = sqliteEnum(
   "commission_business_domain",
-  ["fttr", "heartlink"],
+  ["heartlink"],
 );
 export const commissionTargetTypeEnum = sqliteEnum("commission_target_type", [
   "product",
-  "package",
-  "fttr_plan",
 ]);
 export const commissionPaymentModeScopeEnum = sqliteEnum(
   "commission_payment_mode_scope",
@@ -593,6 +586,54 @@ export const customers = sqliteTable(
   ],
 );
 
+export const subscriptionPlans = sqliteTable(
+  "subscription_plans",
+  {
+    id: text("id").$defaultFn(() => randomUUID()).primaryKey(),
+    code: text("code").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    monthlyFen: integer("monthly_fen").notNull(),
+    contractMonths: integer("contract_months").default(36).notNull(),
+    active: integer("active", { mode: "boolean" }).default(true).notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    version: integer("version").default(1).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("subscription_plans_code_unique").on(table.code),
+    index("subscription_plans_active_name_idx").on(table.active, table.name),
+    check("subscription_plans_code_present", sql`NULLIF(TRIM(${table.code}), '') IS NOT NULL`),
+    check("subscription_plans_name_present", sql`NULLIF(TRIM(${table.name}), '') IS NOT NULL`),
+    check("subscription_plans_monthly_positive", sql`${table.monthlyFen} > 0`),
+    check("subscription_plans_contract_36", sql`${table.contractMonths} = 36`),
+    check("subscription_plans_version_positive", sql`${table.version} >= 1`),
+  ],
+);
+
+export const subscriptionPlanItems = sqliteTable(
+  "subscription_plan_items",
+  {
+    id: text("id").$defaultFn(() => randomUUID()).primaryKey(),
+    planId: text("plan_id")
+      .notNull()
+      .references(() => subscriptionPlans.id, { onDelete: "cascade" }),
+    productSku: text("product_sku").notNull(),
+    quantity: integer("quantity").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("subscription_plan_items_plan_sku_unique").on(
+      table.planId,
+      table.productSku,
+    ),
+    index("subscription_plan_items_plan_idx").on(table.planId),
+    check("subscription_plan_items_quantity_positive", sql`${table.quantity} > 0 AND ${table.quantity} <= 20`),
+  ],
+);
+
 export const quotes = sqliteTable(
   "quotes",
   {
@@ -610,11 +651,10 @@ export const quotes = sqliteTable(
       .references(() => users.id, { onDelete: "restrict" }),
     status: quoteStatusEnum("status").notNull(),
     paymentMode: paymentModeEnum("payment_mode").notNull(),
-    fttrKind: fttrKindEnum("fttr_kind").notNull(),
-    fttrPlan: integer("fttr_plan"),
-    customFttrNote: text("custom_fttr_note"),
-    fttrMonthlyFen: integer("fttr_monthly_fen").notNull(),
-    heartMonthlyFen: integer("heart_monthly_fen").notNull(),
+    subscriptionPlanId: text("subscription_plan_id").references(
+      () => subscriptionPlans.id,
+      { onDelete: "restrict" },
+    ),
     oneTimeFen: integer("one_time_fen").notNull(),
     monthlyTotalFen: integer("monthly_total_fen").notNull(),
     contract36Fen: integer("contract_36_fen").notNull(),
@@ -638,26 +678,11 @@ export const quotes = sqliteTable(
     index("quotes_confirmed_at_idx").on(table.confirmedAt),
     check(
       "quotes_amounts_nonnegative",
-      sql`${table.fttrMonthlyFen} >= 0 AND ${table.heartMonthlyFen} >= 0 AND ${table.oneTimeFen} >= 0 AND ${table.monthlyTotalFen} >= 0 AND ${table.contract36Fen} >= 0`,
+      sql`${table.oneTimeFen} >= 0 AND ${table.monthlyTotalFen} >= 0 AND ${table.contract36Fen} >= 0`,
     ),
     check(
-      "quotes_fttr_state_consistent",
-      sql`(
-        ${table.fttrKind} = 'none'
-        AND ${table.fttrPlan} IS NULL
-        AND ${table.fttrMonthlyFen} = 0
-        AND ${table.customFttrNote} IS NULL
-      ) OR (
-        ${table.fttrKind} = 'standard'
-        AND ${table.fttrPlan} IN (129, 159, 199, 239, 299, 399)
-        AND ${table.fttrMonthlyFen} = ${table.fttrPlan} * 100
-        AND ${table.customFttrNote} IS NULL
-      ) OR (
-        ${table.fttrKind} = 'custom'
-        AND ${table.fttrPlan} BETWEEN 1 AND 9999
-        AND ${table.fttrMonthlyFen} = ${table.fttrPlan} * 100
-        AND NULLIF(TRIM(${table.customFttrNote}), '') IS NOT NULL
-      )`,
+      "quotes_payment_state_consistent",
+      sql`(${table.paymentMode} = 'one_time' AND ${table.subscriptionPlanId} IS NULL AND ${table.monthlyTotalFen} = 0 AND ${table.contract36Fen} = 0) OR (${table.paymentMode} = 'contract_36' AND ${table.subscriptionPlanId} IS NULL) OR (${table.paymentMode} = 'contract_36' AND ${table.subscriptionPlanId} IS NOT NULL AND ${table.oneTimeFen} = 0 AND ${table.monthlyTotalFen} > 0 AND ${table.contract36Fen} = ${table.monthlyTotalFen} * 36)`,
     ),
     check("quotes_version_positive", sql`${table.version} >= 1`),
   ],
@@ -762,11 +787,10 @@ export const orders = sqliteTable(
     status: orderStatusEnum("status").notNull(),
     salesChannel: salesChannelEnum("sales_channel").default("offline").notNull(),
     paymentMode: paymentModeEnum("payment_mode").notNull(),
-    fttrKind: fttrKindEnum("fttr_kind").notNull(),
-    fttrPlan: integer("fttr_plan"),
-    customFttrNote: text("custom_fttr_note"),
-    fttrMonthlyFen: integer("fttr_monthly_fen").notNull(),
-    heartMonthlyFen: integer("heart_monthly_fen").notNull(),
+    subscriptionPlanId: text("subscription_plan_id").references(
+      () => subscriptionPlans.id,
+      { onDelete: "restrict" },
+    ),
     oneTimeFen: integer("one_time_fen").notNull(),
     monthlyTotalFen: integer("monthly_total_fen").notNull(),
     contract36Fen: integer("contract_36_fen").notNull(),
@@ -816,26 +840,11 @@ export const orders = sqliteTable(
     index("orders_status_created_idx").on(table.status, table.createdAt),
     check(
       "orders_amounts_nonnegative",
-      sql`${table.fttrMonthlyFen} >= 0 AND ${table.heartMonthlyFen} >= 0 AND ${table.oneTimeFen} >= 0 AND ${table.monthlyTotalFen} >= 0 AND ${table.contract36Fen} >= 0 AND ${table.refundedFen} >= 0`,
+      sql`${table.oneTimeFen} >= 0 AND ${table.monthlyTotalFen} >= 0 AND ${table.contract36Fen} >= 0 AND ${table.refundedFen} >= 0`,
     ),
     check(
-      "orders_fttr_state_consistent",
-      sql`(
-        ${table.fttrKind} = 'none'
-        AND ${table.fttrPlan} IS NULL
-        AND ${table.fttrMonthlyFen} = 0
-        AND ${table.customFttrNote} IS NULL
-      ) OR (
-        ${table.fttrKind} = 'standard'
-        AND ${table.fttrPlan} IN (129, 159, 199, 239, 299, 399)
-        AND ${table.fttrMonthlyFen} = ${table.fttrPlan} * 100
-        AND ${table.customFttrNote} IS NULL
-      ) OR (
-        ${table.fttrKind} = 'custom'
-        AND ${table.fttrPlan} BETWEEN 1 AND 9999
-        AND ${table.fttrMonthlyFen} = ${table.fttrPlan} * 100
-        AND NULLIF(TRIM(${table.customFttrNote}), '') IS NOT NULL
-      )`,
+      "orders_payment_state_consistent",
+      sql`(${table.paymentMode} = 'one_time' AND ${table.subscriptionPlanId} IS NULL AND ${table.monthlyTotalFen} = 0 AND ${table.contract36Fen} = 0) OR (${table.paymentMode} = 'contract_36' AND ${table.subscriptionPlanId} IS NULL) OR (${table.paymentMode} = 'contract_36' AND ${table.subscriptionPlanId} IS NOT NULL AND ${table.oneTimeFen} = 0 AND ${table.monthlyTotalFen} > 0 AND ${table.contract36Fen} = ${table.monthlyTotalFen} * 36)`,
     ),
     check("orders_version_positive", sql`${table.version} >= 1`),
   ],
@@ -861,6 +870,7 @@ export const orderLines = sqliteTable(
     oneTimeSubtotalFen: integer("one_time_subtotal_fen").default(0).notNull(),
     monthlySubtotalFen: integer("monthly_subtotal_fen").default(0).notNull(),
     locations: text("locations", { mode: "json" }).$type<string[]>().default([]).notNull(),
+    hardwareNumbers: text("hardware_numbers", { mode: "json" }).$type<string[]>().default([]).notNull(),
     reason: text("reason"),
     lineSnapshot: text("line_snapshot", { mode: "json" })
       .$type<Record<string, unknown>>()
@@ -1087,7 +1097,6 @@ export const commissionRules = sqliteTable(
     businessDomain: commissionBusinessDomainEnum("business_domain").notNull(),
     targetType: commissionTargetTypeEnum("target_type").notNull(),
     targetSku: text("target_sku"),
-    fttrPlan: integer("fttr_plan"),
     paymentModeScope: commissionPaymentModeScopeEnum("payment_mode_scope")
       .notNull(),
     calculationBasis: commissionCalculationBasisEnum("calculation_basis")
@@ -1140,7 +1149,7 @@ export const commissionRules = sqliteTable(
     ),
     check(
       "commission_rules_target_present",
-      sql`(${table.targetType} IN ('product', 'package') AND NULLIF(TRIM(${table.targetSku}), '') IS NOT NULL) OR (${table.targetType} = 'fttr_plan' AND (${table.fttrPlan} BETWEEN 1 AND 9999 OR ${table.targetSku} = 'CUSTOM'))`,
+      sql`${table.targetType} = 'product' AND ${table.targetSku} IN ('WATCH', 'MATTRESS', 'GATEWAY', 'MOTION', 'DOOR', 'PORTABLE_BUTTON', 'WALL_BUTTON')`,
     ),
   ],
 );

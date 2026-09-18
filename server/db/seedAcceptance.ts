@@ -2,7 +2,7 @@ import { hash } from "@node-rs/argon2";
 import { eq, inArray } from "drizzle-orm";
 
 import { calculateQuote } from "../../shared/pricing/quoteEngine.js";
-import type { QuoteInput } from "../../shared/pricing/types.js";
+import type { QuoteInput, SubscriptionPlanDefinition } from "../../shared/pricing/types.js";
 import { DEFAULT_REGIONAL_COMMISSION_RULES } from "../../shared/regionalCommission/types.js";
 import { createPiiProtector, maskPhone } from "../security/pii.js";
 import { migrateDatabase } from "./migrate.js";
@@ -20,6 +20,8 @@ import {
   regionalManagerStoreHistory,
   regionalManagerStores,
   stores,
+  subscriptionPlanItems,
+  subscriptionPlans,
   users,
 } from "./schema.js";
 import { seedBootstrapAdmin } from "./seed.js";
@@ -227,6 +229,42 @@ try {
   }).from(users).where(eq(users.workNo, "SALE")).limit(1);
   if (!seller) throw new Error("验收营业员初始化失败");
 
+  const acceptancePlanId = "40000000-0000-4000-8000-000000000001";
+  const [acceptancePlanRow] = await client.db.insert(subscriptionPlans).values({
+    id: acceptancePlanId,
+    code: "ACCEPT_A",
+    name: "验收月付套餐A",
+    monthlyFen: 15_900,
+    contractMonths: 36,
+    active: true,
+    createdBy: admin.id,
+  }).onConflictDoUpdate({
+    target: subscriptionPlans.code,
+    set: { name: "验收月付套餐A", monthlyFen: 15_900, active: true, updatedAt: now },
+  }).returning();
+  if (!acceptancePlanRow) throw new Error("验收月付套餐初始化失败");
+  await client.db.delete(subscriptionPlanItems).where(eq(subscriptionPlanItems.planId, acceptancePlanRow.id));
+  await client.db.insert(subscriptionPlanItems).values([
+    { planId: acceptancePlanRow.id, productSku: "GATEWAY", quantity: 1 },
+    { planId: acceptancePlanRow.id, productSku: "MOTION", quantity: 1 },
+    { planId: acceptancePlanRow.id, productSku: "WALL_BUTTON", quantity: 1 },
+  ]);
+  const acceptancePlan: SubscriptionPlanDefinition = {
+    id: acceptancePlanRow.id,
+    code: acceptancePlanRow.code,
+    name: acceptancePlanRow.name,
+    description: acceptancePlanRow.description,
+    monthlyFen: acceptancePlanRow.monthlyFen,
+    contractMonths: 36,
+    active: true,
+    version: acceptancePlanRow.version,
+    items: [
+      { sku: "GATEWAY", quantity: 1 },
+      { sku: "MOTION", quantity: 1 },
+      { sku: "WALL_BUTTON", quantity: 1 },
+    ],
+  };
+
   const orderFixtures: readonly {
     suffix: string;
     customerName: string;
@@ -234,12 +272,12 @@ try {
     signedOn: string;
     pricing: QuoteInput;
   }[] = [
-    { suffix: "01", customerName: "测试客户甲", phone: "13800001001", signedOn: "2026-07-18", pricing: { mode: "one_time", fttrPlan: null, selection: { watch: 1 } } },
-    { suffix: "02", customerName: "测试客户乙", phone: "13800001002", signedOn: "2026-08-02", pricing: { mode: "one_time", fttrPlan: null, selection: { mattress: 1 } } },
-    { suffix: "03", customerName: "测试客户丙", phone: "13800001003", signedOn: "2026-08-12", pricing: { mode: "one_time", fttrPlan: null, selection: { oneKey: 1 } } },
-    { suffix: "04", customerName: "测试客户丁", phone: "13800001004", signedOn: "2026-08-20", pricing: { mode: "contract_36", fttrPlan: 159, selection: { homeDual: 1 } } },
-    { suffix: "05", customerName: "测试客户戊", phone: "13800001005", signedOn: "2026-08-30", pricing: { mode: "one_time", fttrPlan: null, selection: { gateway: 1, motion: 2 } } },
-    { suffix: "06", customerName: "测试客户己", phone: "13800001006", signedOn: "2026-09-01", pricing: { mode: "one_time", fttrPlan: null, selection: { door: 1, wallButton: 1 } } },
+    { suffix: "01", customerName: "测试客户甲", phone: "13800001001", signedOn: "2026-07-18", pricing: { mode: "one_time", subscriptionPlanId: null, selection: { watch: 1 } } },
+    { suffix: "02", customerName: "测试客户乙", phone: "13800001002", signedOn: "2026-08-02", pricing: { mode: "one_time", subscriptionPlanId: null, selection: { mattress: 1 } } },
+    { suffix: "03", customerName: "测试客户丙", phone: "13800001003", signedOn: "2026-08-12", pricing: { mode: "one_time", subscriptionPlanId: null, selection: { oneKey: 1 } } },
+    { suffix: "04", customerName: "测试客户丁", phone: "13800001004", signedOn: "2026-08-20", pricing: { mode: "contract_36", subscriptionPlanId: acceptancePlan.id, selection: {} } },
+    { suffix: "05", customerName: "测试客户戊", phone: "13800001005", signedOn: "2026-08-30", pricing: { mode: "one_time", subscriptionPlanId: null, selection: { gateway: 1, motion: 2 } } },
+    { suffix: "06", customerName: "测试客户己", phone: "13800001006", signedOn: "2026-09-01", pricing: { mode: "one_time", subscriptionPlanId: null, selection: { door: 1, wallButton: 1 } } },
   ];
 
   let importedOrders = 0;
@@ -262,7 +300,11 @@ try {
         source: "大区提成验收数据",
         notesEncrypted: null,
       };
-      const calculation = calculateQuote(fixture.pricing);
+      const calculation = calculateQuote(
+        fixture.pricing,
+        undefined,
+        fixture.pricing.mode === "contract_36" ? acceptancePlan : null,
+      );
       const quoteSnapshot = {
         catalogVersion: calculation.catalogVersion,
         pricingInput: fixture.pricing,
@@ -299,11 +341,7 @@ try {
         sellerId: seller.id,
         status: "converted",
         paymentMode: calculation.mode,
-        fttrKind: calculation.fttrKind,
-        fttrPlan: calculation.fttrPlan,
-        customFttrNote: calculation.customFttrNote,
-        fttrMonthlyFen: calculation.fttrMonthlyFen,
-        heartMonthlyFen: calculation.heartMonthlyFen,
+        subscriptionPlanId: calculation.subscriptionPlan?.id ?? null,
         oneTimeFen: calculation.oneTimeFen,
         monthlyTotalFen: calculation.monthlyTotalFen,
         contract36Fen: calculation.contract36Fen,
@@ -356,11 +394,7 @@ try {
         status: reconciledAt ? "reconciled" : "signed",
         salesChannel: fixture.suffix === "04" ? "online" : "offline",
         paymentMode: calculation.mode,
-        fttrKind: calculation.fttrKind,
-        fttrPlan: calculation.fttrPlan,
-        customFttrNote: calculation.customFttrNote,
-        fttrMonthlyFen: calculation.fttrMonthlyFen,
-        heartMonthlyFen: calculation.heartMonthlyFen,
+        subscriptionPlanId: calculation.subscriptionPlan?.id ?? null,
         oneTimeFen: calculation.oneTimeFen,
         monthlyTotalFen: calculation.monthlyTotalFen,
         contract36Fen: calculation.contract36Fen,

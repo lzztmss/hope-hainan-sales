@@ -29,6 +29,13 @@
       "when": 1788838000000,
       "tag": "0003_confirmed_regional_cooperation_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789108557314,
+      "tag": "0004_gorgeous_red_shift",
+      "breakpoints": true
     }
   ]
 }

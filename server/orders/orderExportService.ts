@@ -119,13 +119,10 @@ const snapshotText = (
   return "";
 };
 
-const fttrLabel = (order: ExportOrder): string => {
-  if (order.fttrKind === "none" || order.fttrPlan === null) return "未新增FTTR";
-  if (order.fttrKind === "custom") {
-    return `自定义 ${order.fttrPlan}元/月${order.customFttrNote ? `（${order.customFttrNote}）` : ""}`;
-  }
-  return `${order.fttrPlan}元/月`;
-};
+const planLabel = (order: ExportOrder): string =>
+  order.paymentMode === "contract_36"
+    ? order.lines.find((line) => line.lineType === "charge" && line.sku.startsWith("PLAN:"))?.label ?? "36个月月付套餐"
+    : "一次性购买";
 
 const filterSummary = (filters: OrderListFilters): string => {
   const parts: string[] = [];
@@ -265,7 +262,7 @@ export const buildOrderExportWorkbook = async (
   exportedAt: Date,
 ): Promise<Buffer> => {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "海南联通 FTTR 心连心融合套餐销售报价系统";
+  workbook.creator = "海南联通心连心养老套餐销售报价系统";
   workbook.created = exportedAt;
   workbook.modified = exportedAt;
   workbook.subject = "订单对账导出";
@@ -278,7 +275,7 @@ export const buildOrderExportWorkbook = async (
 
   const orderHeaders = [
     "订单号", "销售渠道", "客户姓名", "手机号", "营业厅", "销售员", "订单状态", "付款方式",
-    "FTTR档位", "FTTR月费", "心连心原月增费", "当前心连心月增费", "当前每月合计", "36个月合约月费合计",
+    "售卖套餐", "原每月合计", "当前每月合计", "36个月合计",
     "一次性商品金额", "累计实际退款", "创建时间", "激活时间", "签收时间", "对账时间", "收款时间",
     "提成发放状态", "当前净提成", "已发放提成", "退货扣回提成", "退单号",
   ] as const;
@@ -287,9 +284,9 @@ export const buildOrderExportWorkbook = async (
     orderSheet,
     "订单对账明细",
     orderHeaders,
-    [24, 11, 14, 15, 20, 16, 13, 18, 18, 14, 16, 18, 16, 18, 17, 16, 19, 19, 19, 19, 19, 16, 15, 15, 16, 28],
-    [10, 11, 12, 13, 14, 15, 16, 23, 24, 25],
-    [17, 18, 19, 20, 21],
+    [24, 11, 14, 15, 20, 16, 13, 18, 22, 16, 16, 18, 17, 16, 19, 19, 19, 19, 19, 16, 15, 15, 16, 28],
+    [10, 11, 12, 13, 14, 21, 22, 23],
+    [15, 16, 17, 18, 19],
     metadata,
   );
   for (const order of orders) {
@@ -298,10 +295,9 @@ export const buildOrderExportWorkbook = async (
       const lineId = line.id ?? "";
       return total + (returnedQuantity.get(lineId) ?? 0) * line.monthlyUnitFen;
     }, 0);
-    const currentFttrFen = order.status === "returned" ? 0 : order.fttrMonthlyFen;
-    const currentHeartFen = order.status === "returned"
+    const currentMonthlyFen = order.status === "returned"
       ? 0
-      : Math.max(0, order.heartMonthlyFen - returnedMonthlyFen);
+      : Math.max(0, order.monthlyTotalFen - returnedMonthlyFen);
     orderSheet.addRow([
       safeText(order.orderNo),
       order.salesChannel === "online" ? "线上" : "线下",
@@ -311,11 +307,9 @@ export const buildOrderExportWorkbook = async (
       safeText(snapshotText(order.sellerSnapshot, "displayName", "name") || order.sellerId),
       ORDER_STATUS_LABELS[order.status] ?? order.status,
       order.paymentMode === "contract_36" ? "36个月合约月付" : "一次性支付",
-      safeText(fttrLabel(order)),
-      yuan(currentFttrFen),
-      yuan(order.heartMonthlyFen),
-      yuan(currentHeartFen),
-      yuan(currentFttrFen + currentHeartFen),
+      safeText(planLabel(order)),
+      yuan(order.monthlyTotalFen),
+      yuan(currentMonthlyFen),
       yuan(order.contract36Fen),
       yuan(order.oneTimeFen),
       yuan(order.refundedFen),
@@ -335,14 +329,14 @@ export const buildOrderExportWorkbook = async (
 
   const itemHeaders = [
     "订单号", "营业厅", "销售员", "SKU", "商品名称", "商品类型", "原数量", "已退数量", "剩余数量",
-    "单位", "一次性单价", "月付单价", "一次性小计", "月增费小计", "安装位置", "配置说明",
+    "单位", "一次性单价", "月付单价", "一次性小计", "月费小计", "硬件串号", "安装位置", "配置说明",
   ] as const;
   const itemSheet = workbook.addWorksheet("商品明细", { properties: { defaultRowHeight: 20 } });
   styleSheet(
     itemSheet,
     "商品明细",
     itemHeaders,
-    [24, 20, 16, 18, 24, 15, 11, 11, 11, 10, 14, 14, 15, 15, 30, 30],
+    [24, 20, 16, 18, 24, 15, 11, 11, 11, 10, 14, 14, 15, 15, 28, 30, 30],
     [11, 12, 13, 14],
     [],
     metadata,
@@ -371,6 +365,7 @@ export const buildOrderExportWorkbook = async (
         line.lineType === "component" ? null : yuan(line.monthlyUnitFen),
         line.lineType === "component" ? null : yuan(line.oneTimeSubtotalFen),
         line.lineType === "component" ? null : yuan(line.monthlySubtotalFen),
+        safeText((line.hardwareNumbers ?? []).join("、")),
         safeText(line.locations.join("、")),
         safeText(line.reason),
       ]);
@@ -380,7 +375,7 @@ export const buildOrderExportWorkbook = async (
 
   const returnHeaders = [
     "退单号", "原订单号", "处理类型", "退货范围", "申请原因类型", "申请说明", "申请人", "申请时间",
-    "审批状态", "审批时间", "审批意见", "退货商品明细", "申请退款金额", "实际退款金额", "完成时间", "FTTR处理",
+    "审批状态", "审批时间", "审批意见", "退货商品明细", "申请退款金额", "实际退款金额", "完成时间", "套餐处理",
   ] as const;
   const returnSheet = workbook.addWorksheet("售后退款明细", { properties: { defaultRowHeight: 20 } });
   styleSheet(
@@ -393,12 +388,12 @@ export const buildOrderExportWorkbook = async (
     metadata,
   );
   for (const record of returnRecords) {
-    const fttrHandling = record.returnType === "partial"
-      ? "部分退货，不影响FTTR"
+    const planHandling = record.returnType === "partial"
+      ? "部分退货，按当前规则处理"
       : record.status === "completed"
         ? "已按整单退订统计"
         : record.status === "rejected"
-          ? "已驳回，不影响FTTR"
+          ? "已驳回，不影响套餐"
           : "完成后将按整单退订统计";
     returnSheet.addRow([
       safeText(record.returnNo),
@@ -416,7 +411,7 @@ export const buildOrderExportWorkbook = async (
       yuan(record.requestedRefundFen),
       record.status === "completed" ? yuan(record.refundFen) : null,
       dateValue(record.completedAt),
-      fttrHandling,
+      planHandling,
     ]);
   }
   finishDataRows(returnSheet);

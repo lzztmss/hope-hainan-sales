@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   calculateCommission,
+  COMMISSION_DEVICE_SKUS,
 } from "../../shared/commission/commissionEngine.js";
 import type {
   CommissionCalculation,
@@ -221,6 +222,9 @@ const validateAndAssignRules = (
   return drafts.map((draft) => {
     const sku = draft.sku.trim();
     if (!sku) throw new Error("提成规则 SKU 不能为空");
+    if (!(COMMISSION_DEVICE_SKUS as readonly string[]).includes(sku)) {
+      throw new Error(`提成只能按单独设备配置：${sku}`);
+    }
     if (!Number.isSafeInteger(draft.amountFen) || draft.amountFen < 0) {
       throw new Error(`提成金额不合法：${sku}`);
     }

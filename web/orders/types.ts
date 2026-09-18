@@ -77,6 +77,7 @@ export interface OrderLineView {
   oneTimeSubtotalFen: number;
   monthlySubtotalFen: number;
   locations: string[];
+  hardwareNumbers?: string[];
 }
 
 export interface OrderTimelineEvent {
@@ -117,8 +118,7 @@ export interface ReturnRecordView {
 export interface OrderDetail extends OrderSummary {
   activatedAt?: string | null;
   customerAddress: string;
-  fttrLabel: string;
-  heartMonthlyFen: number;
+  subscriptionPlanLabel: string;
   contract36Fen: number;
   lines: OrderLineView[];
   timeline: OrderTimelineEvent[];
