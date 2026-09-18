@@ -248,7 +248,6 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
   return <PageLayout
     eyebrow="大区经理"
     title="大区经理提成"
-    description="按签收满 7 天的有效订单和已核验业务数据计算。"
     actions={(canEdit || actor.role === "regional_manager") ? <Link className="regional-primary-action" to="/commissions/regional/personal-orders">{canEdit ? "管理个人渠道订单" : "查看个人渠道订单"}</Link> : undefined}
   >
     <RegionalActionErrorDialog message={actionError} onClose={() => setActionError(null)} />

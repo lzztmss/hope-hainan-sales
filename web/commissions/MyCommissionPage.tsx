@@ -56,7 +56,6 @@ export interface MyCommissionPageProps {
   onPayout?(orderIds: readonly string[]): Promise<void>;
   title?: string;
   eyebrow?: string;
-  description?: string;
 }
 
 const displayMoney = (value: number, reversal = false): string => {
@@ -116,7 +115,6 @@ const summaryDefinitions: ReadonlyArray<{
 
 export const MyCommissionPage = ({
   dashboard,
-  description = "数据按订单签收、公司收款和实际发放状态统计",
   eyebrow = "销售激励",
   onPageChange,
   onPayout,
@@ -144,7 +142,7 @@ export const MyCommissionPage = ({
       <div>
         <p>{eyebrow}</p>
         <h1 id="my-commission-title">{title}</h1>
-        <span>{dashboard.periodLabel} · {description}</span>
+        <span>{dashboard.periodLabel}</span>
       </div>
     </header>
 
@@ -216,11 +214,11 @@ export const MyCommissionPage = ({
                     aria-label={`选择订单 ${order.orderNo}`}
                     checked={selected.has(order.orderId)}
                     disabled={payoutBusy || order.payoutStatus !== "pending"}
-                    onChange={(event) => setSelected((current) => {
+                    onChange={(event) => { const checked = event.currentTarget.checked; setSelected((current) => {
                       const next = new Set(current);
-                      if (event.currentTarget.checked) next.add(order.orderId); else next.delete(order.orderId);
+                      if (checked) next.add(order.orderId); else next.delete(order.orderId);
                       return next;
-                    })}
+                    }); }}
                     title={order.payoutStatus === "deduction" ? "该订单为待扣回提成" : order.payoutStatus === "paid" ? "提成已发放" : order.payoutStatus !== "pending" ? "尚未到发放条件" : "选择发放"}
                     type="checkbox"
                   />

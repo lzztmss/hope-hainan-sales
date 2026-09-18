@@ -89,6 +89,18 @@ export const registerReportRoutes = async (
     }
   });
 
+  app.get("/api/reports/sales/order-trend", async (request, reply) => {
+    const user = await resolveUser(request, reply, options.authService);
+    if (!user) return;
+    const filters = parseFilters(request.query);
+    if (!filters) return reply.status(400).send({ error: "趋势查询条件不正确" });
+    try {
+      return await options.salesReportService.getSignedOrderTrend(user, filters);
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
+
   app.post("/api/reports/sales/export.csv", async (request, reply) => {
     if (!ensureTrustedOrigin(request, reply, options.appOrigin)) return;
     const user = await resolveUser(request, reply, options.authService);

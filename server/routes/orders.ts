@@ -10,6 +10,7 @@ import {
   type OrderRecord,
   type OrderService,
 } from "../orders/orderService.js";
+import type { OrderStatus } from "../orders/orderStateMachine.js";
 import type { OrderExportService } from "../orders/orderExportService.js";
 import { SESSION_COOKIE_NAME } from "./auth.js";
 import { sendValidationError } from "./validationError.js";
@@ -85,27 +86,30 @@ const dateSchema = z
   .regex(/^\d{4}-\d{2}-\d{2}$/)
   .refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00+08:00`)));
 
+const ORDER_STATUS_VALUES = [
+  "pending",
+  "accepted",
+  "activated",
+  "signed",
+  "reconciled",
+  "paid",
+  "cancelled",
+  "return_pending",
+  "partially_returned",
+  "returned",
+  "voided",
+] as const;
+
+const orderStatusSchema = z.enum(ORDER_STATUS_VALUES);
+
 const listQuerySchema = z.object({
   query: z.string().trim().min(1).max(120).optional(),
   orderNo: z.string().trim().min(1).max(64).optional(),
   customerPhoneTail: z.string().regex(/^\d{4}$/).optional(),
   storeQuery: z.string().trim().min(1).max(160).optional(),
   sellerQuery: z.string().trim().min(1).max(120).optional(),
-  status: z
-    .enum([
-      "pending",
-      "accepted",
-      "activated",
-      "signed",
-      "reconciled",
-      "paid",
-      "cancelled",
-      "return_pending",
-      "partially_returned",
-      "returned",
-      "voided",
-    ])
-    .optional(),
+  status: orderStatusSchema.optional(),
+  statuses: z.string().trim().max(400).optional(),
   paymentMode: z.enum(["one_time", "contract_36"]).optional(),
   roomType: z
     .enum(["one_bedroom", "two_bedroom", "three_bedroom"])
@@ -205,6 +209,15 @@ const parseListFilters = (
   if (dateFrom && dateTo && dateFrom >= dateTo) return { success: false };
   if (signedDateFrom && signedDateTo && signedDateFrom >= signedDateTo) return { success: false };
   if (reconciledDateFrom && reconciledDateTo && reconciledDateFrom >= reconciledDateTo) return { success: false };
+  const statuses: OrderStatus[] = [];
+  if (parsed.data.statuses) {
+    for (const value of parsed.data.statuses.split(",")) {
+      const parsedStatus = orderStatusSchema.safeParse(value.trim());
+      if (!parsedStatus.success) return { success: false };
+      statuses.push(parsedStatus.data);
+    }
+    if (statuses.length === 0) return { success: false };
+  }
   return {
     success: true,
     filters: {
@@ -214,6 +227,7 @@ const parseListFilters = (
       storeQuery: parsed.data.storeQuery,
       sellerQuery: parsed.data.sellerQuery,
       status: parsed.data.status,
+      ...(statuses.length > 0 ? { statuses } : {}),
       paymentMode: parsed.data.paymentMode,
       roomType: parsed.data.roomType,
       productSku: parsed.data.productSku,

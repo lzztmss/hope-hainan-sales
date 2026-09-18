@@ -13,6 +13,7 @@ import type {
   SubscriptionPlanItem,
 } from "../../shared/pricing/types";
 import type { RegionalCommissionRules } from "../../shared/regionalCommission/types";
+import type { SalesOrderTrendResponse } from "../../shared/reports/types";
 import type { MyCommissionDashboard } from "../commissions/MyCommissionPage";
 import type {
   OrderPaymentMode,
@@ -413,6 +414,7 @@ export interface OrderListApiQuery {
   storeQuery?: string;
   sellerQuery?: string;
   status?: OrderStatus;
+  statuses?: readonly OrderStatus[];
   paymentMode?: OrderPaymentMode;
   signedDateFrom?: string;
   signedDateTo?: string;
@@ -568,6 +570,7 @@ export interface ApiClient {
   listCommissionPolicyVersions(): Promise<readonly CommissionPolicyVersionDto[]>;
   listOrderReturns(orderId: string): Promise<readonly ReturnRecordDto[]>;
   listOrders(query: OrderListApiQuery): Promise<OrderListApiResponse>;
+  getSalesOrderTrend(query: { from: string; to: string }): Promise<SalesOrderTrendResponse>;
   exportOrders(query: OrderListApiQuery): Promise<OrderExportDownload>;
   listOrderFilterOptions(): Promise<OrderFilterOptionsApiResponse>;
   login(input: LoginInput): Promise<AuthenticatedUser>;
@@ -888,6 +891,7 @@ export const createApiClient = ({
     if (query.storeQuery) parameters.set("storeQuery", query.storeQuery);
     if (query.sellerQuery) parameters.set("sellerQuery", query.sellerQuery);
     if (query.status) parameters.set("status", query.status);
+    if (query.statuses?.length) parameters.set("statuses", query.statuses.join(","));
     if (query.paymentMode) parameters.set("paymentMode", query.paymentMode);
     if (query.signedDateFrom) parameters.set("signedDateFrom", query.signedDateFrom);
     if (query.signedDateTo) parameters.set("signedDateTo", query.signedDateTo);
@@ -1058,6 +1062,12 @@ export const createApiClient = ({
         ? "/api/orders/recycle-bin"
         : "/api/orders";
       return readOrderList(await request(`${path}?${parameters.toString()}`));
+    },
+    async getSalesOrderTrend(query) {
+      const parameters = new URLSearchParams({ from: query.from, to: query.to });
+      return (await request(
+        `/api/reports/sales/order-trend?${parameters.toString()}`,
+      )) as SalesOrderTrendResponse;
     },
     async exportOrders(query) {
       const parameters = orderQueryParameters(query);

@@ -58,6 +58,20 @@ export const defaultReportDates = (now: Date): { from: string; to: string } => {
   };
 };
 
+/** 周期内每个上海自然日的 YYYY-MM-DD，升序（上海无夏令时，按 24 小时递推） */
+export const shanghaiDateKeys = (period: ReportPeriod): string[] => {
+  const keys: string[] = [];
+  for (
+    let time = period.start.getTime();
+    time < period.endExclusive.getTime();
+    time += 86_400_000
+  ) {
+    const parts = shanghaiParts(new Date(time));
+    keys.push(`${parts.year}-${parts.month}-${parts.day}`);
+  }
+  return keys;
+};
+
 export const parseReportPeriod = (
   from: string | undefined,
   to: string | undefined,

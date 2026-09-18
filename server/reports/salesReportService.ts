@@ -1,7 +1,12 @@
-import type { SalesReportFilters, SalesReportMetrics, SalesReportResponse } from "../../shared/reports/types.js";
+import type { SalesOrderTrendResponse, SalesReportFilters, SalesReportMetrics, SalesReportResponse } from "../../shared/reports/types.js";
 import type { AuthenticatedUser } from "../auth/authorization.js";
 import { buildSalesReportCsv } from "./csv.js";
-import { parseReportPeriod, type ReportPeriod } from "./reportPeriod.js";
+import {
+  parseReportPeriod,
+  REPORT_TIME_ZONE,
+  shanghaiDateKeys,
+  type ReportPeriod,
+} from "./reportPeriod.js";
 
 export interface SalesReportFact {
   storeId: string;
@@ -40,6 +45,10 @@ export interface ReportExportAudit {
 
 export interface SalesReportRepository {
   loadFacts(scope: SalesReportScope, period: ReportPeriod): Promise<readonly SalesReportFact[]>;
+  loadSignedOrderCounts(
+    scope: SalesReportScope,
+    period: ReportPeriod,
+  ): Promise<readonly { date: string; count: number }[]>;
   listActiveStores(storeId?: string): Promise<readonly { id: string; name: string }[]>;
   recordExportAudit(event: ReportExportAudit): Promise<void>;
 }
@@ -143,6 +152,13 @@ const normalizeScope = (
   };
 };
 
+const SCOPE_LABELS: Record<SalesReportScope["kind"], string> = {
+  seller: "本人",
+  store: "本营业厅",
+  region: "所管营业厅",
+  global: "全公司",
+};
+
 const groupFacts = (
   facts: readonly SalesReportFact[],
   groupBy: "store" | "seller",
@@ -231,14 +247,7 @@ export const createSalesReportService = (options: {
       period: { from: period.from, to: period.to, timeZone: "Asia/Shanghai" },
       scope: {
         kind: scope.kind,
-        label:
-          scope.kind === "seller"
-            ? "本人"
-            : scope.kind === "store"
-              ? "本营业厅"
-              : scope.kind === "region"
-                ? "所管营业厅"
-              : "全公司",
+        label: SCOPE_LABELS[scope.kind],
       },
       totals: metricsForFacts(facts),
       rows,
@@ -250,6 +259,27 @@ export const createSalesReportService = (options: {
 
   return {
     getReport,
+    async getSignedOrderTrend(
+      user: AuthenticatedUser,
+      filters: SalesReportFilters = {},
+    ): Promise<SalesOrderTrendResponse> {
+      const generatedAt = now();
+      const period = parseReportPeriod(filters.from, filters.to, generatedAt);
+      const scope = normalizeScope(user, filters);
+      const counts = await options.repository.loadSignedOrderCounts(scope, period);
+      const countByDate = new Map(counts.map((entry) => [entry.date, entry.count]));
+      const days = shanghaiDateKeys(period).map((date) => ({
+        date,
+        signedOrderCount: countByDate.get(date) ?? 0,
+      }));
+      return {
+        generatedAt: generatedAt.toISOString(),
+        period: { from: period.from, to: period.to, timeZone: REPORT_TIME_ZONE },
+        scope: { kind: scope.kind, label: SCOPE_LABELS[scope.kind] },
+        days,
+        total: days.reduce((sum, day) => sum + day.signedOrderCount, 0),
+      };
+    },
     async exportCsv(
       user: AuthenticatedUser,
       filters: SalesReportFilters,

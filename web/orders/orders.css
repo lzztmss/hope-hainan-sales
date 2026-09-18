@@ -164,11 +164,6 @@
   gap: var(--hfttr-space-3);
 }
 
-.order-filter-panel > header strong,
-.order-filter-panel > header span {
-  display: block;
-}
-
 .order-filter-header-actions {
   display: flex;
   align-items: center;
@@ -202,16 +197,19 @@
   font-size: var(--hfttr-font-size-lg);
 }
 
-.order-filter-panel > header span {
-  margin-top: var(--hfttr-space-1);
-  color: var(--app-color-text-muted);
-  font-size: var(--hfttr-font-size-sm);
-}
-
 .order-filter-fields {
   display: grid;
   min-width: 0;
   gap: var(--hfttr-space-3);
+}
+
+.order-filter-todo__option {
+  display: flex;
+  align-items: center;
+  gap: var(--hfttr-space-2);
+  min-height: var(--app-control-min-size);
+  color: var(--app-color-text);
+  font-weight: var(--app-font-weight-medium);
 }
 
 .order-filter-fields label:not(.order-recycle-filter),
@@ -993,7 +991,15 @@
   position: sticky;
   bottom: 0;
   padding: var(--hfttr-space-3) 0 max(var(--hfttr-space-3), env(safe-area-inset-bottom));
-  background: linear-gradient(transparent, var(--app-color-surface) 30%);
+  background: transparent;
+}
+
+/* 操作栏不再有底色遮罩，按钮不能靠元素透明度表示禁用，否则滚动内容会从按钮里透出 */
+.order-detail-actions button:disabled {
+  border-color: var(--app-color-border);
+  background: var(--app-color-surface-subtle);
+  color: var(--app-color-text-muted);
+  opacity: 1;
 }
 
 .return-dialog {

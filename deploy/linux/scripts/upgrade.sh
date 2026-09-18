@@ -53,7 +53,7 @@ printf '==> 升级前 SQLite 一致性备份\n'
 bash "${SCRIPT_DIR}/backup.sh" --env-file "${ENV_FILE}"
 
 printf '==> 构建新版本镜像（旧版本 tag 保留）\n'
-compose build --pull api web
+compose build api web
 printf '==> 执行只向上迁移\n'
 compose run --rm migrate
 compose run --rm seed

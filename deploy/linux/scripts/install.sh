@@ -79,14 +79,14 @@ HTTP_PORT=8080
 SQLITE_VOLUME_NAME=hainan_fttr_heartlink_sqlite_data
 PII_ENCRYPTION_KEY_BASE64=${pii_one}
 PII_LOOKUP_HMAC_KEY_BASE64=${pii_two}
-BOOTSTRAP_ADMIN_USERNAME=ADMIN001
+BOOTSTRAP_ADMIN_USERNAME=ADMIN
 BOOTSTRAP_ADMIN_PASSWORD=${admin_password}
 BACKUP_RETENTION_DAYS=30
 BACKUP_DIR=./backups
 EOF
   chmod 0600 "${ENV_FILE}"
   printf '已生成 %s（权限 0600）。\n' "${ENV_FILE}"
-  printf '初始管理员：ADMIN001\n'
+  printf '初始管理员：ADMIN\n'
   printf '初始密码：%s\n' "${admin_password}"
   printf '请离线记录并在首次登录后立即修改。\n'
 }
@@ -116,7 +116,7 @@ mkdir -p "${DEPLOY_ROOT}/backups" "${DEPLOY_ROOT}/state"
 chmod 0700 "${DEPLOY_ROOT}/backups" "${DEPLOY_ROOT}/state"
 
 printf '==> 从当前源码构建镜像\n'
-compose build --pull api web
+compose build api web
 printf '==> 初始化数据库结构\n'
 compose run --rm migrate
 printf '==> 初始化管理员与默认提成规则\n'

@@ -127,7 +127,6 @@
 .sales-shell__drawer-close { margin-left: auto; min-width: 44px; min-height: 44px; }
 
 .sales-shell__sidebar-brand > span:last-child,
-.sales-shell__sidebar-user > span:last-child,
 .sales-shell__identity-copy {
   display: grid;
   min-width: 0;
@@ -140,7 +139,6 @@
 }
 
 .sales-shell__sidebar-brand small,
-.sales-shell__sidebar-user small,
 .sales-shell__identity-copy small {
   overflow: hidden;
   color: var(--muted-foreground);
@@ -200,9 +198,7 @@
 }
 
 .sales-shell__sidebar-user {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
+  display: block;
   margin-top: auto;
   padding: 0.875rem 1rem max(1rem, env(safe-area-inset-bottom));
   border-top: 1px solid var(--border);
@@ -210,25 +206,11 @@
 
 .sales-shell__sidebar-logout {
   display: inline-flex;
-  flex: 0 0 auto;
-  margin-inline-start: auto;
+  width: 100%;
+  justify-content: flex-start;
   color: var(--muted-foreground);
 }
 
-.sales-shell__avatar {
-  display: grid;
-  flex: 0 0 auto;
-  width: 1.875rem;
-  height: 1.875rem;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--primary);
-  font-size: 0.75rem;
-  font-weight: 750;
-}
-
-.sales-shell__sidebar-user strong,
 .sales-shell__identity-copy strong {
   overflow: hidden;
   color: var(--foreground);
@@ -348,16 +330,7 @@
   }
 
   .sales-shell__identity-copy {
-    display: none;
-  }
-
-  .sales-shell__identity > strong {
-    color: var(--foreground);
-  }
-
-  .sales-shell__role {
-    background: var(--accent);
-    color: var(--primary);
+    display: grid;
   }
 
   .sales-shell__logout {
@@ -368,7 +341,7 @@
     color: var(--foreground);
   }
 
-  .sales-shell__sidebar-logout {
+  .sales-shell__sidebar-user {
     display: none;
   }
 

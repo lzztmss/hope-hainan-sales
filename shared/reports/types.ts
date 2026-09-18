@@ -52,3 +52,25 @@ export interface SalesReportResponse {
   page: number;
   pageSize: number;
 }
+
+export interface SalesOrderTrendDay {
+  /** 上海时区自然日 YYYY-MM-DD */
+  date: string;
+  signedOrderCount: number;
+}
+
+export interface SalesOrderTrendResponse {
+  generatedAt: string;
+  period: {
+    from: string;
+    to: string;
+    timeZone: "Asia/Shanghai";
+  };
+  scope: {
+    kind: "seller" | "store" | "region" | "global";
+    label: string;
+  };
+  /** 按自然日升序，无数据的日期补 0 */
+  days: SalesOrderTrendDay[];
+  total: number;
+}

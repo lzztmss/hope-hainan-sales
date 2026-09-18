@@ -550,6 +550,7 @@ export class DrizzleOrderRepository implements OrderRepository {
       );
     }
     if (filters.status) conditions.push(eq(orders.status, filters.status));
+    if (filters.statuses?.length) conditions.push(inArray(orders.status, [...filters.statuses]));
     if (filters.paymentMode) {
       conditions.push(eq(orders.paymentMode, filters.paymentMode));
     }

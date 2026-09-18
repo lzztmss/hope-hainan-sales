@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import type { SalesReportFilters, SalesReportResponse } from "../../shared/reports/types";
+import type { SalesOrderTrendResponse, SalesReportFilters, SalesReportResponse } from "../../shared/reports/types";
 import type { ApiClient, ApiUserRole, AuthenticatedUser, OrderDto, QuoteDetailDto, QuoteStatus } from "../api/client";
 import { PageLayout } from "../components/layout";
 import { Badge } from "../components/ui/badge";
@@ -41,6 +41,7 @@ import {
   TableCell,
 } from "../components/ui/table";
 import { usePageAutoRefresh } from "../hooks/usePageAutoRefresh";
+import { todoOrderStatuses } from "../orders/orderTransitions";
 import { ReportFilters } from "../reports/ReportFilters";
 import { formatReportFen, formatReportRate, ReportSummary } from "../reports/ReportSummary";
 import { reportsApi } from "../reports/reportApi";
@@ -72,6 +73,8 @@ const PENDING_ORDER_COPY: Partial<Record<OrderDto["status"], { label: string; ic
   reconciled: { label: "等待确认收款", icon: WalletCards },
   return_pending: { label: "售后申请待处理", icon: Undo2 },
 };
+
+const TREND_DAY_COUNT = 7;
 
 interface QuickAction {
   href: string;
@@ -118,35 +121,29 @@ const QUICK_ACTIONS: Record<ApiUserRole, readonly QuickAction[]> = {
   ],
 };
 
-const ROLE_COPY: Record<ApiUserRole, { eyebrow: string; description: string; scope: string }> = {
+const ROLE_COPY: Record<ApiUserRole, { eyebrow: string; scope: string }> = {
   sales: {
     eyebrow: "个人工作台",
-    description: "查看本人最新报价、订单进度、销售数据与提成状态。",
     scope: "个人销售数据",
   },
   store_manager: {
     eyebrow: "营业厅工作台",
-    description: "集中掌握本厅报价、订单、售后与团队经营情况。",
     scope: "本营业厅经营数据",
   },
   regional_manager: {
     eyebrow: "大区工作台",
-    description: "掌握所管营业厅的销售进度、业务待办与提成完成情况。",
     scope: "所管营业厅经营数据",
   },
   hr: {
     eyebrow: "人力工作台",
-    description: "查看全公司销售与提成数据，处理大区经理目标及相关业务资料。",
     scope: "全公司经营数据",
   },
   finance: {
     eyebrow: "财务工作台",
-    description: "查看全公司订单、收款、退款和提成结算相关数据。",
     scope: "全公司财务数据",
   },
   admin: {
     eyebrow: "系统工作台",
-    description: "查看全局业务运行情况，并进入账号、规则、结算与审计管理。",
     scope: "全局经营数据",
   },
 };
@@ -193,6 +190,7 @@ export const SalesDashboardPage = ({
   const [report, setReport] = useState(initialReport);
   const [quotes, setQuotes] = useState<readonly QuoteDetailDto[]>([]);
   const [orders, setOrders] = useState<readonly OrderDto[]>([]);
+  const [trend, setTrend] = useState<SalesOrderTrendResponse | null>(null);
   const [quoteTotal, setQuoteTotal] = useState(0);
   const [storeNames, setStoreNames] = useState<Record<string, string>>({});
   const [sellerNames, setSellerNames] = useState<Record<string, string>>({});
@@ -210,8 +208,13 @@ export const SalesDashboardPage = ({
   }), [defaults.from, defaults.to, report?.period.from, report?.period.to]);
   const appliedFilters = useRef(initialFilters);
   const initialLoadStarted = useRef(false);
-  const operationalLoadStarted = useRef(false);
   const copy = ROLE_COPY[viewer.role];
+  const trendWindow = useMemo(() => {
+    const end = report?.period.to ? new Date(`${report.period.to}T00:00:00+08:00`) : new Date();
+    const start = new Date(end);
+    start.setUTCDate(end.getUTCDate() - (TREND_DAY_COUNT - 1));
+    return { from: shanghaiDateKey(start), to: shanghaiDateKey(end), end };
+  }, [report?.period.to]);
 
   const loadReport = useCallback(async (filters: SalesReportFilters, background = false) => {
     if (!background) {
@@ -233,10 +236,11 @@ export const SalesDashboardPage = ({
       setOperationalBusy(true);
       setOperationalError(null);
     }
-    const [quoteResult, orderResult, optionResult] = await Promise.allSettled([
+    const [quoteResult, orderResult, optionResult, trendResult] = await Promise.allSettled([
       client.listQuotes({ page: 1, pageSize: 8 }),
       client.listOrders({ page: 1, limit: 12 }),
       client.listOrderFilterOptions(),
+      client.getSalesOrderTrend({ from: trendWindow.from, to: trendWindow.to }),
     ]);
 
     if (quoteResult.status === "fulfilled") {
@@ -244,28 +248,29 @@ export const SalesDashboardPage = ({
       setQuoteTotal(quoteResult.value.total);
     }
     if (orderResult.status === "fulfilled") setOrders(orderResult.value.items);
+    if (trendResult.status === "fulfilled") setTrend(trendResult.value);
     if (optionResult.status === "fulfilled") {
       setStoreNames(Object.fromEntries(optionResult.value.stores.map((item) => [item.id, item.label])));
       setSellerNames(Object.fromEntries(optionResult.value.sellers.map((item) => [item.id, item.label])));
     }
-    if (quoteResult.status === "rejected" || orderResult.status === "rejected") {
+    if (quoteResult.status === "rejected" || orderResult.status === "rejected" || trendResult.status === "rejected") {
       setOperationalError("部分实时业务数据暂时无法加载，请进入对应列表查看。");
     } else {
       setOperationalError(null);
     }
     if (!background) setOperationalBusy(false);
-  }, [client]);
+  }, [client, trendWindow.from, trendWindow.to]);
 
   useEffect(() => {
     if (!initialReport && !initialLoadStarted.current) {
       initialLoadStarted.current = true;
       void loadReport(appliedFilters.current);
     }
-    if (!operationalLoadStarted.current) {
-      operationalLoadStarted.current = true;
-      void loadOperationalData();
-    }
-  }, [initialReport, loadOperationalData, loadReport]);
+  }, [initialReport, loadReport]);
+
+  useEffect(() => {
+    void loadOperationalData();
+  }, [loadOperationalData]);
 
   usePageAutoRefresh({
     enabled: Boolean(report) && !busy && !operationalBusy,
@@ -290,39 +295,19 @@ export const SalesDashboardPage = ({
     }).slice(0, 5);
   }, [quoteQuery, quoteStatus, quotes]);
 
+  const todoStatuses = useMemo(() => new Set(todoOrderStatuses(viewer)), [viewer]);
   const pendingOrders = useMemo(() => orders
-    .filter((order) => PENDING_ORDER_COPY[order.status])
-    .slice(0, 4), [orders]);
+    .filter((order) => PENDING_ORDER_COPY[order.status] !== undefined && todoStatuses.has(order.status))
+    .slice(0, 4), [orders, todoStatuses]);
 
-  const trendDays = useMemo(() => {
-    const end = report?.period.to
-      ? new Date(`${report.period.to}T00:00:00+08:00`)
-      : new Date();
-    const quoteByDay = new Map<string, number>();
-    const orderByDay = new Map<string, number>();
-    quotes.forEach((quote) => {
-      const key = shanghaiDateKey(quote.updatedAt);
-      quoteByDay.set(key, (quoteByDay.get(key) ?? 0) + 1);
-    });
-    orders.forEach((order) => {
-      const key = shanghaiDateKey(order.updatedAt);
-      orderByDay.set(key, (orderByDay.get(key) ?? 0) + 1);
-    });
-    return Array.from({ length: 7 }, (_, index) => {
-      const day = new Date(end);
-      day.setUTCDate(end.getUTCDate() - (6 - index));
-      const key = shanghaiDateKey(day);
-      return {
-        label: key.slice(5).replace("-", "/"),
-        key,
-        quotes: quoteByDay.get(key) ?? 0,
-        orders: orderByDay.get(key) ?? 0,
-      };
-    });
-  }, [orders, quotes, report?.period.to]);
+  const trendDays = useMemo(() => (trend?.days ?? []).map((day) => ({
+    key: day.date,
+    label: day.date.slice(5).replace("-", "/"),
+    count: day.signedOrderCount,
+  })), [trend]);
 
-  const trendMax = Math.max(1, ...trendDays.map((day) => day.orders));
-  const trendOrderTotal = trendDays.reduce((total, day) => total + day.orders, 0);
+  const trendMax = Math.max(1, ...trendDays.map((day) => day.count));
+  const trendOrderTotal = trend?.total ?? 0;
 
   const metrics = report?.totals;
   const primaryAction = QUICK_ACTIONS[viewer.role][0];
@@ -331,7 +316,6 @@ export const SalesDashboardPage = ({
     <PageLayout
       eyebrow={copy.eyebrow}
       title={`您好，${viewer.displayName}`}
-      description={copy.description}
       actions={primaryAction ? (
         <Link className="operations-primary-action" to={primaryAction.href}>
           <primaryAction.icon aria-hidden="true" />
@@ -344,7 +328,7 @@ export const SalesDashboardPage = ({
 
         <section className="operations-metrics" aria-label="关键指标">
           <Card className="operations-metric" size="sm">
-            <CardContent><span>本期报价</span><FileText aria-hidden="true" /><strong>{metrics?.quoteCount.toLocaleString("zh-CN") ?? "--"}</strong><small>按当前报表周期统计</small></CardContent>
+            <CardContent><span>报价数</span><FileText aria-hidden="true" /><strong>{metrics?.quoteCount.toLocaleString("zh-CN") ?? "--"}</strong><small>{report ? `统计周期 ${report.period.from.slice(5)} ~ ${report.period.to.slice(5)}` : "按当前报表周期统计"}</small></CardContent>
           </Card>
           <Card className="operations-metric" size="sm">
             <CardContent><span>成交订单</span><PackageCheck aria-hidden="true" /><strong>{metrics?.orderCount.toLocaleString("zh-CN") ?? "--"}</strong><small>成交率 {metrics ? formatReportRate(metrics.conversionRateBps) : "--"}</small></CardContent>
@@ -396,7 +380,7 @@ export const SalesDashboardPage = ({
               <CardHeader className="operations-panel__header">
                 <CardTitle><h2>订单待办</h2></CardTitle>
                 <CardDescription>当前角色可见范围内的近期事项</CardDescription>
-                <CardAction><Link className="operations-text-action" to="/orders">订单列表 <ArrowRight aria-hidden="true" /></Link></CardAction>
+                <CardAction><Link className="operations-text-action" to="/orders?todo=1">全部待办订单 <ArrowRight aria-hidden="true" /></Link></CardAction>
               </CardHeader>
               <CardContent className="operations-task-list">
                 {pendingOrders.map((order) => {
@@ -415,11 +399,11 @@ export const SalesDashboardPage = ({
 
           <aside className="operations-stack" aria-label="业务辅助信息">
             <Card className="operations-panel">
-              <CardHeader className="operations-panel__header"><CardTitle><h2>成交趋势</h2></CardTitle><CardDescription>近 7 天 · 上海时间</CardDescription></CardHeader>
+              <CardHeader className="operations-panel__header"><CardTitle><h2>成交趋势</h2></CardTitle><CardDescription>近 7 天已签收 · 上海时间</CardDescription></CardHeader>
               <CardContent className="operations-trend">
-                <div className="operations-trend__meta"><div><strong>{trendOrderTotal}</strong><span>近 7 天成交订单</span></div><Badge variant="secondary">报价 {quotes.length}</Badge></div>
-                <div className="operations-trend__bars" aria-label="近七日成交订单柱状图">
-                  {trendDays.map((day) => <div className="operations-trend__bar" key={day.key}><span style={{ height: `${Math.max(day.orders ? 12 : 0, (day.orders / trendMax) * 100)}%` }} title={`${day.label}：${day.orders} 笔订单，${day.quotes} 笔报价`} /><small>{day.label}</small></div>)}
+                <div className="operations-trend__meta"><div><strong>{trendOrderTotal}</strong><span>近 7 天已签收订单</span></div></div>
+                <div className="operations-trend__bars" aria-label="近七日已签收订单柱状图">
+                  {trendDays.map((day) => <div className="operations-trend__bar" key={day.key}><strong className="operations-trend__count">{day.count}</strong><span style={{ height: `${Math.max(day.count ? 12 : 0, (day.count / trendMax) * 100)}%` }} title={`${day.label}：${day.count} 笔已签收`} /><small>{day.label}</small></div>)}
                 </div>
               </CardContent>
             </Card>

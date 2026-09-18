@@ -7,7 +7,7 @@ DEPLOY_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PROJECT_ROOT="$(cd "${DEPLOY_ROOT}/../.." && pwd)"
 COMPOSE_FILE="${DEPLOY_ROOT}/docker-compose.yml"
 DEFAULT_ENV_FILE="${DEPLOY_ROOT}/.env"
-PROJECT_NAME="${COMPOSE_PROJECT_NAME:-hainan-fttr-heartlink}"
+# 项目名在 compose() 中解析：环境变量 > .env 的 COMPOSE_PROJECT_NAME > 仓库目录名（保证多套环境互不冲突）
 COMPOSE_COMMAND=()
 
 die() {
@@ -120,7 +120,10 @@ detect_compose() {
 compose() {
   local env_file="${ENV_FILE:-${DEFAULT_ENV_FILE}}"
   ((${#COMPOSE_COMMAND[@]} > 0)) || detect_compose
-  "${COMPOSE_COMMAND[@]}" --env-file "${env_file}" -f "${COMPOSE_FILE}" -p "${PROJECT_NAME}" "$@"
+  local project="${COMPOSE_PROJECT_NAME:-$(env_value "${env_file}" COMPOSE_PROJECT_NAME)}"
+  project="${project:-$(basename "${PROJECT_ROOT}")}"
+  project="$(printf '%s' "${project}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')"
+  "${COMPOSE_COMMAND[@]}" --env-file "${env_file}" -f "${COMPOSE_FILE}" -p "${project}" "$@"
 }
 
 record_release() {

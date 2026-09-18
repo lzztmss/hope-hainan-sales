@@ -139,6 +139,8 @@ export interface OrderListFilters {
   reconciliationStatus?: "pending" | "reconciled" | "";
   collectionStatus?: "unpaid" | "paid" | "";
   recycleBin: boolean;
+  /** 只看当前账号需要处理的订单（工作台「全部待办订单」入口） */
+  todoOnly: boolean;
 }
 
 export interface OrderListResult {

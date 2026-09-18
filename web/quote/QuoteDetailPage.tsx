@@ -51,7 +51,6 @@ export const QuoteDetailPage = ({ client, quoteId, viewer }: { client: ApiClient
     <PageLayout
       eyebrow="报价管理"
       title={quote?.quoteNo ?? "报价详情"}
-      description={viewer.role === "sales" ? "查看已保存版本；未转订单的报价可以继续修改、打印或转为订单。" : "查看已保存的报价版本和报价单；管理及职能账号不修改报价或转订单。"}
       actions={<Link className="quote-management__secondary-link" to="/quotes">返回报价列表</Link>}
     >
       {error ? <p className="quote-management__error" role="alert">{error}</p> : null}
