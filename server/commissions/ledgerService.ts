@@ -93,6 +93,10 @@ export interface CommissionLedgerRepository {
   findOrderForAccrual(orderId: string): Promise<CommissionAccrualOrder | null>;
   findAccrualByOrder(orderId: string): Promise<CommissionAccrualResult | null>;
   findEffectivePolicy(at: Date): Promise<CommissionPolicyForAccrual | null>;
+  listOrdersMissingAccrualInWindow(
+    from: Date,
+    to: Date | null,
+  ): Promise<readonly { id: string }[]>;
   createAccrual(input: CommissionAccrualWrite): Promise<CommissionAccrualResult>;
   findReversalByReturn(
     returnId: string,
@@ -100,6 +104,16 @@ export interface CommissionLedgerRepository {
   createReversal(
     input: CommissionReversalWrite,
   ): Promise<CommissionReversalResult>;
+}
+
+export interface CommissionBackfillInput {
+  effectiveFrom: string;
+  effectiveTo: string | null;
+}
+
+export interface CommissionBackfillReport {
+  accrued: number;
+  skipped: readonly { orderId: string; reason: string }[];
 }
 
 export interface CommissionLedgerServiceOptions {
@@ -124,6 +138,69 @@ const validateEventKey = (eventKey: string): void => {
   if (!/^[A-Za-z0-9:_-]{12,128}$/.test(eventKey)) {
     throw new Error("提成事件键格式不正确");
   }
+};
+
+// 允许计提的订单状态：正常激活时只接受 activated；补提覆盖生效后的所有在途状态。
+const ACTIVE_ACCRUAL_STATUSES = ["activated"];
+const BACKFILL_STATUSES = [
+  "activated",
+  "signed",
+  "reconciled",
+  "paid",
+  "return_pending",
+  "partially_returned",
+];
+
+const accrueOrderInTransaction = async (
+  repository: CommissionLedgerRepository,
+  orderId: string,
+  eventKey: string,
+  allowedStatuses: readonly string[],
+  now: () => Date,
+): Promise<CommissionAccrualResult> => {
+  const existing = await repository.findAccrualByOrder(orderId);
+  if (existing) return existing;
+
+  const order = await repository.findOrderForAccrual(orderId);
+  if (!order) throw new Error("订单不存在");
+  if (!allowedStatuses.includes(order.status) || !order.activatedAt) {
+    throw new Error("只有已激活订单可以计提");
+  }
+  validateAttributions(order.attributions);
+
+  const policy = await repository.findEffectivePolicy(order.activatedAt);
+  if (!policy) throw new Error("未找到生效的提成规则版本");
+  const calculation = calculateCommission(
+    order.lines,
+    policy.rules,
+    order.sellerContext,
+  );
+  const accruedAt = now();
+  const ledgerEntries = creditsForCalculation(
+    order,
+    calculation,
+    eventKey,
+    accruedAt,
+  );
+  const ledgerTotal = ledgerEntries.reduce(
+    (sum, entry) => sum + entry.amountFen,
+    0,
+  );
+  if (ledgerTotal !== calculation.totalFen) {
+    throw new Error("提成分配合计与计算结果不一致");
+  }
+
+  return repository.createAccrual({
+    orderId,
+    eventKey,
+    policyVersionId: policy.id,
+    policyVersion: policy.version,
+    totalFen: calculation.totalFen,
+    calculation: structuredClone(calculation),
+    attributionSnapshot: structuredClone(order.attributions),
+    ledgerEntries,
+    accruedAt,
+  });
 };
 
 const validateAttributions = (
@@ -287,51 +364,57 @@ export const createCommissionLedgerService = (
       eventKey: string,
     ): Promise<CommissionAccrualResult> {
       validateEventKey(eventKey);
-      return options.repository.runTransaction(async (repository) => {
-        const existing = await repository.findAccrualByOrder(orderId);
-        if (existing) return existing;
-
-        const order = await repository.findOrderForAccrual(orderId);
-        if (!order) throw new Error("订单不存在");
-        if (order.status !== "activated" || !order.activatedAt) {
-          throw new Error("只有已激活订单可以计提");
-        }
-        validateAttributions(order.attributions);
-
-        const policy = await repository.findEffectivePolicy(order.activatedAt);
-        if (!policy) throw new Error("未找到生效的提成规则版本");
-        const calculation = calculateCommission(
-          order.lines,
-          policy.rules,
-          order.sellerContext,
-        );
-        const accruedAt = now();
-        const ledgerEntries = creditsForCalculation(
-          order,
-          calculation,
-          eventKey,
-          accruedAt,
-        );
-        const ledgerTotal = ledgerEntries.reduce(
-          (sum, entry) => sum + entry.amountFen,
-          0,
-        );
-        if (ledgerTotal !== calculation.totalFen) {
-          throw new Error("提成分配合计与计算结果不一致");
-        }
-
-        return repository.createAccrual({
+      return options.repository.runTransaction(async (repository) =>
+        accrueOrderInTransaction(
+          repository,
           orderId,
           eventKey,
-          policyVersionId: policy.id,
-          policyVersion: policy.version,
-          totalFen: calculation.totalFen,
-          calculation: structuredClone(calculation),
-          attributionSnapshot: structuredClone(order.attributions),
-          ledgerEntries,
-          accruedAt,
-        });
-      });
+          ACTIVE_ACCRUAL_STATUSES,
+          now,
+        ),
+      );
+    },
+
+    // 规则版本发布（含把生效日回填到历史空窗）后，为「已生效但无提成快照、
+    // 激活时点落在版本覆盖区间内」的订单补计提。计提仍按订单各自的激活时点
+    // 解析规则快照；单笔订单失败只跳过并记录，不阻塞其余订单。
+    async backfillForPolicyWindow(
+      input: CommissionBackfillInput,
+    ): Promise<CommissionBackfillReport> {
+      const from = new Date(input.effectiveFrom);
+      const to = input.effectiveTo ? new Date(input.effectiveTo) : null;
+      if (!Number.isFinite(from.getTime())) {
+        throw new Error("提成规则生效日不合法");
+      }
+      if (to && !Number.isFinite(to.getTime())) {
+        throw new Error("提成规则失效日不合法");
+      }
+      const candidates = await options.repository.listOrdersMissingAccrualInWindow(
+        from,
+        to,
+      );
+      const skipped: { orderId: string; reason: string }[] = [];
+      let accrued = 0;
+      for (const candidate of candidates) {
+        try {
+          await options.repository.runTransaction(async (repository) =>
+            accrueOrderInTransaction(
+              repository,
+              candidate.id,
+              `activation:${candidate.id}`,
+              BACKFILL_STATUSES,
+              now,
+            ),
+          );
+          accrued += 1;
+        } catch (error) {
+          skipped.push({
+            orderId: candidate.id,
+            reason: error instanceof Error ? error.message : "补提失败",
+          });
+        }
+      }
+      return { accrued, skipped };
     },
 
     async validateReversalForCompletedReturn(

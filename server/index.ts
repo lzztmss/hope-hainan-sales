@@ -64,11 +64,18 @@ const quoteService = createQuoteService({
   pii,
   plans: planService,
 });
-const commissionRuleService = createCommissionRuleService({
-  repository: new DrizzleCommissionRuleRepository(databaseClient),
-});
 const commissionLedgerService = createCommissionLedgerService({
   repository: new DrizzleCommissionLedgerRepository(databaseClient),
+});
+const commissionRuleService = createCommissionRuleService({
+  repository: new DrizzleCommissionRuleRepository(databaseClient),
+  // 规则发布（含生效日回填到历史空窗）后自动为覆盖区间内已生效但无提成
+  // 快照的订单补计提。
+  onPublished: (version) =>
+    commissionLedgerService.backfillForPolicyWindow({
+      effectiveFrom: version.effectiveFrom,
+      effectiveTo: version.effectiveTo,
+    }),
 });
 const commissionDashboardService = createCommissionDashboardService({
   repository: new DrizzleCommissionDashboardRepository(databaseClient),

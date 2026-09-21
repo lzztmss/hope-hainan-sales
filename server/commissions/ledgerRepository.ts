@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, notExists, or, type SQL } from "drizzle-orm";
 
 import type {
   CommissionOrderLine,
@@ -224,6 +224,40 @@ export class DrizzleCommissionLedgerRepository
       version: version.versionNo,
       rules: rules.map(mapRule),
     };
+  }
+
+  // 已生效（含生效后各状态）但没有提成快照、激活时点落在给定区间内的订单。
+  // 与看板 listMissingAccrualOrders 同口径，但只用于补提，不含已整单退完的订单
+  // （补提后再全额冲销净额为零，直接跳过）。
+  async listOrdersMissingAccrualInWindow(
+    from: Date,
+    to: Date | null,
+  ): Promise<readonly { id: string }[]> {
+    const windowConditions: SQL[] = [gte(orders.activatedAt, from)];
+    if (to) windowConditions.push(lt(orders.activatedAt, to));
+    return this.executor
+      .select({ id: orders.id })
+      .from(orders)
+      .where(and(
+        inArray(orders.status, [
+          "activated",
+          "signed",
+          "reconciled",
+          "paid",
+          "return_pending",
+          "partially_returned",
+        ]),
+        isNull(orders.deletedAt),
+        isNotNull(orders.activatedAt),
+        ...windowConditions,
+        notExists(
+          this.executor
+            .select({ id: orderCommissionSnapshots.id })
+            .from(orderCommissionSnapshots)
+            .where(eq(orderCommissionSnapshots.orderId, orders.id)),
+        ),
+      ))
+      .orderBy(asc(orders.activatedAt), asc(orders.id));
   }
 
   async createAccrual(

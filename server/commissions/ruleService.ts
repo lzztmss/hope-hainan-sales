@@ -122,6 +122,9 @@ export interface CommissionRuleServiceOptions {
   repository: CommissionRuleRepository;
   now?: () => Date;
   idFactory?: (kind: IdKind) => string;
+  // 版本发布成功后触发（参数为发布后的版本快照）。用于自动为覆盖区间内
+  // 已生效但无提成快照的订单补计提；抛出的异常会向上传播。
+  onPublished?: (version: CommissionPolicyVersion) => Promise<unknown>;
 }
 
 const SHANGHAI_UTC_OFFSET_MS = 8 * 60 * 60 * 1000;
@@ -571,6 +574,10 @@ export const createCommissionRuleService = (
         predecessorWrite,
       );
       if (!replaced) throw new Error("提成规则版本已被其他操作更新");
+      if (options.onPublished) {
+        // 版本此刻已发布成功；补提钩子按发布后的最终生效区间执行。
+        await options.onPublished(published);
+      }
       return snapshotVersion(published);
     },
 
