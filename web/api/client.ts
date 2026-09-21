@@ -123,6 +123,29 @@ export interface RegionalCommissionSummary {
   cooperation: readonly RegionalCooperationDto[];
   revenueAcceleration: { unlockOrderCount: number; currentOrderCount: number; unlocked: boolean; ratePartsPerMillion: number; monthlyCapFen: number };
 }
+export interface RegionalValidOrderItem {
+  id: string;
+  source: "store" | "personal";
+  orderNo: string;
+  place: string;
+  signedOn: string | null;
+  effectiveOn: string;
+  orderCount: number;
+  status: "valid" | "returned";
+  periodSequence: number | null;
+}
+export interface RegionalValidOrdersReport {
+  month: string;
+  statisticsStartsOn: string | null;
+  statisticsEndsOn: string;
+  targetPlanStartsOn: string | null;
+  targetPlanEndsOn: string | null;
+  managedOrderCount: number;
+  personalOrderCount: number;
+  orderCount: number;
+  periods: readonly { sequence: number; startsOn: string; endsOn: string }[];
+  items: readonly RegionalValidOrderItem[];
+}
 export interface RegionalManagerOption { id: string; displayName: string; workNo: string; active: boolean; employmentStartDate: string | null; employmentEndDate: string | null; }
 export interface RegionalTemplateDto {
   id: string;
@@ -621,6 +644,7 @@ export interface ApiClient {
     input: UpdateCommissionRuleInput,
   ): Promise<CommissionPolicyVersionDto>;
   getRegionalCommissionSummary(query?: RegionalCommissionSummaryQuery): Promise<RegionalCommissionSummary>;
+  listRegionalValidOrders(query?: RegionalCommissionSummaryQuery): Promise<RegionalValidOrdersReport>;
   listRegionalTargetPlans(managerId: string): Promise<readonly RegionalTargetPlanDto[]>;
   createSuggestedRegionalTargetPlan(managerId: string, reason: string): Promise<RegionalTargetPlanDto>;
   saveRegionalTargetPlan(input: { id?: string; managerId: string; planType: RegionalTargetPlanType; startsOn: string; periodTargets: readonly number[]; reason: string }): Promise<RegionalTargetPlanDto>;
@@ -1218,6 +1242,7 @@ export const createApiClient = ({
       );
     },
     async getRegionalCommissionSummary(query = {}) { const parameters = new URLSearchParams(); if (query.managerId) parameters.set("managerId", query.managerId); if (query.month) parameters.set("month", query.month); return (await request(`/api/regional-commissions/summary?${parameters.toString()}`)) as RegionalCommissionSummary; },
+    async listRegionalValidOrders(query: RegionalCommissionSummaryQuery = {}) { const parameters = new URLSearchParams(); if (query.managerId) parameters.set("managerId", query.managerId); if (query.month) parameters.set("month", query.month); return (await request(`/api/regional-commissions/valid-orders?${parameters.toString()}`)) as RegionalValidOrdersReport; },
     async listRegionalTargetPlans(managerId) { return readProperty<readonly RegionalTargetPlanDto[]>(await request(`/api/regional-commissions/target-plans?managerId=${encodeURIComponent(managerId)}`), "items"); },
     async createSuggestedRegionalTargetPlan(managerId, reason) { return (await request("/api/regional-commissions/target-plans/suggest", { method: "POST", body: JSON.stringify({ managerId, reason }) })) as RegionalTargetPlanDto; },
     async saveRegionalTargetPlan(input) { return (await request("/api/regional-commissions/target-plans", { method: "POST", body: JSON.stringify(input) })) as RegionalTargetPlanDto; },

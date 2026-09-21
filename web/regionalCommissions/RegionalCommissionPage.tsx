@@ -13,6 +13,7 @@ import type {
 import { PageLayout } from "../components/layout";
 import { RegionalActionErrorDialog } from "./RegionalActionErrorDialog";
 import { RegionalTemplateEditor } from "./RegionalTemplateEditor";
+import { RegionalValidOrdersDialog } from "./RegionalValidOrdersDialog";
 import "./regionalCommission.css";
 
 const yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
@@ -77,6 +78,7 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
   const [cooperationForm, setCooperationForm] = useState({ stageCode: "PROJECT", achievedOn: "", evidenceNo: "", note: "" });
   const [cooperationReasons, setCooperationReasons] = useState<Record<string, string>>({});
   const [pendingStatementAction, setPendingStatementAction] = useState<string | null>(null);
+  const [validOrdersOpen, setValidOrdersOpen] = useState(false);
   const showError = (value: unknown, fallback = "操作失败") => {
     const errorMessage = value instanceof Error ? value.message : typeof value === "string" ? value : fallback;
     setMessage(errorMessage);
@@ -251,6 +253,7 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
     actions={(canEdit || actor.role === "regional_manager") ? <Link className="regional-primary-action" to="/commissions/regional/personal-orders">{canEdit ? "管理个人渠道订单" : "查看个人渠道订单"}</Link> : undefined}
   >
     <RegionalActionErrorDialog message={actionError} onClose={() => setActionError(null)} />
+    {validOrdersOpen && summary && managerId ? <RegionalValidOrdersDialog client={client} managerId={managerId} month={month} summary={summary} onClose={() => setValidOrdersOpen(false)} /> : null}
     {actor.role !== "regional_manager" ? <label className="regional-manager-select">
       <span>大区经理</span>
       <select value={managerId} onChange={(event) => setManagerId(event.currentTarget.value)}>
@@ -307,7 +310,9 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
           ["个人商品提成", yuan(summary.personalProductFen)],
           ["合作奖", yuan(summary.cooperationFen)],
           ["累计金额", yuan(summary.totalFen)],
-        ].map(([label, value]) => <div className="regional-metric" key={label}><span>{label}</span><strong>{value}</strong></div>)}
+        ].map(([label, value], index) => <div className="regional-metric" key={label}>{index === 0
+          ? <button className="regional-metric-trigger" type="button" onClick={() => setValidOrdersOpen(true)} title="点击查看有效订单明细">当前版本累计有效订单</button>
+          : <span>{label}</span>}<strong>{value}</strong></div>)}
       </section>
 
       <section className="regional-section" hidden={workspace !== "targets"}>

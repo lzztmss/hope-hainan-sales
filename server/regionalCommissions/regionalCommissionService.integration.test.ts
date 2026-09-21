@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { and, eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { DEFAULT_REGIONAL_COMMISSION_RULES } from "../../shared/regionalCommission/types.js";
@@ -18,6 +19,8 @@ import {
   regionalCommissionTemplateVersions,
   regionalCommissionLedger,
   regionalManagerStoreHistory,
+  regionalPersonalChannelOrders,
+  returns as orderReturns,
   stores,
   users,
 } from "../db/schema.js";
@@ -674,6 +677,201 @@ describe("大区经理个人渠道提成", () => {
     expect(summary.statisticsStartsOn).toBe("2026-01-10");
     expect(summary.managedOrderCount).toBe(1);
     expect(summary.orderCount).toBe(1);
+    await client.close();
+  });
+
+  it("有效订单明细列表与汇总计数一致，并标注来源、状态和归属周期", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "hope-regional-valid-orders-"));
+    directories.push(directory);
+    const path = join(directory, "app.sqlite");
+    await migrateDatabase(path);
+    const client = createDatabaseClient(path);
+    await client.db.insert(users).values([
+      { id: "admin", workNo: "ADMIN", displayName: "管理员", passwordHash: "x", role: "admin", personnelType: "admin", mustChangePassword: false },
+      { id: "hr", workNo: "HR", displayName: "人力", passwordHash: "x", role: "hr", personnelType: "admin", mustChangePassword: false },
+      { id: "regional", workNo: "REGIONAL", displayName: "大区经理", passwordHash: "x", role: "regional_manager", personnelType: "admin", employmentStartDate: "2026-01-01", mustChangePassword: false },
+    ]);
+    const storeId = "00000000-0000-4000-8000-000000000801";
+    await client.db.insert(stores).values({ id: storeId, code: "RGVO01", name: "明细核查营业厅" });
+    await client.db.insert(regionalManagerStoreHistory).values({
+      regionalManagerId: "regional",
+      storeId,
+      effectiveFrom: new Date("2026-01-01T00:00:00+08:00"),
+    });
+    const [template] = await client.db.insert(regionalCommissionTemplateVersions).values({
+      templateCode: "VALID-ORDERS",
+      versionNo: 1,
+      name: "明细核查模板",
+      status: "published",
+      effectiveFrom: "2026-01-01",
+      rulesSnapshot: {
+        ...DEFAULT_REGIONAL_COMMISSION_RULES,
+        targetCycle: { ...DEFAULT_REGIONAL_COMMISSION_RULES.targetCycle, startsOn: "2026-01-01" },
+      } as unknown as Record<string, unknown>,
+      createdBy: "admin",
+      publishedBy: "admin",
+      publishedAt: new Date(),
+      changeReason: "测试",
+    }).returning();
+    await client.db.insert(regionalCommissionTemplateAssignments).values({
+      regionalManagerId: "regional",
+      templateVersionId: template!.id,
+      effectiveFrom: "2026-01-01",
+      assignedBy: "admin",
+      reason: "测试",
+    });
+
+    const orderRows = [
+      // 生效日 2026-01-15：M1 内，应计入。
+      { suffix: "A", signedAt: new Date("2026-01-08T12:00:00+08:00"), cancelledAt: null },
+      // 生效日 2026-01-27：M1 内，计入且已有已完成整单退货。
+      { suffix: "B", signedAt: new Date("2026-01-20T12:00:00+08:00"), cancelledAt: null },
+      // 生效日 2025-12-27：统计起点之前，不计入。
+      { suffix: "C", signedAt: new Date("2025-12-20T12:00:00+08:00"), cancelledAt: null },
+      // 签收未满 7 天，不计入。
+      { suffix: "D", signedAt: new Date("2026-02-25T12:00:00+08:00"), cancelledAt: null },
+      // 生效日 2026-01-12，但生效前已取消，不计入。
+      { suffix: "E", signedAt: new Date("2026-01-05T12:00:00+08:00"), cancelledAt: new Date("2026-01-10T00:00:00+08:00") },
+    ];
+    await client.db.insert(customers).values({
+      id: "00000000-0000-4000-8000-000000000909",
+      storeId,
+      ownerUserId: "admin",
+      nameEncrypted: "test",
+      phoneEncrypted: "test",
+      phoneLookupHash: "valid-orders-phone",
+      phoneTail: "0000",
+      elderCount: 1,
+      createdBy: "admin",
+    });
+    await client.db.insert(quotes).values(orderRows.map((row) => ({
+      id: `00000000-0000-4000-8000-00000000090${row.suffix}`,
+      quoteNo: `XLX-VO-${row.suffix}`,
+      idempotencyKey: `quote-vo-${row.suffix}`,
+      customerId: "00000000-0000-4000-8000-000000000909",
+      storeId,
+      sellerId: "admin",
+      status: "converted",
+      paymentMode: "contract_36",
+      fttrKind: "standard",
+      fttrPlan: 159,
+      fttrMonthlyFen: 15900,
+      heartMonthlyFen: 2000,
+      oneTimeFen: 0,
+      monthlyTotalFen: 17900,
+      contract36Fen: 644400,
+      catalogVersion: "test",
+      customerSnapshot: {},
+      quoteSnapshot: {},
+      confirmedAt: new Date("2026-01-02T09:00:00+08:00"),
+    })));
+    const insertedOrders = await client.db.insert(orders).values(orderRows.map((row) => ({
+      id: `00000000-0000-4000-8000-00000000091${row.suffix}`,
+      orderNo: `XLXDD-VO-${row.suffix}`,
+      idempotencyKey: `order-vo-${row.suffix}`,
+      quoteId: `00000000-0000-4000-8000-00000000090${row.suffix}`,
+      customerId: "00000000-0000-4000-8000-000000000909",
+      storeId,
+      sellerId: "admin",
+      status: "accepted",
+      paymentMode: "contract_36",
+      fttrKind: "standard",
+      fttrPlan: 159,
+      fttrMonthlyFen: 15900,
+      heartMonthlyFen: 2000,
+      oneTimeFen: 0,
+      monthlyTotalFen: 17900,
+      contract36Fen: 644400,
+      catalogVersion: "test",
+      catalogSnapshot: {},
+      customerSnapshot: {},
+      quoteSnapshot: {},
+      storeSnapshot: {},
+      sellerSnapshot: {},
+      createdBy: "admin",
+      acceptedAt: new Date("2026-01-02T09:00:00+08:00"),
+      signedAt: row.signedAt,
+      cancelledAt: row.cancelledAt,
+    }))).returning({ id: orders.id, orderNo: orders.orderNo });
+    const orderB = insertedOrders.find((row) => row.orderNo === "XLXDD-VO-B")!;
+    await client.db.insert(orderReturns).values({
+      returnNo: "TH-VO-B",
+      idempotencyKey: "return-vo-b",
+      completionIdempotencyKey: "return-vo-b-complete",
+      orderId: orderB.id,
+      returnType: "full",
+      status: "completed",
+      reason: "测试整单退货",
+      requestedBy: "admin",
+      requestedAt: new Date("2026-01-28T00:00:00+08:00"),
+      decidedBy: "admin",
+      decidedAt: new Date("2026-01-29T00:00:00+08:00"),
+      completedBy: "admin",
+      completedAt: new Date("2026-02-05T00:00:00+08:00"),
+    });
+
+    const service = new RegionalCommissionService(client);
+    const hr: AuthenticatedUser = { id: "hr", displayName: "人力", role: "hr", storeId: null, mustChangePassword: false };
+    await service.createPersonalOrder(hr, {
+      managerId: "regional",
+      orderNo: "VO-PERSONAL-1",
+      channel: "电信",
+      orderCount: 2,
+      businessDate: "2026-01-15",
+      signedOn: "2026-01-13",
+      evidenceNo: "VO-P1",
+      lines: [{ sku: "GATEWAY", label: "迷你网关", quantity: 1 }],
+    });
+    await service.createPersonalOrder(hr, {
+      managerId: "regional",
+      orderNo: "VO-PERSONAL-2",
+      channel: "电信",
+      orderCount: 1,
+      businessDate: "2026-01-20",
+      signedOn: "2026-01-18",
+      evidenceNo: "VO-P2",
+      lines: [{ sku: "GATEWAY", label: "迷你网关", quantity: 1 }],
+    });
+    // 作废时间落在统计月内才会被剔除；这里直接写入 2 月作废的记录。
+    await client.db.update(regionalPersonalChannelOrders).set({
+      status: "voided",
+      voidedBy: "hr",
+      voidedAt: new Date("2026-02-10T00:00:00+08:00"),
+      voidReason: "录入作废",
+    }).where(and(
+      eq(regionalPersonalChannelOrders.regionalManagerId, "regional"),
+      eq(regionalPersonalChannelOrders.orderNo, "VO-PERSONAL-2"),
+    ));
+
+    const summary = await service.summary(hr, "regional", "2026-02");
+    const detail = await service.listValidOrders(hr, "regional", "2026-02");
+    expect(detail.orderCount).toBe(summary.orderCount);
+    expect(detail.managedOrderCount).toBe(summary.managedOrderCount);
+    expect(detail.personalOrderCount).toBe(summary.personalOrderCount);
+    expect(detail.orderCount).toBe(4);
+    expect(detail.items).toHaveLength(3);
+    const byOrderNo = new Map(detail.items.map((item) => [item.orderNo, item]));
+    expect(byOrderNo.get("XLXDD-VO-A")).toMatchObject({
+      source: "store",
+      place: "明细核查营业厅",
+      effectiveOn: "2026-01-15",
+      status: "valid",
+      orderCount: 1,
+      periodSequence: 1,
+    });
+    expect(byOrderNo.get("XLXDD-VO-B")).toMatchObject({ source: "store", status: "returned", periodSequence: 1 });
+    expect(byOrderNo.get("VO-PERSONAL-1")).toMatchObject({
+      source: "personal",
+      place: "电信",
+      effectiveOn: "2026-01-20",
+      status: "valid",
+      orderCount: 2,
+      periodSequence: 1,
+    });
+    expect(byOrderNo.get("XLXDD-VO-E")).toBeUndefined();
+    expect(byOrderNo.get("XLXDD-VO-C")).toBeUndefined();
+    expect(byOrderNo.get("XLXDD-VO-D")).toBeUndefined();
+    expect(byOrderNo.get("VO-PERSONAL-2")).toBeUndefined();
     await client.close();
   });
 });

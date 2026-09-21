@@ -1044,3 +1044,82 @@
     flex-direction: column;
   }
 }
+
+.regional-metric-trigger {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 0.3em;
+}
+
+.regional-metric-trigger:hover,
+.regional-metric-trigger:focus-visible {
+  color: #14568c;
+}
+
+.regional-valid-orders-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  width: min(64rem, 100%);
+  max-height: min(88vh, 50rem);
+  padding: 1.5rem;
+  border: 1px solid #cfdce8;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 1.5rem 4rem rgb(15 35 55 / 0.24);
+}
+
+.regional-valid-orders-dialog__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.regional-valid-orders-dialog__heading h2,
+.regional-valid-orders-dialog__heading p {
+  margin: 0;
+}
+
+.regional-valid-orders-dialog__heading p {
+  margin-top: 0.4rem;
+  color: #5d6875;
+  line-height: 1.6;
+}
+
+.regional-valid-orders-dialog__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.85rem;
+}
+
+.regional-valid-orders-dialog__filters label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.regional-valid-orders-dialog__filters select,
+.regional-valid-orders-dialog__filters input {
+  min-height: 2.2rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid #c3cfda;
+  border-radius: 0.45rem;
+}
+
+.regional-valid-orders-dialog__filters small {
+  color: #5d6875;
+}
+
+.regional-valid-orders-table {
+  overflow: auto;
+  max-height: 26rem;
+}

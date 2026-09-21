@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, exists, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, exists, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql, type SQL } from "drizzle-orm";
 
 import {
   completionReward,
@@ -38,6 +38,7 @@ import {
   regionalPersonalChannelOrderLines,
   regionalPersonalChannelOrders,
   settlementBatches,
+  stores,
   users,
 } from "../db/schema.js";
 
@@ -513,11 +514,9 @@ export class RegionalCommissionService {
     return rulesOn(await this.loadRuleAssignments(managerId), onDate, legacyTargetPlan?.startsOn ?? null);
   }
 
-  async summary(actor: AuthenticatedUser, managerId: string, month = new Date().toISOString().slice(0, 7)) {
-    assertManagerAccess(actor, managerId);
-    if (!MONTH_PATTERN.test(month)) throw new Error("统计截止月份格式不正确");
-    if (month > currentShanghaiMonth()) throw new Error("统计截止月份不能晚于当前月份");
-    const asOf = monthEnd(month);
+  // 提成统计窗口：summary 与「当前版本累计有效订单」明细共用同一套规则解析
+  // 与日期窗口，保证计数和逐单核查列表口径一致。
+  private async loadStatisticsWindow(managerId: string, asOf: Date) {
     const asOfDate = dateOnly(asOf);
     const manager = (await this.client.db.select({ employmentStartDate: users.employmentStartDate, employmentEndDate: users.employmentEndDate }).from(users).where(and(eq(users.id, managerId), eq(users.role, "regional_manager"))))[0];
     if (!manager) throw new Error("大区经理不存在");
@@ -547,6 +546,192 @@ export class RegionalCommissionService {
     const history = await this.client.db.select().from(regionalManagerStoreHistory)
       .where(eq(regionalManagerStoreHistory.regionalManagerId, managerId));
     const storeIds = [...new Set(history.map((row) => row.storeId))];
+    return {
+      manager,
+      formalStartsOn,
+      legacyTargetPlan,
+      ruleAssignments,
+      cycleFallbackStartsOn,
+      resolved,
+      summaryRules,
+      configuredTargetCycle,
+      targetPlan,
+      calculationStartsOn,
+      calculationEndsOn,
+      statisticsEndsOn,
+      history,
+      storeIds,
+    };
+  }
+
+  // 营业厅有效订单的统一过滤条件：汇总聚合与逐单明细共用，等价于
+  // 「签收满 7 天生效、未取消/未作废、生效日落在计算窗口内、生效时点
+  // 营业厅归属该经理、未过离职日」。
+  private managedOrderConditions(input: {
+    managerId: string;
+    calculationStartsOn: string;
+    calculationEndsOn: string | null;
+    employmentEndDate: string | null;
+  }, asOf: Date): Array<SQL<unknown> | undefined> {
+    const effectiveAt = sql<number>`${orders.signedAt} + ${7 * DAY_MS}`;
+    const conditions: Array<SQL<unknown> | undefined> = [
+      isNotNull(orders.signedAt),
+      lte(orders.signedAt, new Date(asOf.getTime() - 7 * DAY_MS)),
+      gte(effectiveAt, Date.parse(`${input.calculationStartsOn}T00:00:00.000Z`)),
+      or(isNull(orders.cancelledAt), gte(orders.cancelledAt, effectiveAt)),
+      or(isNull(orders.deletedAt), gte(orders.deletedAt, effectiveAt)),
+      exists(
+        this.client.db.select({ id: regionalManagerStoreHistory.id })
+          .from(regionalManagerStoreHistory)
+          .where(and(
+            eq(regionalManagerStoreHistory.regionalManagerId, input.managerId),
+            eq(regionalManagerStoreHistory.storeId, orders.storeId),
+            lte(regionalManagerStoreHistory.effectiveFrom, effectiveAt),
+            or(
+              isNull(regionalManagerStoreHistory.effectiveTo),
+              gt(regionalManagerStoreHistory.effectiveTo, effectiveAt),
+            ),
+          )),
+      ),
+    ];
+    if (input.calculationEndsOn) {
+      conditions.push(lt(effectiveAt, Date.parse(`${addDays(input.calculationEndsOn, 1)}T00:00:00.000Z`)));
+    }
+    if (input.employmentEndDate) {
+      conditions.push(lt(effectiveAt, Date.parse(`${addDays(input.employmentEndDate, 1)}T00:00:00.000Z`)));
+    }
+    return conditions;
+  }
+
+  private async loadPersonalOrdersInWindow(
+    managerId: string,
+    manager: { employmentEndDate: string | null },
+    calculationStartsOn: string | null,
+    calculationEndsOn: string | null,
+    asOf: Date,
+  ) {
+    const asOfDate = dateOnly(asOf);
+    const personalRows = await this.client.db.select().from(regionalPersonalChannelOrders).where(and(
+      eq(regionalPersonalChannelOrders.regionalManagerId, managerId),
+      inArray(regionalPersonalChannelOrders.status, ["active", "returned", "voided"]),
+      lte(regionalPersonalChannelOrders.effectiveOn, asOfDate),
+    ));
+    return calculationStartsOn
+      ? personalRows.filter((row) =>
+        row.effectiveOn >= calculationStartsOn
+        && (!calculationEndsOn || row.effectiveOn <= calculationEndsOn)
+        && (!manager.employmentEndDate || row.effectiveOn <= manager.employmentEndDate)
+        && !(row.status === "voided" && row.voidedAt && dateOnly(row.voidedAt) <= asOfDate))
+      : [];
+  }
+
+  // 「当前版本累计有效订单」的逐单核查明细，合计数与 summary().orderCount 一致。
+  async listValidOrders(actor: AuthenticatedUser, managerId: string, month = new Date().toISOString().slice(0, 7)) {
+    assertManagerAccess(actor, managerId);
+    if (!MONTH_PATTERN.test(month)) throw new Error("统计截止月份格式不正确");
+    if (month > currentShanghaiMonth()) throw new Error("统计截止月份不能晚于当前月份");
+    const asOf = monthEnd(month);
+    const asOfDate = dateOnly(asOf);
+    const window = await this.loadStatisticsWindow(managerId, asOf);
+    const { manager, targetPlan, calculationStartsOn, calculationEndsOn } = window;
+    const managedRows = !calculationStartsOn || window.storeIds.length === 0
+      ? []
+      : await this.client.db.select({
+        id: orders.id,
+        orderNo: orders.orderNo,
+        storeId: orders.storeId,
+        signedAt: orders.signedAt,
+      }).from(orders).where(and(...this.managedOrderConditions({
+        managerId,
+        calculationStartsOn,
+        calculationEndsOn,
+        employmentEndDate: manager.employmentEndDate,
+      }, asOf))).orderBy(asc(orders.signedAt), asc(orders.orderNo));
+    const fullReturnIds = new Set((await this.client.db.select({ orderId: orderReturns.orderId })
+      .from(orderReturns)
+      .where(and(
+        eq(orderReturns.returnType, "full"),
+        eq(orderReturns.status, "completed"),
+        lte(orderReturns.completedAt, asOf),
+      ))).map((row) => row.orderId));
+    const storeNames = new Map(window.storeIds.length === 0
+      ? []
+      : (await this.client.db.select({ id: stores.id, name: stores.name })
+        .from(stores)
+        .where(inArray(stores.id, window.storeIds))).map((row) => [row.id, row.name]));
+    const personal = await this.loadPersonalOrdersInWindow(managerId, manager, calculationStartsOn, calculationEndsOn, asOf);
+    const periods = targetPlan?.periods ?? [];
+    const periodOf = (effectiveOn: string) =>
+      periods.find((period) => effectiveOn >= period.startsOn && effectiveOn <= period.endsOn)?.sequence ?? null;
+    const managedOrderCount = managedRows.length;
+    const personalOrderCount = personal.reduce((sum, row) => sum + row.orderCount, 0);
+    const items = [
+      ...managedRows.map((row) => {
+        const effectiveAt = new Date(row.signedAt!.getTime() + 7 * DAY_MS);
+        const effectiveOn = dateOnly(effectiveAt);
+        return {
+          id: row.id,
+          source: "store" as const,
+          orderNo: row.orderNo,
+          place: storeNames.get(row.storeId) ?? "",
+          signedOn: dateOnly(row.signedAt!),
+          effectiveOn,
+          orderCount: 1,
+          status: fullReturnIds.has(row.id) ? ("returned" as const) : ("valid" as const),
+          periodSequence: periodOf(effectiveOn),
+        };
+      }),
+      ...personal.map((row) => ({
+        id: row.id,
+        source: "personal" as const,
+        orderNo: row.orderNo,
+        place: row.channel,
+        signedOn: row.signedOn,
+        effectiveOn: row.effectiveOn,
+        orderCount: row.orderCount,
+        status: row.status === "returned" && row.returnedOn !== null && row.returnedOn <= asOfDate
+          ? ("returned" as const)
+          : ("valid" as const),
+        periodSequence: periodOf(row.effectiveOn),
+      })),
+    ].sort((left, right) => left.effectiveOn.localeCompare(right.effectiveOn)
+      || left.orderNo.localeCompare(right.orderNo));
+    return {
+      month,
+      statisticsStartsOn: calculationStartsOn,
+      statisticsEndsOn: window.statisticsEndsOn,
+      targetPlanStartsOn: targetPlan?.startsOn ?? null,
+      targetPlanEndsOn: targetPlan?.endsOn ?? null,
+      managedOrderCount,
+      personalOrderCount,
+      orderCount: managedOrderCount + personalOrderCount,
+      periods: periods.map((period) => ({ sequence: period.sequence, startsOn: period.startsOn, endsOn: period.endsOn })),
+      items,
+    };
+  }
+
+  async summary(actor: AuthenticatedUser, managerId: string, month = new Date().toISOString().slice(0, 7)) {
+    assertManagerAccess(actor, managerId);
+    if (!MONTH_PATTERN.test(month)) throw new Error("统计截止月份格式不正确");
+    if (month > currentShanghaiMonth()) throw new Error("统计截止月份不能晚于当前月份");
+    const asOf = monthEnd(month);
+    const asOfDate = dateOnly(asOf);
+    const {
+      manager,
+      formalStartsOn,
+      legacyTargetPlan,
+      ruleAssignments,
+      cycleFallbackStartsOn,
+      resolved,
+      summaryRules,
+      configuredTargetCycle,
+      targetPlan,
+      calculationStartsOn,
+      calculationEndsOn,
+      statisticsEndsOn,
+      history,
+      storeIds,
+    } = await this.loadStatisticsWindow(managerId, asOf);
     type ManagedOrder = { id: string; effectiveOn: string; reconciledAt: Date | null };
     const [completedFullReturn] = await this.client.db.select({ id: orderReturns.id })
       .from(orderReturns)
@@ -567,32 +752,12 @@ export class RegionalCommissionService {
       // in JavaScript while preserving the existing calculation semantics.
       const effectiveAt = sql<number>`${orders.signedAt} + ${7 * DAY_MS}`;
       const effectiveOn = sql<string>`date((${effectiveAt}) / 1000, 'unixepoch')`;
-      const conditions = [
-        isNotNull(orders.signedAt),
-        lte(orders.signedAt, new Date(asOf.getTime() - 7 * DAY_MS)),
-        gte(effectiveAt, Date.parse(`${calculationStartsOn}T00:00:00.000Z`)),
-        or(isNull(orders.cancelledAt), gte(orders.cancelledAt, effectiveAt)),
-        or(isNull(orders.deletedAt), gte(orders.deletedAt, effectiveAt)),
-        exists(
-          this.client.db.select({ id: regionalManagerStoreHistory.id })
-            .from(regionalManagerStoreHistory)
-            .where(and(
-              eq(regionalManagerStoreHistory.regionalManagerId, managerId),
-              eq(regionalManagerStoreHistory.storeId, orders.storeId),
-              lte(regionalManagerStoreHistory.effectiveFrom, effectiveAt),
-              or(
-                isNull(regionalManagerStoreHistory.effectiveTo),
-                gt(regionalManagerStoreHistory.effectiveTo, effectiveAt),
-              ),
-            )),
-        ),
-      ];
-      if (calculationEndsOn) {
-        conditions.push(lt(effectiveAt, Date.parse(`${addDays(calculationEndsOn, 1)}T00:00:00.000Z`)));
-      }
-      if (manager.employmentEndDate) {
-        conditions.push(lt(effectiveAt, Date.parse(`${addDays(manager.employmentEndDate, 1)}T00:00:00.000Z`)));
-      }
+      const conditions = this.managedOrderConditions({
+        managerId,
+        calculationStartsOn,
+        calculationEndsOn,
+        employmentEndDate: manager.employmentEndDate,
+      }, asOf);
       const dailyRows = await this.client.db.select({
         effectiveOn,
         orderCount: sql<number>`count(*)`,
@@ -636,18 +801,7 @@ export class RegionalCommissionService {
       ? managedOrdersAsOf.filter((order) =>
         order.effectiveOn >= targetPlan.startsOn && order.effectiveOn <= targetPlan.endsOn)
       : [];
-    const personalRows = await this.client.db.select().from(regionalPersonalChannelOrders).where(and(
-      eq(regionalPersonalChannelOrders.regionalManagerId, managerId),
-      inArray(regionalPersonalChannelOrders.status, ["active", "returned", "voided"]),
-      lte(regionalPersonalChannelOrders.effectiveOn, asOfDate),
-    ));
-    const personal = calculationStartsOn
-      ? personalRows.filter((row) =>
-        row.effectiveOn >= calculationStartsOn
-        && (!calculationEndsOn || row.effectiveOn <= calculationEndsOn)
-        && (!manager.employmentEndDate || row.effectiveOn <= manager.employmentEndDate)
-        && !(row.status === "voided" && row.voidedAt && dateOnly(row.voidedAt) <= asOfDate))
-      : [];
+    const personal = await this.loadPersonalOrdersInWindow(managerId, manager, calculationStartsOn, calculationEndsOn, asOf);
     const planPersonal = targetPlan
       ? personal.filter((row) =>
         row.effectiveOn >= targetPlan.startsOn && row.effectiveOn <= targetPlan.endsOn)
