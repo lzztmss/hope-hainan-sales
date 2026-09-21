@@ -179,7 +179,7 @@ export interface AdminRepository {
     plan: ReturnType<typeof buildPresetHalfYearPlan>;
   }): Promise<void>;
   updateUser(id: string, patch: AdminUserPatch): Promise<AdminUserRecord | null>;
-  replaceRegionalManagerStores(userId: string, storeIds: readonly string[], at: Date): Promise<void>;
+  replaceRegionalManagerStores(userId: string, storeIds: readonly string[], at: Date, initialAffiliationFrom?: Date | null): Promise<void>;
   listActiveAdminsForUpdate(): Promise<readonly string[]>;
   deleteSessionsForUser(userId: string): Promise<void>;
   writeAudit(input: AdminAuditInput): Promise<void>;
@@ -331,6 +331,15 @@ const employmentDatesForRole = (
   }
   return { employmentStartDate, employmentEndDate };
 };
+
+// 提成有效订单从入职日起算，首次绑定营业厅的归属生效日因此取入职日期（上海时区零点），
+// 而不是管理端操作时刻。
+const employmentAffiliationStart = (
+  employmentStartDate: string | null | undefined,
+): Date | null =>
+  employmentStartDate
+    ? new Date(`${employmentStartDate}T00:00:00+08:00`)
+    : null;
 
 const isUniqueViolation = (error: unknown): boolean =>
   typeof error === "object" &&
@@ -709,7 +718,12 @@ export const createAdminService = (options: AdminServiceOptions) => {
               const managedStore = await repository.findStoreForUpdate(managedStoreId);
               if (!managedStore?.active) throw new AdminServiceError("大区经理只能管理启用的营业厅", 400);
             }
-            await repository.replaceRegionalManagerStores(created.id, managedStoreIds, at);
+            await repository.replaceRegionalManagerStores(
+              created.id,
+              managedStoreIds,
+              at,
+              employmentAffiliationStart(employmentDates.employmentStartDate),
+            );
             if (!created.employmentStartDate) {
               throw new AdminServiceError("大区经理必须填写入职日期", 400);
             }
@@ -838,7 +852,12 @@ export const createAdminService = (options: AdminServiceOptions) => {
               const managedStore = await repository.findStoreForUpdate(managedStoreId);
               if (!managedStore?.active) throw new AdminServiceError("大区经理只能管理启用的营业厅", 400);
             }
-            await repository.replaceRegionalManagerStores(userId, managedStoreIds, at);
+            await repository.replaceRegionalManagerStores(
+              userId,
+              managedStoreIds,
+              at,
+              employmentAffiliationStart(employmentDates.employmentStartDate),
+            );
           }
           const completeUpdated = await repository.findUserForUpdate(userId);
           if (!completeUpdated) throw new AdminServiceError("账号更新后读取失败", 500);

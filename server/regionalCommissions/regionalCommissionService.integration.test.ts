@@ -5,13 +5,20 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { DEFAULT_REGIONAL_COMMISSION_RULES } from "../../shared/regionalCommission/types.js";
+import { DrizzleAdminRepository } from "../admin/adminRepository.js";
+import { createAdminService } from "../admin/adminService.js";
 import type { AuthenticatedUser } from "../auth/authorization.js";
 import { createDatabaseClient } from "../db/client.js";
 import { migrateDatabase } from "../db/migrate.js";
 import {
+  customers,
+  orders,
+  quotes,
   regionalCommissionTemplateAssignments,
   regionalCommissionTemplateVersions,
   regionalCommissionLedger,
+  regionalManagerStoreHistory,
+  stores,
   users,
 } from "../db/schema.js";
 import { RegionalCommissionService } from "./regionalCommissionService.js";
@@ -530,6 +537,143 @@ describe("大区经理个人渠道提成", () => {
       effectiveTo: null,
       reason: "纠正为入职日生效",
     });
+    await client.close();
+  });
+
+  it("补建账号回填入职日期时，营业厅订单从入职日起计入有效订单", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "hope-regional-hire-affiliation-"));
+    directories.push(directory);
+    const path = join(directory, "app.sqlite");
+    await migrateDatabase(path);
+    const client = createDatabaseClient(path);
+    await client.db.insert(users).values([
+      { id: "admin", workNo: "ADMIN", displayName: "管理员", passwordHash: "x", role: "admin", personnelType: "admin", mustChangePassword: false },
+      { id: "hr", workNo: "HR", displayName: "人力", passwordHash: "x", role: "hr", personnelType: "admin", mustChangePassword: false },
+    ]);
+    const storeId = "00000000-0000-4000-8000-000000000401";
+    await client.db.insert(stores).values({ id: storeId, code: "RGHIRE01", name: "入职起算营业厅" });
+    // 2026-01-10 入职，2026-01-20 才补建账号并绑定营业厅。
+    const adminService = createAdminService({
+      repository: new DrizzleAdminRepository(client),
+      pii: {
+        encryptPii: (value) => value,
+        decryptPii: (value) => value,
+        phoneLookupHash: (value) => value,
+      },
+      hashPassword: async () => "hashed-for-test",
+      now: () => new Date("2026-01-20T10:00:00+08:00"),
+    });
+    const admin: AuthenticatedUser = { id: "admin", displayName: "管理员", role: "admin", storeId: null, mustChangePassword: false };
+    const manager = await adminService.createUser(admin, {
+      workNo: "REGIONAL-HIRE-BACKFILL",
+      displayName: "回填入职日大区经理",
+      role: "regional_manager",
+      personnelType: "unicom",
+      storeId: null,
+      managedStoreIds: [storeId],
+      employmentStartDate: "2026-01-10",
+      initialPassword: "password-for-test",
+      reason: "补建账号并回填入职日期",
+    });
+
+    const [affiliation] = await client.db.select().from(regionalManagerStoreHistory);
+    expect(affiliation).toMatchObject({
+      storeId,
+      effectiveFrom: new Date("2026-01-10T00:00:00+08:00"),
+      effectiveTo: null,
+    });
+
+    const [template] = await client.db.insert(regionalCommissionTemplateVersions).values({
+      templateCode: "HIRE-BACKFILL",
+      versionNo: 1,
+      name: "入职起算测试模板",
+      status: "published",
+      effectiveFrom: "2026-01-10",
+      rulesSnapshot: DEFAULT_REGIONAL_COMMISSION_RULES as unknown as Record<string, unknown>,
+      createdBy: "admin",
+      publishedBy: "admin",
+      publishedAt: new Date(),
+      changeReason: "测试",
+    }).returning();
+    await client.db.insert(regionalCommissionTemplateAssignments).values({
+      regionalManagerId: manager.id,
+      templateVersionId: template!.id,
+      effectiveFrom: "2026-01-10",
+      assignedBy: "admin",
+      reason: "测试",
+    });
+
+    const customerId = "00000000-0000-4000-8000-000000000402";
+    await client.db.insert(customers).values({
+      id: customerId,
+      storeId,
+      ownerUserId: "admin",
+      nameEncrypted: "test",
+      phoneEncrypted: "test",
+      phoneLookupHash: "hire-backfill-phone",
+      phoneTail: "0000",
+      elderCount: 1,
+      createdBy: "admin",
+    });
+    const orderRows = [
+      // 生效日（签收满 7 天）2026-01-15：入职之后、建号之前，应计入。
+      { orderNo: "HIRE-AFTER-001", idempotencyKey: "hire-after-001", quoteId: "quote-after-001", signedAt: new Date("2026-01-08T12:00:00+08:00") },
+      // 生效日 2026-01-09：入职之前，不计入。
+      { orderNo: "HIRE-BEFORE-001", idempotencyKey: "hire-before-001", quoteId: "quote-before-001", signedAt: new Date("2026-01-02T12:00:00+08:00") },
+    ];
+    await client.db.insert(quotes).values(orderRows.map((row) => ({
+      id: row.quoteId,
+      quoteNo: `XLX-${row.orderNo}`,
+      idempotencyKey: `quote-${row.idempotencyKey}`,
+      customerId,
+      storeId,
+      sellerId: "admin",
+      status: "converted",
+      paymentMode: "contract_36",
+      fttrKind: "standard",
+      fttrPlan: 159,
+      fttrMonthlyFen: 15900,
+      heartMonthlyFen: 2000,
+      oneTimeFen: 0,
+      monthlyTotalFen: 17900,
+      contract36Fen: 644400,
+      catalogVersion: "test",
+      customerSnapshot: {},
+      quoteSnapshot: {},
+      confirmedAt: new Date("2026-01-02T09:00:00+08:00"),
+    })));
+    await client.db.insert(orders).values(orderRows.map((row) => ({
+      orderNo: row.orderNo,
+      idempotencyKey: row.idempotencyKey,
+      quoteId: row.quoteId,
+      customerId,
+      storeId,
+      sellerId: "admin",
+      status: "accepted",
+      paymentMode: "contract_36",
+      fttrKind: "standard",
+      fttrPlan: 159,
+      fttrMonthlyFen: 15900,
+      heartMonthlyFen: 2000,
+      oneTimeFen: 0,
+      monthlyTotalFen: 17900,
+      contract36Fen: 644400,
+      catalogVersion: "test",
+      catalogSnapshot: {},
+      customerSnapshot: {},
+      quoteSnapshot: {},
+      storeSnapshot: {},
+      sellerSnapshot: {},
+      createdBy: "admin",
+      acceptedAt: new Date("2026-01-02T09:00:00+08:00"),
+      signedAt: row.signedAt,
+    })));
+
+    const hr: AuthenticatedUser = { id: "hr", displayName: "人力", role: "hr", storeId: null, mustChangePassword: false };
+    const summary = await new RegionalCommissionService(client).summary(hr, manager.id, "2026-01");
+    expect(summary.statisticsStartsOn).toBe("2026-01-10");
+    expect(summary.managedOrderCount).toBe(1);
+    expect(summary.orderCount).toBe(1);
     await client.close();
   });
 });

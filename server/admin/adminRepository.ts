@@ -8,6 +8,7 @@ import {
   eq,
   inArray,
   isNull,
+  ne,
   type SQL,
 } from "drizzle-orm";
 
@@ -345,6 +346,7 @@ export class DrizzleAdminRepository implements AdminRepository {
     userId: string,
     storeIds: readonly string[],
     at: Date,
+    initialAffiliationFrom?: Date | null,
   ): Promise<void> {
     const currentRows = await this.executor
       .select({ storeId: regionalManagerStores.storeId })
@@ -378,10 +380,62 @@ export class DrizzleAdminRepository implements AdminRepository {
       );
     }
     if (added.length > 0) {
+      const affiliationFrom = await this.resolveAffiliationFrom(
+        userId,
+        added,
+        at,
+        current.size === 0,
+        initialAffiliationFrom ?? null,
+      );
       await this.executor.insert(regionalManagerStoreHistory).values(
-        added.map((storeId) => ({ regionalManagerId: userId, storeId, effectiveFrom: at, createdAt: at })),
+        added.map((storeId) => ({
+          regionalManagerId: userId,
+          storeId,
+          effectiveFrom: affiliationFrom.get(storeId) ?? at,
+          createdAt: at,
+        })),
       );
     }
+  }
+
+  // 首次绑定营业厅时，归属生效日取入职日期而不是操作时刻，保证提成有效订单从入职日起算；
+  // 中途增减营业厅仍按操作时刻归属（设计口径 21）。新起点不早于该营业厅上一段归属的结束日，
+  // 避免与前任经理的区间重叠导致同一订单被双方同时计入。
+  private async resolveAffiliationFrom(
+    userId: string,
+    storeIds: readonly string[],
+    at: Date,
+    hadNoStores: boolean,
+    initialAffiliationFrom: Date | null,
+  ): Promise<Map<string, Date>> {
+    if (!initialAffiliationFrom || !hadNoStores) return new Map();
+    const existingHistory = await this.executor
+      .select({ id: regionalManagerStoreHistory.id })
+      .from(regionalManagerStoreHistory)
+      .where(eq(regionalManagerStoreHistory.regionalManagerId, userId))
+      .limit(1);
+    if (existingHistory.length > 0) return new Map();
+    const priorRows = await this.executor
+      .select({
+        storeId: regionalManagerStoreHistory.storeId,
+        effectiveFrom: regionalManagerStoreHistory.effectiveFrom,
+        effectiveTo: regionalManagerStoreHistory.effectiveTo,
+      })
+      .from(regionalManagerStoreHistory)
+      .where(and(
+        ne(regionalManagerStoreHistory.regionalManagerId, userId),
+        inArray(regionalManagerStoreHistory.storeId, [...storeIds]),
+      ));
+    const priorEndByStore = new Map<string, Date>();
+    for (const row of priorRows) {
+      const boundary = row.effectiveTo ?? row.effectiveFrom;
+      const known = priorEndByStore.get(row.storeId);
+      if (!known || boundary > known) priorEndByStore.set(row.storeId, boundary);
+    }
+    return new Map(storeIds.map((storeId) => {
+      const priorEnd = priorEndByStore.get(storeId);
+      return [storeId, priorEnd && priorEnd > initialAffiliationFrom ? priorEnd : initialAffiliationFrom];
+    }));
   }
 
   async listActiveAdminsForUpdate(): Promise<readonly string[]> {
