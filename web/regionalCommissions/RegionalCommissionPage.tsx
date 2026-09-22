@@ -318,7 +318,7 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
       <section className="regional-section" hidden={workspace !== "targets"}>
         <div className="regional-section-heading">
           <div><h2>目标计划周期</h2><p>周期目标和 M1 开始日期来自当前模板版本；订单仍使用原始业务日期实时统计，不会复制到版本中。</p></div>
-          <span>营业厅 {summary.managedOrderCount} 笔 · 个人渠道 {summary.personalOrderCount} 笔</span>
+          <span>营业厅 {summary.managedOrderCount} 笔 · 个人渠道 {summary.personalOrderCount} 笔{summary.returnedOrderCount > 0 ? ` · 整单退回 −${summary.returnedOrderCount} 笔` : ""}</span>
         </div>
         {summary.targetPlanStartsOn && summary.targetPlanEndsOn ? <p className="regional-inline-help">
           累计查询范围：{summary.statisticsStartsOn ?? summary.targetPlanStartsOn} 至 {summary.statisticsEndsOn}；
@@ -421,11 +421,15 @@ export const RegionalCommissionPage = ({ client, actor }: { client: ApiClient; a
           <ul className="regional-settlement-rules">
             <li>营业厅订单在签收满 7 天后计为有效订单；模板计算范围内累计 {summary.managedOrderCount} 笔。</li>
             <li>个人渠道订单按其生效日和匹配模板计入；模板计算范围内共 {summary.personalOrderCount} 笔。</li>
+            <li>整单退货按退货完成日所在周期扣减有效订单计数，本期、累计和各解锁门槛均按净数计算（可为负）；分段订单奖按净数重排阶梯，退货订单后面的订单整体前移、档位差价一并扣回。已确认或已发放的历史结算金额保持锁定，退货差额在下一个未结算月结转，当月净额为负时本月发放 0 并顺延抵扣，已发放的里程碑奖、补足奖和合作奖不追回。</li>
             <li>回款奖累计纳入模板范围内各月已核验净回款；合作奖只使用已确认记录，退单按规则扣回。</li>
             <li>“待结算”是累计已产生减去累计已确认/已发放；锁定后补录的历史业务差额自动结转到下个未结算月。</li>
           </ul>
         </div>
         {settlementCoveredReason ? <div className="system-notice">{settlementCoveredReason}</div> : null}
+        {summary.deferredNegativeFen < 0 ? <div className="system-notice" role="status">
+          本月结算净额为负（{yuan(summary.deferredNegativeFen)}），本月按 ¥0.00 生成，负差额顺延到下一个未结算月参与抵扣。
+        </div> : null}
         <div className="regional-table-wrap regional-settlement-breakdown"><table><thead><tr><th>提成组成</th><th>累计已产生</th><th>累计已确认/发放</th><th>{currentStatement && currentStatement.status !== "draft" ? "结转待结算" : "本期待结算"}</th></tr></thead><tbody>
           {summary.settlementEntries.map((entry) => <tr key={entry.category}>
             <td>{settlementCategoryLabel[entry.category] ?? entry.category}</td>

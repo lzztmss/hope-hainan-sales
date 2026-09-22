@@ -649,13 +649,17 @@ export class RegionalCommissionService {
         calculationEndsOn,
         employmentEndDate: manager.employmentEndDate,
       }, asOf))).orderBy(asc(orders.signedAt), asc(orders.orderNo));
-    const fullReturnIds = new Set((await this.client.db.select({ orderId: orderReturns.orderId })
+    const fullReturnRows = await this.client.db.select({ orderId: orderReturns.orderId, completedAt: orderReturns.completedAt })
       .from(orderReturns)
       .where(and(
         eq(orderReturns.returnType, "full"),
         eq(orderReturns.status, "completed"),
         lte(orderReturns.completedAt, asOf),
-      ))).map((row) => row.orderId));
+      ));
+    const returnCompletedByOrder = new Map<string, string>();
+    for (const row of fullReturnRows) {
+      if (row.completedAt) returnCompletedByOrder.set(row.orderId, dateOnly(row.completedAt));
+    }
     const storeNames = new Map(window.storeIds.length === 0
       ? []
       : (await this.client.db.select({ id: stores.id, name: stores.name })
@@ -679,7 +683,7 @@ export class RegionalCommissionService {
           signedOn: dateOnly(row.signedAt!),
           effectiveOn,
           orderCount: 1,
-          status: fullReturnIds.has(row.id) ? ("returned" as const) : ("valid" as const),
+          status: returnCompletedByOrder.has(row.id) ? ("returned" as const) : ("valid" as const),
           periodSequence: periodOf(effectiveOn),
         };
       }),
@@ -696,8 +700,41 @@ export class RegionalCommissionService {
           : ("valid" as const),
         periodSequence: periodOf(row.effectiveOn),
       })),
+      // 整单退货的扣减行：落在退货完成日所在周期，使各期与合计都收敛到净数。
+      ...managedRows.flatMap((row) => {
+        const completedOn = returnCompletedByOrder.get(row.id);
+        return completedOn ? [{
+          id: `return:${row.id}`,
+          source: "return" as const,
+          orderNo: row.orderNo,
+          place: storeNames.get(row.storeId) ?? "",
+          signedOn: null,
+          effectiveOn: completedOn,
+          orderCount: -1,
+          status: "returned" as const,
+          periodSequence: periodOf(completedOn),
+        }] : [];
+      }),
+      ...personal.flatMap((row) => {
+        if (!(row.status === "returned" && row.returnedOn !== null && row.returnedOn <= asOfDate)) return [];
+        return [{
+          id: `return:${row.id}`,
+          source: "return" as const,
+          orderNo: row.orderNo,
+          place: row.channel,
+          signedOn: null,
+          effectiveOn: row.returnedOn,
+          orderCount: -row.orderCount,
+          status: "returned" as const,
+          periodSequence: periodOf(row.returnedOn),
+        }];
+      }),
     ].sort((left, right) => left.effectiveOn.localeCompare(right.effectiveOn)
-      || left.orderNo.localeCompare(right.orderNo));
+      || left.orderNo.localeCompare(right.orderNo)
+      || left.id.localeCompare(right.id));
+    const returnedOrderCount = items
+      .filter((item) => item.source === "return")
+      .reduce((sum, item) => sum + -item.orderCount, 0);
     return {
       month,
       statisticsStartsOn: calculationStartsOn,
@@ -706,7 +743,8 @@ export class RegionalCommissionService {
       targetPlanEndsOn: targetPlan?.endsOn ?? null,
       managedOrderCount,
       personalOrderCount,
-      orderCount: managedOrderCount + personalOrderCount,
+      returnedOrderCount,
+      orderCount: managedOrderCount + personalOrderCount - returnedOrderCount,
       periods: periods.map((period) => ({ sequence: period.sequence, startsOn: period.startsOn, endsOn: period.endsOn })),
       items,
     };
@@ -808,14 +846,32 @@ export class RegionalCommissionService {
       ? personal.filter((row) =>
         row.effectiveOn >= targetPlan.startsOn && row.effectiveOn <= targetPlan.endsOn)
       : [];
+    const cumulativeManagedIds = new Set(managedOrdersAsOf.map((order) => order.id));
+    // 不构造 50,000 个 SQL 占位符；先按退单状态读取，再以内存集合限定经理订单。
+    const fullReturns = completedFullReturn && managedOrdersAsOf.length ? (await this.client.db.select({ orderId: orderReturns.orderId, completedAt: orderReturns.completedAt })
+      .from(orderReturns).where(and(eq(orderReturns.returnType, "full"), eq(orderReturns.status, "completed"), lte(orderReturns.completedAt, asOf))))
+      .filter((row) => cumulativeManagedIds.has(row.orderId)) : [];
+    // 整单退货按退货完成日扣减有效订单计数：本期、累计和各解锁门槛均用净数，允许为负。
+    // 原周期已形成的计数与完成率不回改；金额上只扣回该单的分段订单奖，
+    // 已发放的里程碑奖、补足奖和合作奖不追回。
+    const returnEvents = [
+      ...fullReturns.flatMap((row) => row.completedAt ? [{ completedOn: dateOnly(row.completedAt), orderCount: 1 }] : []),
+      ...personal.flatMap((row) => row.status === "returned" && row.returnedOn && row.returnedOn <= asOfDate
+        ? [{ completedOn: row.returnedOn, orderCount: row.orderCount }]
+        : []),
+    ];
+    const returnedOrderCount = returnEvents.reduce((sum, event) => sum + event.orderCount, 0);
+    const returnedCountBetween = (startsOn: string, endsOn: string) => returnEvents
+      .filter((event) => event.completedOn >= startsOn && event.completedOn <= endsOn)
+      .reduce((sum, event) => sum + event.orderCount, 0);
     // 原始订单永久保留；当前统计壳从当前模板的 M1/目标周期起点重新累计。
-    const orderCount = managedOrdersAsOf.length + personal.reduce((sum, row) => sum + row.orderCount, 0);
+    const orderCount = managedOrdersAsOf.length + personal.reduce((sum, row) => sum + row.orderCount, 0) - returnedOrderCount;
     const periods = targetPlan?.periods ?? [];
     let cumulativeOrderCount = 0;
     const periodStats = periods.map((period) => {
       const managedCount = planManagedOrders.filter((order) => order.effectiveOn >= period.startsOn && order.effectiveOn <= period.endsOn).length;
       const personalCount = planPersonal.filter((order) => order.effectiveOn >= period.startsOn && order.effectiveOn <= period.endsOn).reduce((sum, order) => sum + order.orderCount, 0);
-      const currentCount = managedCount + personalCount;
+      const currentCount = managedCount + personalCount - returnedCountBetween(period.startsOn, period.endsOn);
       cumulativeOrderCount += currentCount;
       const periodRules = rulesOn(ruleAssignments, period.endsOn, cycleFallbackStartsOn);
       return {
@@ -868,14 +924,13 @@ export class RegionalCommissionService {
         .reduce((count, order) => count + order.orderCount, 0);
       const periodRules = rulesOn(ruleAssignments, period.endsOn, cycleFallbackStartsOn);
       return periodRules.templateVersionId
-        ? sum + completionReward(managedCount + personalCount, period.targetOrderCount, periodRules.rules)
+        ? sum + completionReward(
+          managedCount + personalCount - returnedCountBetween(period.startsOn, period.endsOn),
+          period.targetOrderCount,
+          periodRules.rules,
+        )
         : sum;
     }, 0);
-    const cumulativeManagedIds = new Set(managedOrdersAsOf.map((order) => order.id));
-    // 不构造 50,000 个 SQL 占位符；先按退单状态读取，再以内存集合限定经理订单。
-    const fullReturns = completedFullReturn && managedOrdersAsOf.length ? (await this.client.db.select({ orderId: orderReturns.orderId, completedAt: orderReturns.completedAt })
-      .from(orderReturns).where(and(eq(orderReturns.returnType, "full"), eq(orderReturns.status, "completed"), lte(orderReturns.completedAt, asOf))))
-      .filter((row) => cumulativeManagedIds.has(row.orderId)) : [];
     const systemReturnIds = new Set(fullReturns.map((row) => row.orderId));
     const units = [
       ...managedOrdersAsOf.map((order) => ({ effectiveOn: order.effectiveOn, key: order.id, returned: systemReturnIds.has(order.id) })),
@@ -902,7 +957,8 @@ export class RegionalCommissionService {
       }
     }
     let tieredOrderFen = 0;
-    let directReturnFen = 0;
+    let netTieredOrderFen = 0;
+    let netOrderPosition = 0;
     let milestoneFen = 0;
     const milestoneEvents: Array<{
       category: "milestone";
@@ -920,12 +976,12 @@ export class RegionalCommissionService {
       const endIndex = group.startIndex + group.units.length;
       tieredOrderFen += tieredOrderReward(endIndex, eventRules.rules)
         - tieredOrderReward(group.startIndex, eventRules.rules);
-      group.units.forEach((unit, offset) => {
-        if (!unit.returned) return;
-        const index = group.startIndex + offset;
-        directReturnFen += tieredOrderReward(index + 1, eventRules.rules)
-          - tieredOrderReward(index, eventRules.rules);
-      });
+      // 分段订单奖按净数重排：只有未退订单占据阶梯位，退货后面的订单
+      // 整体前移，档位差价一并扣回。
+      const validCount = group.units.filter((unit) => !unit.returned).length;
+      netTieredOrderFen += tieredOrderReward(netOrderPosition + validCount, eventRules.rules)
+        - tieredOrderReward(netOrderPosition, eventRules.rules);
+      netOrderPosition += validCount;
 
       const milestoneBoundaries = new Set<number>([group.startIndex + 1]);
       for (const milestone of eventRules.rules.milestones) {
@@ -949,8 +1005,12 @@ export class RegionalCommissionService {
         milestoneFen = nextCumulativeFen;
       }
     }
+    // 退货扣回 = 毛阶梯 − 净阶梯：包含退货订单自身的边际奖和重排后
+    // 其他订单回落的档位差价（B 口径）。
+    const directReturnFen = tieredOrderFen - netTieredOrderFen;
     const verifiedOrderCount = managedOrdersAsOf.filter((order) => Boolean(order.reconciledAt && order.reconciledAt <= asOf)).length
-      + personal.reduce((sum, row) => sum + row.orderCount, 0);
+      + personal.reduce((sum, row) => sum + row.orderCount, 0)
+      - returnedOrderCount;
     const topUpThreshold = summaryRules.rules.topUp.orderCount;
     const topUpThresholdUnit = units[topUpThreshold - 1];
     const topUpEventRules = topUpThresholdUnit
@@ -986,7 +1046,10 @@ export class RegionalCommissionService {
         const ruleDate = earliestDate(receiptMonthEndsOn, calculationEndsOn) ?? receiptMonthEndsOn;
         const eventRules = rulesOn(ruleAssignments, ruleDate, cycleFallbackStartsOn);
         if (!eventRules.templateVersionId) return [];
-        const effectiveOrderCount = units.filter((unit) => unit.effectiveOn <= ruleDate).length;
+        const effectiveOrderCount = units.filter((unit) => unit.effectiveOn <= ruleDate).length
+          - returnEvents
+            .filter((event) => event.completedOn <= ruleDate)
+            .reduce((sum, event) => sum + event.orderCount, 0);
         return [{
           month: row.month,
           amountFen: revenueAccelerationReward(
@@ -1093,13 +1156,24 @@ export class RegionalCommissionService {
       (sum, entry) => sum + entry.payableFen,
       0,
     );
+    // 当月结算净额为负（通常由已结算订单的整单退货扣回引起）时不发放，
+    // 本月按 0 元生成；负差额通过「累计已产生 − 已确认/发放」自动顺延
+    // 到下一个未结算月参与抵扣。
+    const deferredNegativeFen = !settlementCoveredBy && rawSettlementPreviewFen < 0
+      ? rawSettlementPreviewFen
+      : 0;
+    if (deferredNegativeFen < 0) {
+      settlementEntries.forEach((entry) => {
+        entry.payableFen = 0;
+      });
+    }
     if (settlementCoveredBy) {
       settlementEntries.forEach((entry) => {
         entry.previouslySettledFen = entry.accruedFen;
         entry.payableFen = 0;
       });
     }
-    const settlementPreviewFen = settlementCoveredBy ? 0 : rawSettlementPreviewFen;
+    const settlementPreviewFen = settlementCoveredBy ? 0 : Math.max(0, rawSettlementPreviewFen);
     const cooperationWithConditions: Array<(typeof cooperation)[number] & { condition: { label: string; satisfied: boolean } }> = await Promise.all(cooperation.map(async (row) => ({
       ...row,
       condition: await this.cooperationPrerequisites(managerId, row.stageCode, row.achievedOn, orderCount),
@@ -1121,11 +1195,12 @@ export class RegionalCommissionService {
       statisticsEndsOn,
       employmentStartDate: manager.employmentStartDate,
       employmentEndDate: manager.employmentEndDate,
-      orderCount, managedOrderCount: managedOrdersAsOf.length, personalOrderCount: personal.reduce((sum, row) => sum + row.orderCount, 0),
+      orderCount, managedOrderCount: managedOrdersAsOf.length, personalOrderCount: personal.reduce((sum, row) => sum + row.orderCount, 0), returnedOrderCount,
       completionFen, tieredOrderFen, milestoneFen, topUpFen, revenueAccelerationFen, currentMonthRevenueAccelerationFen, personalProductFen: productFen,
       cooperationFen, directReturnFen,
       totalFen: completionFen + tieredOrderFen + milestoneFen + topUpFen + revenueAccelerationFen + productFen + cooperationFen - directReturnFen,
       settlementPreviewFen,
+      deferredNegativeFen,
       settlementCoveredBy: settlementCoveredBy ? {
         id: settlementCoveredBy.id,
         settlementMonth: settlementCoveredBy.settlementMonth,

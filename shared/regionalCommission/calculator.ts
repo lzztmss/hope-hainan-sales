@@ -5,10 +5,12 @@ export const completionReward = (
   targetCount: number,
   rules: RegionalCommissionRules,
 ): number => {
-  if (targetCount <= 0 || orderCount < 0) throw new Error("订单数和目标值不合法");
+  if (targetCount <= 0) throw new Error("目标值不合法");
+  // 整单退货按退货完成日扣减计数后，本期净订单数允许为负，按未达最低完成率处理。
+  const effectiveOrderCount = Math.max(0, orderCount);
   return [...rules.completionRewards]
     .sort((left, right) => right.thresholdBasisPoints - left.thresholdBasisPoints)
-    .find((tier) => orderCount * 10_000 >= targetCount * tier.thresholdBasisPoints)
+    .find((tier) => effectiveOrderCount * 10_000 >= targetCount * tier.thresholdBasisPoints)
     ?.amountFen ?? 0;
 };
 

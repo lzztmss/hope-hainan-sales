@@ -27,6 +27,7 @@ const summary: RegionalCommissionSummary = {
   orderCount: 0,
   managedOrderCount: 0,
   personalOrderCount: 0,
+  returnedOrderCount: 0,
   completionFen: 0,
   tieredOrderFen: 0,
   milestoneFen: 0,
@@ -38,6 +39,7 @@ const summary: RegionalCommissionSummary = {
   directReturnFen: 0,
   totalFen: 0,
   settlementPreviewFen: 0,
+  deferredNegativeFen: 0,
   settlementEntries: [
     { category: "tiered_order", accruedFen: 0, previouslySettledFen: 0, payableFen: 0 },
     { category: "revenue_acceleration", accruedFen: 0, previouslySettledFen: 0, payableFen: 0 },

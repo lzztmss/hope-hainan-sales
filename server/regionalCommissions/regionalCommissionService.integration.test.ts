@@ -77,7 +77,9 @@ describe("大区经理个人渠道提成", () => {
     const refreshed = await service.listPersonalOrders(hr, "regional");
     await service.returnPersonalOrder(hr, created.id, { completedOn: "2026-02-03", reason: "全部退回", lines: refreshed[0]!.lines.map((line) => ({ lineId: line.id, returnedQuantity: line.quantity })) });
     const returned = await service.summary(hr, "regional", "2026-02");
-    expect(returned.orderCount).toBe(1);
+    expect(returned.orderCount).toBe(0);
+    expect(returned.returnedOrderCount).toBe(1);
+    expect(returned.periods[1]).toMatchObject({ sequence: 2, orderCount: -1, cumulativeOrderCount: 0 });
     expect(returned.personalProductFen).toBe(0);
     expect(returned.directReturnFen).toBe(100);
 
@@ -116,9 +118,36 @@ describe("大区经理个人渠道提成", () => {
     expect(februaryPreview.settlementEntries.find((entry) => entry.category === "personal_product")).toMatchObject({
       accruedFen: 0,
       previouslySettledFen: 1_500,
-      payableFen: -1_500,
+      payableFen: 0,
     });
-    expect(februaryPreview.settlementEntries.find((entry) => entry.category === "tiered_return")?.payableFen).toBe(-100);
+    expect(februaryPreview.settlementEntries.find((entry) => entry.category === "tiered_return")).toMatchObject({
+      accruedFen: -100,
+      payableFen: 0,
+    });
+    // 二月净额为负（-1,600）：本月不发放，差额顺延到下一个月结算。
+    expect(februaryPreview.deferredNegativeFen).toBe(-1_600);
+    expect(februaryPreview.settlementPreviewFen).toBe(0);
+    const februaryStatement = await service.calculateStatement(hr, "regional", "2026-02");
+    expect(februaryStatement.totalFen).toBe(0);
+    // 三月新增足量有效订单后，新增金额先抵扣上月顺延的负差额，剩余部分正常发放。
+    await service.createPersonalOrder(hr, { managerId: "regional", orderNo: "P-002", channel: "电信", orderCount: 25, businessDate: "2026-03-01", signedOn: "2026-03-01", evidenceNo: "E-002", lines: [{ sku: "GATEWAY", label: "迷你网关", quantity: 1 }] });
+    const marchPreview = await service.summary(hr, "regional", "2026-03");
+    expect(marchPreview.settlementEntries.find((entry) => entry.category === "personal_product")).toMatchObject({
+      accruedFen: 600,
+      previouslySettledFen: 1_500,
+      payableFen: -900,
+    });
+    expect(marchPreview.settlementEntries.find((entry) => entry.category === "tiered_order")).toMatchObject({
+      accruedFen: 2_600,
+      previouslySettledFen: 100,
+      payableFen: 2_500,
+    });
+    expect(marchPreview.settlementEntries.find((entry) => entry.category === "tiered_return")).toMatchObject({
+      accruedFen: -100,
+      payableFen: -100,
+    });
+    expect(marchPreview.deferredNegativeFen).toBe(0);
+    expect(marchPreview.settlementPreviewFen).toBe(1_500);
     await client.close();
   });
 
@@ -446,6 +475,63 @@ describe("大区经理个人渠道提成", () => {
     expect(june.settlementEntries.every((entry) => entry.payableFen === 0)).toBe(true);
     await expect(service.calculateStatement(hr, "regional", "2026-06"))
       .rejects.toThrow("2026-06 已包含在 2026-08 已发放的累计结算中");
+    await client.close();
+  });
+
+  it("整单退货按净数重排分段订单奖阶梯，档位差价一并扣回", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "hope-regional-tier-rerank-"));
+    directories.push(directory);
+    const path = join(directory, "app.sqlite");
+    await migrateDatabase(path);
+    const client = createDatabaseClient(path);
+    await client.db.insert(users).values([
+      { id: "admin", workNo: "ADMIN", displayName: "管理员", passwordHash: "x", role: "admin", personnelType: "admin", mustChangePassword: false },
+      { id: "hr", workNo: "HR", displayName: "人力", passwordHash: "x", role: "hr", personnelType: "admin", mustChangePassword: false },
+      { id: "regional", workNo: "REGIONAL", displayName: "大区经理", passwordHash: "x", role: "regional_manager", personnelType: "admin", employmentStartDate: "2026-02-01", mustChangePassword: false },
+    ]);
+    const rules = {
+      ...DEFAULT_REGIONAL_COMMISSION_RULES,
+      targetCycle: { startsOn: "2026-02-01", planType: "half_year" as const, periodTargets: [1_000, 4_000, 8_000, 10_000, 13_000, 14_000] },
+      orderTiers: [
+        { upToOrders: 2, amountFenPerOrder: 100 },
+        { upToOrders: 1_000, amountFenPerOrder: 900 },
+      ],
+    };
+    const [template] = await client.db.insert(regionalCommissionTemplateVersions).values({
+      templateCode: "TIER-RERANK",
+      versionNo: 1,
+      name: "阶梯重排测试模板",
+      status: "published",
+      effectiveFrom: "2026-02-01",
+      rulesSnapshot: rules as unknown as Record<string, unknown>,
+      createdBy: "admin",
+      publishedBy: "admin",
+      publishedAt: new Date(),
+      changeReason: "测试",
+    }).returning();
+    await client.db.insert(regionalCommissionTemplateAssignments).values({
+      regionalManagerId: "regional",
+      templateVersionId: template!.id,
+      effectiveFrom: "2026-02-01",
+      assignedBy: "admin",
+      reason: "测试",
+    });
+    const service = new RegionalCommissionService(client);
+    const hr: AuthenticatedUser = { id: "hr", displayName: "人力", role: "hr", storeId: null, mustChangePassword: false };
+
+    // 早单 3 笔（第 1~3 位，跨过 2 笔的档位边界），晚单 2 笔（第 4~5 位）。
+    const early = await service.createPersonalOrder(hr, { managerId: "regional", orderNo: "EARLY", channel: "电信", orderCount: 3, businessDate: "2026-02-01", signedOn: "2026-02-01", evidenceNo: "E-EARLY", lines: [{ sku: "GATEWAY", label: "迷你网关", quantity: 1 }] });
+    await service.createPersonalOrder(hr, { managerId: "regional", orderNo: "LATE", channel: "电信", orderCount: 2, businessDate: "2026-02-10", signedOn: "2026-02-10", evidenceNo: "E-LATE", lines: [{ sku: "GATEWAY", label: "迷你网关", quantity: 1 }] });
+    const earlyLines = (await service.listPersonalOrders(hr, "regional")).find((row) => row.orderNo === "EARLY")!.lines;
+    await service.returnPersonalOrder(hr, early.id, { completedOn: "2026-02-20", reason: "早单整单退回", lines: earlyLines.map((line) => ({ lineId: line.id, returnedQuantity: line.quantity })) });
+
+    const summary = await service.summary(hr, "regional", "2026-02");
+    // 毛阶梯：2×100 + 3×900 = 2,900；净阶梯：晚单 2 笔回落到第一档 = 200；
+    // 扣回 2,700 = 早单自身边际（100+100+900）+ 晚单两笔的档位差价（2×800）。
+    expect(summary.tieredOrderFen).toBe(2_900);
+    expect(summary.directReturnFen).toBe(2_700);
+    expect(summary.totalFen).toBe(200 + 600);
+    expect(summary.orderCount).toBe(2);
     await client.close();
   });
 
@@ -863,10 +949,13 @@ describe("大区经理个人渠道提成", () => {
     expect(detail.orderCount).toBe(summary.orderCount);
     expect(detail.managedOrderCount).toBe(summary.managedOrderCount);
     expect(detail.personalOrderCount).toBe(summary.personalOrderCount);
-    expect(detail.orderCount).toBe(4);
-    expect(detail.items).toHaveLength(3);
-    const byOrderNo = new Map(detail.items.map((item) => [item.orderNo, item]));
-    expect(byOrderNo.get("XLXDD-VO-A")).toMatchObject({
+    expect(summary.returnedOrderCount).toBe(1);
+    expect(detail.returnedOrderCount).toBe(1);
+    expect(detail.orderCount).toBe(3);
+    expect(detail.items).toHaveLength(4);
+    expect(summary.periods[1]).toMatchObject({ sequence: 2, orderCount: -1, cumulativeOrderCount: 3 });
+    const byOrderNo = new Map(detail.items.map((item) => [`${item.source}:${item.orderNo}`, item]));
+    expect(byOrderNo.get("store:XLXDD-VO-A")).toMatchObject({
       source: "store",
       place: "明细核查营业厅",
       effectiveOn: "2026-01-15",
@@ -874,8 +963,14 @@ describe("大区经理个人渠道提成", () => {
       orderCount: 1,
       periodSequence: 1,
     });
-    expect(byOrderNo.get("XLXDD-VO-B")).toMatchObject({ source: "store", status: "returned", periodSequence: 1 });
-    expect(byOrderNo.get("VO-PERSONAL-1")).toMatchObject({
+    expect(byOrderNo.get("store:XLXDD-VO-B")).toMatchObject({ source: "store", status: "returned", periodSequence: 1, orderCount: 1 });
+    expect(byOrderNo.get("return:XLXDD-VO-B")).toMatchObject({
+      source: "return",
+      effectiveOn: "2026-02-04",
+      orderCount: -1,
+      periodSequence: 2,
+    });
+    expect(byOrderNo.get("personal:VO-PERSONAL-1")).toMatchObject({
       source: "personal",
       place: "电信",
       effectiveOn: "2026-01-20",
@@ -883,10 +978,11 @@ describe("大区经理个人渠道提成", () => {
       orderCount: 2,
       periodSequence: 1,
     });
-    expect(byOrderNo.get("XLXDD-VO-E")).toBeUndefined();
-    expect(byOrderNo.get("XLXDD-VO-C")).toBeUndefined();
-    expect(byOrderNo.get("XLXDD-VO-D")).toBeUndefined();
-    expect(byOrderNo.get("VO-PERSONAL-2")).toBeUndefined();
+    expect(byOrderNo.get("store:XLXDD-VO-E")).toBeUndefined();
+    expect(byOrderNo.get("store:XLXDD-VO-C")).toBeUndefined();
+    expect(byOrderNo.get("store:XLXDD-VO-D")).toBeUndefined();
+    expect(byOrderNo.get("personal:VO-PERSONAL-2")).toBeUndefined();
+    expect(detail.items.reduce((sum, item) => sum + item.orderCount, 0)).toBe(detail.orderCount);
     await client.close();
   });
 });
