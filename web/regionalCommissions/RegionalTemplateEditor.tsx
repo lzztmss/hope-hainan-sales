@@ -233,6 +233,8 @@ export const RegionalTemplateEditor = ({
   const [changeReason, setChangeReason] = useState("");
   const changeReasonInput = useRef<HTMLInputElement>(null);
   const [actionDate, setActionDate] = useState(shanghaiToday);
+  // 分配生效日期早于模板生效日时，需要管理员在弹窗中再次确认才会提交。
+  const [pendingBackdateReason, setPendingBackdateReason] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState({
     name: "海南大区经理提成",
     effectiveFrom: shanghaiToday(),
@@ -1030,7 +1032,11 @@ export const RegionalTemplateEditor = ({
                         type="button"
                         onClick={() => {
                           const reason = requireReason();
-                          if (!reason || !managerId) return;
+                          if (!reason || !managerId || !selected) return;
+                          if (actionDate < selected.effectiveFrom) {
+                            setPendingBackdateReason(reason);
+                            return;
+                          }
                           void run(
                             () =>
                               client.assignRegionalTemplate({
@@ -1084,6 +1090,35 @@ export const RegionalTemplateEditor = ({
               setOperationFeedback(null);
               setSelectedId(pendingSwitchTemplate.id);
             }}>放弃修改并切换</button>
+          </div>
+        </section>
+      </div> : null}
+      {pendingBackdateReason !== null && selected ? <div className="regional-template-switch-backdrop" role="presentation">
+        <section aria-labelledby="regional-template-backdate-title" aria-modal="true" className="regional-template-switch-dialog" role="alertdialog">
+          <h2 id="regional-template-backdate-title">确认倒填分配生效日期</h2>
+          <p>
+            分配生效日期 {actionDate} 早于模板生效日期 {selected.effectiveFrom}。确认后，
+            该日期起签收满 7 天且尚未结算的订单会按“{selected.name} · 第 {selected.versionNo} 版”的规则补算提成；
+            已确认或已发放的历史结算不会重复计发。请确认日期填写无误。
+          </p>
+          <div className="regional-form-actions">
+            <button autoFocus className="regional-secondary-action" type="button" onClick={() => setPendingBackdateReason(null)}>返回修改日期</button>
+            <button className="regional-danger-action" type="button" disabled={busy} onClick={() => {
+              const reason = pendingBackdateReason;
+              setPendingBackdateReason(null);
+              if (!reason || !managerId) return;
+              void run(
+                () =>
+                  client.assignRegionalTemplate({
+                    managerId,
+                    templateVersionId: selected.id,
+                    effectiveFrom: actionDate,
+                    reason,
+                    confirmBackdated: true,
+                }),
+                "模板已分配给大区经理",
+              ).then((success) => success ? onAssignmentChange?.() : undefined);
+            }}>确认倒填并分配</button>
           </div>
         </section>
       </div> : null}

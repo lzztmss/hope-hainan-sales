@@ -497,8 +497,23 @@ describe("大区经理个人渠道提成", () => {
       managerId: "regional",
       templateVersionId: first!.id,
       effectiveFrom: "2026-01-14",
-      reason: "倒填日期",
-    })).rejects.toThrow("不能早于模板生效日期");
+      reason: "倒填日期未确认",
+    })).rejects.toThrow("需要确认：分配生效日期早于模板生效日期");
+    await service.assignTemplate(admin, {
+      managerId: "regional",
+      templateVersionId: first!.id,
+      effectiveFrom: "2026-01-14",
+      reason: "确认倒填到模板生效日之前",
+      confirmBackdated: true,
+    });
+    const backdated = await client.db.select().from(regionalCommissionTemplateAssignments);
+    expect(backdated).toHaveLength(1);
+    expect(backdated[0]).toMatchObject({
+      templateVersionId: first!.id,
+      effectiveFrom: "2026-01-14",
+      effectiveTo: null,
+      reason: "确认倒填到模板生效日之前",
+    });
     await client.close();
   });
 

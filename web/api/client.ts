@@ -661,7 +661,7 @@ export interface ApiClient {
   copyRegionalTemplate(id: string, input: { name?: string; effectiveFrom: string; reason: string }): Promise<RegionalTemplateDto>;
   publishRegionalTemplate(id: string, reason: string): Promise<RegionalTemplateDto>;
   stopRegionalTemplate(id: string, reason: string): Promise<RegionalTemplateDto>;
-  assignRegionalTemplate(input: { managerId: string; templateVersionId: string; effectiveFrom: string; reason: string }): Promise<void>;
+  assignRegionalTemplate(input: { managerId: string; templateVersionId: string; effectiveFrom: string; reason: string; confirmBackdated?: boolean }): Promise<void>;
   listRegionalCooperation(managerId: string): Promise<readonly RegionalCooperationDto[]>;
   submitRegionalCooperation(input: { managerId: string; stageCode: string; achievedOn: string; evidenceNo: string; note?: string }): Promise<RegionalCooperationDto>;
   transitionRegionalCooperation(id: string, action: "verify" | "confirm" | "revoke", reason?: string): Promise<void>;

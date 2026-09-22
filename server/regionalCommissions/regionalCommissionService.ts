@@ -411,13 +411,15 @@ export class RegionalCommissionService {
     return row;
   }
 
-  async assignTemplate(actor: AuthenticatedUser, input: { managerId: string; templateVersionId: string; effectiveFrom: string; reason: string }) {
+  async assignTemplate(actor: AuthenticatedUser, input: { managerId: string; templateVersionId: string; effectiveFrom: string; reason: string; confirmBackdated?: boolean }) {
     requireRole(actor, "admin");
     if (!DATE_ONLY_PATTERN.test(input.effectiveFrom)) throw new Error("分配生效日期格式不正确");
     const template = (await this.client.db.select().from(regionalCommissionTemplateVersions).where(eq(regionalCommissionTemplateVersions.id, input.templateVersionId)))[0];
     if (!template || template.status !== "published") throw new Error("只能分配已发布模板");
-    if (input.effectiveFrom < template.effectiveFrom) {
-      throw new Error(`分配生效日期不能早于模板生效日期 ${template.effectiveFrom}`);
+    if (input.effectiveFrom < template.effectiveFrom && !input.confirmBackdated) {
+      // 允许倒填到模板生效日之前（口径 27：模板可在订单成立后补建并回溯），
+      // 但必须由操作者显式确认，避免误把日期填早。
+      throw new Error(`需要确认：分配生效日期早于模板生效日期 ${template.effectiveFrom}，该日期起满足条件的订单将按此模板补算提成（已结算月份不会重复计发）`);
     }
     const templateRules = rulesForTemplate(template.rulesSnapshot);
     const templateCycle = buildTargetPlan(
