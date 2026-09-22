@@ -88,16 +88,16 @@ export const RegionalValidOrdersDialog = ({
         </div>
         <div className="regional-table-wrap regional-valid-orders-table">
           <table>
-            <thead><tr><th>来源</th><th>订单号</th><th>营业厅 / 渠道</th><th>签收日</th><th>生效日（满7天）</th><th>归属周期</th><th>笔数</th><th>状态</th></tr></thead>
+            <thead><tr><th>序号</th><th>来源</th><th>订单号</th><th>营业厅 / 渠道</th><th>签收日</th><th>生效日（满7天）</th><th>归属周期</th><th>状态</th></tr></thead>
             <tbody>
-              {filteredItems.map((item) => <tr key={`${item.source}:${item.id}`}>
-                <td>{item.source === "store" ? "营业厅订单" : "个人渠道"}</td>
+              {filteredItems.map((item, index) => <tr key={`${item.source}:${item.id}`}>
+                <td>{index + 1}</td>
+                <td>{item.source === "store" ? "营业厅订单" : item.orderCount > 1 ? `个人渠道（${item.orderCount} 笔）` : "个人渠道"}</td>
                 <td>{item.orderNo}</td>
                 <td>{item.place}</td>
                 <td>{item.signedOn ?? "—"}</td>
                 <td>{item.effectiveOn}</td>
                 <td>{item.periodSequence ? `M${item.periodSequence}` : "范围外"}</td>
-                <td>{item.orderCount}</td>
                 <td>{statusLabel[item.status]}</td>
               </tr>)}
               {filteredItems.length === 0 ? <tr><td colSpan={8}>没有符合筛选条件的有效订单。</td></tr> : null}
@@ -106,7 +106,7 @@ export const RegionalValidOrdersDialog = ({
         </div>
         <p className="regional-inline-help">
           明细合计 {report.managedOrderCount} 笔营业厅 + {report.personalOrderCount} 笔个人渠道 = {report.orderCount} 笔，与汇总「当前版本累计有效订单」一致；
-          已整单退回的订单保留计数，其分段订单奖在退单中扣回。
+          个人渠道为手工录入，一条记录可代表多笔（在来源列标注）；已整单退回的订单保留计数，其分段订单奖在退单中扣回。
         </p>
       </> : !error ? <p className="regional-empty">正在加载有效订单明细…</p> : null}
     </section>
